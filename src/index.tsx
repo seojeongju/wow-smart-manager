@@ -1624,7 +1624,7 @@ app.get('/', (c: Context) => {
                                             <script src="/static/js/shopfloor.js?v=2"></script>
                                             <script src="/static/js/mes-schedule.js?v=1"></script>
                                             <script src="/static/js/barcode-manager.js?v=3"></script>
-                                            <script src="/static/js/help-guides.js?v=8"></script>
+                                            <script src="/static/js/help-guides.js?v=9"></script>
                                         </body>
                                     </html>
                                     `)

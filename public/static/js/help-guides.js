@@ -1057,13 +1057,14 @@ window.loadHelpHubPage = async function () {
   const content = document.getElementById('content');
   if (!content) return;
   window.setHelpContext('help');
+  window._helpHubOpenSections = new Set([0]); // 첫 메인메뉴만 펼침
 
   content.innerHTML = `
     <div class="max-w-5xl mx-auto">
       <div class="mb-6 flex flex-col sm:flex-row sm:items-end sm:justify-between gap-3">
         <div>
           <h1 class="text-2xl font-bold text-slate-800"><i class="fas fa-book-open mr-2 text-teal-600"></i>사용안내</h1>
-          <p class="text-sm text-slate-500 mt-1">메뉴별 짧은 설명서입니다. 업무 중에는 헤더의 ? 버튼으로 현재 화면 안내를 여세요.</p>
+          <p class="text-sm text-slate-500 mt-1">메인 메뉴를 펼쳐 하위 안내를 선택하세요. 업무 중에는 헤더의 ? 버튼으로 현재 화면 안내를 여세요.</p>
         </div>
         <button type="button" onclick="startHelpTour(true)"
           class="inline-flex items-center gap-2 px-4 py-2 rounded-lg border border-teal-200 bg-teal-50 text-teal-800 text-sm font-semibold hover:bg-teal-100">
@@ -1072,21 +1073,7 @@ window.loadHelpHubPage = async function () {
       </div>
 
       <div class="grid lg:grid-cols-12 gap-6">
-        <nav class="lg:col-span-4 space-y-4">
-          ${HELP_HUB_SECTIONS.map((sec, si) => `
-            <div class="bg-white border border-slate-200 rounded-xl overflow-hidden">
-              <div class="px-4 py-2.5 bg-slate-50 border-b border-slate-100 text-xs font-bold text-slate-600">${helpEsc(sec.title)}</div>
-              <div class="divide-y divide-slate-100">
-                ${sec.items.map((it, ii) => `
-                  <button type="button" onclick="helpHubShow('${it.key}')"
-                    class="help-hub-item w-full text-left px-4 py-2.5 text-sm hover:bg-teal-50 ${si === 0 && ii === 0 ? 'bg-teal-50 text-teal-800 font-semibold' : 'text-slate-700'}"
-                    data-help-key="${it.key}">
-                    ${helpEsc(it.label)}
-                    ${it.hint ? `<div class="text-[11px] text-slate-400 font-normal mt-0.5">${helpEsc(it.hint)}</div>` : ''}
-                  </button>`).join('')}
-              </div>
-            </div>`).join('')}
-        </nav>
+        <nav id="help-hub-nav" class="lg:col-span-4 space-y-2"></nav>
         <div class="lg:col-span-8">
           <div id="help-hub-article" class="bg-white border border-slate-200 rounded-xl p-6 min-h-[420px]"></div>
           <div class="mt-4 flex flex-wrap gap-2">
@@ -1102,22 +1089,73 @@ window.loadHelpHubPage = async function () {
     </div>
   `;
 
+  window.renderHelpHubNav();
   window.helpHubShow(HELP_HUB_SECTIONS[0].items[0].key);
 };
 
-window.helpHubShow = function (key) {
+window.renderHelpHubNav = function renderHelpHubNav(activeKey) {
+  const nav = document.getElementById('help-hub-nav');
+  if (!nav) return;
+  const openSet = window._helpHubOpenSections || new Set([0]);
+  const key = activeKey || window._helpHubKey || '';
+
+  nav.innerHTML = HELP_HUB_SECTIONS.map((sec, si) => {
+    const isOpen = openSet.has(si);
+    return `
+      <div class="bg-white border border-slate-200 rounded-xl overflow-hidden" data-help-section="${si}">
+        <button type="button"
+          onclick="toggleHelpHubSection(${si})"
+          class="w-full flex items-center justify-between gap-2 px-4 py-3 text-left hover:bg-slate-50 transition-colors ${isOpen ? 'bg-slate-50 border-b border-slate-100' : ''}"
+          aria-expanded="${isOpen ? 'true' : 'false'}">
+          <span class="flex items-center gap-2 min-w-0">
+            <span class="w-1.5 h-1.5 rounded-full flex-shrink-0 ${si === 0 ? 'bg-teal-500' : si === 1 ? 'bg-orange-500' : si === 2 ? 'bg-indigo-500' : 'bg-blue-500'}"></span>
+            <span class="text-sm font-bold text-slate-800 truncate">${helpEsc(sec.title)}</span>
+            <span class="text-[10px] font-semibold text-slate-400">${sec.items.length}</span>
+          </span>
+          <i class="fas fa-chevron-down text-[10px] text-slate-400 transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}"></i>
+        </button>
+        <div class="help-hub-submenu divide-y divide-slate-100 ${isOpen ? '' : 'hidden'}">
+          ${sec.items.map((it) => {
+            const active = it.key === key;
+            return `
+              <button type="button" onclick="helpHubShow('${it.key}', ${si})"
+                class="help-hub-item w-full text-left px-4 py-2.5 pl-7 text-sm hover:bg-teal-50 ${active ? 'bg-teal-50 text-teal-800 font-semibold' : 'text-slate-700'}"
+                data-help-key="${it.key}">
+                ${helpEsc(it.label)}
+                ${it.hint ? `<div class="text-[11px] text-slate-400 font-normal mt-0.5">${helpEsc(it.hint)}</div>` : ''}
+              </button>`;
+          }).join('')}
+        </div>
+      </div>`;
+  }).join('');
+};
+
+window.toggleHelpHubSection = function toggleHelpHubSection(si) {
+  if (!window._helpHubOpenSections) window._helpHubOpenSections = new Set([0]);
+  if (window._helpHubOpenSections.has(si)) {
+    window._helpHubOpenSections.delete(si);
+  } else {
+    window._helpHubOpenSections.add(si);
+  }
+  window.renderHelpHubNav(window._helpHubKey);
+};
+
+window.helpHubShow = function (key, sectionIndex) {
   window._helpHubKey = key;
+
+  // 선택된 항목의 메인메뉴가 닫혀 있으면 펼침
+  if (!window._helpHubOpenSections) window._helpHubOpenSections = new Set([0]);
+  let si = sectionIndex;
+  if (si == null || Number.isNaN(Number(si))) {
+    si = HELP_HUB_SECTIONS.findIndex((sec) => sec.items.some((it) => it.key === key));
+  }
+  if (si >= 0) window._helpHubOpenSections.add(si);
+
+  window.renderHelpHubNav(key);
+
   const { guide } = helpResolveGuide(key);
   const el = document.getElementById('help-hub-article');
   if (el) el.innerHTML = renderHelpArticle(key, guide, true);
-
-  document.querySelectorAll('.help-hub-item').forEach((btn) => {
-    if (btn.dataset.helpKey === key) {
-      btn.classList.add('bg-teal-50', 'text-teal-800', 'font-semibold');
-    } else {
-      btn.classList.remove('bg-teal-50', 'text-teal-800', 'font-semibold');
-    }
-  });
 
   const go = document.getElementById('help-hub-go');
   if (go) {
