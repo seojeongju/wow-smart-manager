@@ -1263,10 +1263,9 @@ app.get('/', (c: Context) => {
                                                                             <i class="fas fa-clipboard-list w-5 text-center mr-3 text-xs opacity-70"></i>
                                                                             <span>작업지시</span>
                                                                         </a>
-                                                                        <a href="#" data-page="mes-stub" data-tab="capa-plan" class="nav-link flex items-center px-4 py-2 rounded-lg group text-sm opacity-80" onclick="closeSidebarOnMobile()">
+                                                                        <a href="#" data-page="mes-capa" class="nav-link flex items-center px-4 py-2 rounded-lg group text-sm" onclick="closeSidebarOnMobile()">
                                                                             <i class="fas fa-sliders-h w-5 text-center mr-3 text-xs opacity-70"></i>
-                                                                            <span class="flex-1">능력 · 부하 계획</span>
-                                                                            <span class="text-[9px] font-bold px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300">준비중</span>
+                                                                            <span>능력 · 부하 계획</span>
                                                                         </a>
                                                                     </div>
                                                                 </div>
@@ -1311,10 +1310,9 @@ app.get('/', (c: Context) => {
                                                                             <i class="fas fa-chart-area w-5 text-center mr-3 text-xs opacity-70"></i>
                                                                             <span>OEE 대시보드</span>
                                                                         </a>
-                                                                        <a href="#" data-page="mes-stub" data-tab="pm" class="nav-link flex items-center px-4 py-2 rounded-lg group text-sm opacity-80" onclick="closeSidebarOnMobile()">
+                                                                        <a href="#" data-page="mes-pm" class="nav-link flex items-center px-4 py-2 rounded-lg group text-sm" onclick="closeSidebarOnMobile()">
                                                                             <i class="fas fa-tools w-5 text-center mr-3 text-xs opacity-70"></i>
-                                                                            <span class="flex-1">예방보전 (PM)</span>
-                                                                            <span class="text-[9px] font-bold px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300">준비중</span>
+                                                                            <span>예방보전 (PM)</span>
                                                                         </a>
                                                                     </div>
                                                                 </div>
@@ -1333,10 +1331,9 @@ app.get('/', (c: Context) => {
                                                                             <i class="fas fa-check-double w-5 text-center mr-3 text-xs opacity-70"></i>
                                                                             <span>검사 · NCR</span>
                                                                         </a>
-                                                                        <a href="#" data-page="mes-stub" data-tab="spc" class="nav-link flex items-center px-4 py-2 rounded-lg group text-sm opacity-80" onclick="closeSidebarOnMobile()">
+                                                                        <a href="#" data-page="mes-spc" class="nav-link flex items-center px-4 py-2 rounded-lg group text-sm" onclick="closeSidebarOnMobile()">
                                                                             <i class="fas fa-chart-line w-5 text-center mr-3 text-xs opacity-70"></i>
-                                                                            <span class="flex-1">SPC 관리도</span>
-                                                                            <span class="text-[9px] font-bold px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300">준비중</span>
+                                                                            <span>SPC 관리도</span>
                                                                         </a>
                                                                     </div>
                                                                 </div>
@@ -1610,7 +1607,7 @@ app.get('/', (c: Context) => {
                                             <script src="/static/js/utils.js?v=2"></script>
                                             <script src="/static/js/utils_address.js?v=1"></script>
                                             <script src="/static/js/auth.js?v=2"></script>
-                                            <script src="/static/app.js?v=53"></script>
+                                            <script src="/static/app.js?v=54"></script>
                                             <script src="/static/js/outbound.js?v=13"></script>
                                             <script src="/static/js/purchases.js?v=5"></script>
                                             <script src="/static/js/options.js?v=1"></script>
@@ -1623,12 +1620,13 @@ app.get('/', (c: Context) => {
                                             <script src="/static/js/finance.js?v=2"></script>
                                             <script src="/static/js/erp-procurement.js?v=2"></script>
                                             <script src="/static/js/mes-oee.js?v=2"></script>
+                                            <script src="/static/js/mes-phase2.js?v=1"></script>
                                             <script src="/static/js/qr-mes.js?v=6"></script>
                                             <script src="/static/js/production.js?v=15"></script>
                                             <script src="/static/js/shopfloor.js?v=2"></script>
                                             <script src="/static/js/mes-schedule.js?v=1"></script>
                                             <script src="/static/js/barcode-manager.js?v=3"></script>
-                                            <script src="/static/js/help-guides.js?v=10"></script>
+                                            <script src="/static/js/help-guides.js?v=11"></script>
                                         </body>
                                     </html>
                                     `)

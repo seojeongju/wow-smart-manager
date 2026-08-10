@@ -714,7 +714,49 @@ const HELP_GUIDES = {
     tips: ['성능(P)은 이상 사이클 미정의 시 100%로 계산됩니다.', '설비 상태에서 이벤트를 먼저 쌓으세요.'],
     related: [
       { label: '설비 상태', page: 'mes-equipment' },
+      { label: '예방보전', page: 'mes-pm' },
       { label: '제조 KPI', page: 'production', tab: 'kpi' }
+    ]
+  },
+  'mes-pm': {
+    title: '예방보전 (PM)',
+    summary: '설비별 주기 보전 계획을 만들고 일정·작업을 처리합니다.',
+    steps: [
+      '설비를 골라 주기(일)·체크리스트를 등록합니다.',
+      '생성된 일정에서 [시작]하면 설비 상태가 보전으로 기록됩니다.',
+      '[완료]하면 대기 상태로 돌아가고 다음 일정이 생성됩니다.'
+    ],
+    tips: ['지연된 일정은 대시보드의 지연 건수로 확인하세요.'],
+    related: [
+      { label: '설비 상태', page: 'mes-equipment' },
+      { label: 'OEE', page: 'mes-oee' }
+    ]
+  },
+  'mes-spc': {
+    title: 'SPC 관리도',
+    summary: '측정 특성을 등록하고 개체관리도(평균±3σ)·규격 이탈을 봅니다.',
+    steps: [
+      '특성명·USL/LSL을 등록합니다.',
+      '측정값을 기록합니다.',
+      '차트에서 관리한계·규격 이탈을 확인합니다.'
+    ],
+    tips: ['상세 합부 검사는 검사·NCR 메뉴를 함께 사용하세요.'],
+    related: [
+      { label: '검사 · NCR', page: 'production', tab: 'quality' }
+    ]
+  },
+  'mes-capa': {
+    title: '능력 · 부하 계획',
+    summary: '설비 일일 능력 대비 열린 작업지시 부하를 비교합니다.',
+    steps: [
+      '기간(7/14/30일)을 고릅니다.',
+      '가동부하가 100%를 넘는 설비를 확인합니다.',
+      '일일 능력을 조정하거나 생산 일정을 재배치합니다.'
+    ],
+    tips: ['표준공수(공정 표준분)가 정확할수록 부하가 현실적입니다.'],
+    related: [
+      { label: '생산 일정', page: 'production', tab: 'schedule' },
+      { label: '작업지시', page: 'production', tab: 'work-orders' }
     ]
   },
   'mes-wip': {
@@ -842,9 +884,12 @@ const HELP_HUB_SECTIONS = [
       { key: 'production:shopfloor', label: '현장 실행' },
       { key: 'mes-equipment', label: '설비 상태' },
       { key: 'mes-oee', label: 'OEE 대시보드' },
+      { key: 'mes-pm', label: '예방보전 (PM)' },
       { key: 'production:quality', label: '검사 · NCR' },
+      { key: 'mes-spc', label: 'SPC 관리도' },
       { key: 'production:materials', label: '자재 · 외주' },
       { key: 'mes-wip', label: 'WIP 현황' },
+      { key: 'mes-capa', label: '능력 · 부하 계획' },
       { key: 'production:trace', label: 'Lot · 역추적' },
       { key: 'production:kpi', label: '제조 KPI · 원가' }
     ]

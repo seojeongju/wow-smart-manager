@@ -4,6 +4,7 @@ import productionTraceRouter from './production-trace'
 import productionKpiRouter from './production-kpi'
 import productionQualityRouter from './production-quality'
 import productionOpsRouter from './production-ops'
+import productionMes2Router from './production-mes2'
 import productionCostRouter from './production-cost'
 import { denyIfNoPermission } from '../utils/rbac'
 import { createCostSnapshot } from '../utils/mes-cost'
@@ -46,6 +47,7 @@ app.route('/trace', productionTraceRouter)
 app.route('/kpi', productionKpiRouter)
 app.route('/quality', productionQualityRouter)
 app.route('/ops', productionOpsRouter)
+app.route('/ops', productionMes2Router)
 app.route('/cost', productionCostRouter)
 
 type D1Like = Bindings['DB']

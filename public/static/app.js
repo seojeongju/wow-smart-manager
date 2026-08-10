@@ -835,6 +835,21 @@ async function loadPage(page, subPage = null, opts = {}) {
       if (window.loadMesWipPage) await window.loadMesWipPage();
       else content.innerHTML = '<div class="text-center py-10">MES 모듈 로딩 중...</div>';
       break;
+    case 'mes-pm':
+      updatePageTitle('예방보전 (PM)', '주기 계획 · 일정 · 보전 작업');
+      if (window.loadMesPmPage) await window.loadMesPmPage();
+      else content.innerHTML = '<div class="text-center py-10">MES 모듈 로딩 중...</div>';
+      break;
+    case 'mes-spc':
+      updatePageTitle('SPC 관리도', '측정 특성 · 관리한계 · 규격 이탈');
+      if (window.loadMesSpcPage) await window.loadMesSpcPage();
+      else content.innerHTML = '<div class="text-center py-10">MES 모듈 로딩 중...</div>';
+      break;
+    case 'mes-capa':
+      updatePageTitle('능력 · 부하 계획', '설비 능력 대비 WO 부하');
+      if (window.loadMesCapaPage) await window.loadMesCapaPage();
+      else content.innerHTML = '<div class="text-center py-10">MES 모듈 로딩 중...</div>';
+      break;
     case 'finance-ar':
       updatePageTitle('매출채권 (AR)', '미수 잔액 · 입금 · 연령분석');
       if (window.loadFinanceArPage) await window.loadFinanceArPage();
