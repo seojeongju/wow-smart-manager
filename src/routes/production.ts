@@ -507,7 +507,30 @@ app.get('/work-orders', async (c) => {
     query += ' AND (wo.wo_number LIKE ? OR p.name LIKE ? OR p.sku LIKE ?)'
     params.push(`%${search}%`, `%${search}%`, `%${search}%`)
   }
-  query += ' ORDER BY wo.created_at DESC'
+
+  const from = c.req.query('from') || ''
+  const to = c.req.query('to') || ''
+  const unscheduled = c.req.query('unscheduled') === '1'
+  if (unscheduled) {
+    query += ` AND (wo.planned_start_date IS NULL OR TRIM(wo.planned_start_date) = '')`
+  } else {
+    if (from) {
+      query += ` AND (
+        (wo.planned_start_date IS NOT NULL AND DATE(wo.planned_start_date) >= DATE(?))
+        OR (wo.planned_end_date IS NOT NULL AND DATE(wo.planned_end_date) >= DATE(?))
+      )`
+      params.push(from, from)
+    }
+    if (to) {
+      query += ` AND (
+        (wo.planned_start_date IS NOT NULL AND DATE(wo.planned_start_date) <= DATE(?))
+        OR (wo.planned_end_date IS NOT NULL AND DATE(wo.planned_end_date) <= DATE(?))
+      )`
+      params.push(to, to)
+    }
+  }
+
+  query += ' ORDER BY COALESCE(wo.planned_start_date, wo.created_at) ASC, wo.id ASC'
 
   const { results } = await DB.prepare(query).bind(...params).all()
   return c.json({ success: true, data: results })
@@ -672,6 +695,80 @@ app.put('/work-orders/:id', async (c) => {
   ).run()
 
   return c.json({ success: true, message: '작업지시가 수정되었습니다.' })
+})
+
+// 생산 일정 전용 갱신 (드래그 앤 드롭)
+app.patch('/work-orders/:id/schedule', async (c) => {
+  const { DB } = c.env
+  const tenantId = c.get('tenantId')
+  const id = c.req.param('id')
+  const body = await c.req.json<{
+    planned_start_date?: string | null
+    planned_end_date?: string | null
+    equipment_id?: number | null
+  }>()
+
+  const wo = await DB.prepare(
+    'SELECT * FROM mes_work_orders WHERE id = ? AND tenant_id = ?'
+  ).bind(id, tenantId).first<any>()
+
+  if (!wo) {
+    return c.json({ success: false, error: '작업지시를 찾을 수 없습니다.' }, 404)
+  }
+  if (['completed', 'cancelled'].includes(wo.status)) {
+    return c.json({ success: false, error: '완료/취소된 작업지시는 일정을 변경할 수 없습니다.' }, 400)
+  }
+
+  let start = body.planned_start_date !== undefined ? body.planned_start_date : wo.planned_start_date
+  let end = body.planned_end_date !== undefined ? body.planned_end_date : wo.planned_end_date
+
+  // start만 주고 end 미지정 시: 기존 기간(일)을 유지해 end 이동
+  if (
+    body.planned_start_date !== undefined &&
+    body.planned_start_date &&
+    body.planned_end_date === undefined &&
+    wo.planned_start_date &&
+    wo.planned_end_date
+  ) {
+    const oldStart = new Date(String(wo.planned_start_date).slice(0, 10) + 'T00:00:00')
+    const oldEnd = new Date(String(wo.planned_end_date).slice(0, 10) + 'T00:00:00')
+    const newStart = new Date(String(body.planned_start_date).slice(0, 10) + 'T00:00:00')
+    if (!Number.isNaN(oldStart.getTime()) && !Number.isNaN(oldEnd.getTime()) && !Number.isNaN(newStart.getTime())) {
+      const days = Math.max(0, Math.round((oldEnd.getTime() - oldStart.getTime()) / 86400000))
+      const newEnd = new Date(newStart)
+      newEnd.setDate(newEnd.getDate() + days)
+      end = newEnd.toISOString().slice(0, 10)
+    }
+  }
+
+  // 시작만 있고 종료 없으면 당일 종료
+  if (start && !end) end = String(start).slice(0, 10)
+  if (!start) {
+    start = null
+    end = null
+  }
+
+  const equipmentId =
+    body.equipment_id !== undefined ? (body.equipment_id || null) : wo.equipment_id
+
+  await DB.prepare(`
+    UPDATE mes_work_orders
+    SET planned_start_date = ?, planned_end_date = ?, equipment_id = ?,
+        updated_at = datetime('now')
+    WHERE id = ? AND tenant_id = ?
+  `).bind(start, end, equipmentId, id, tenantId).run()
+
+  const updated = await DB.prepare(`
+    SELECT wo.*,
+      p.name as product_name, p.sku as product_sku,
+      eq.name as equipment_name
+    FROM mes_work_orders wo
+    JOIN products p ON wo.product_id = p.id
+    LEFT JOIN mes_equipment eq ON wo.equipment_id = eq.id
+    WHERE wo.id = ? AND wo.tenant_id = ?
+  `).bind(id, tenantId).first()
+
+  return c.json({ success: true, message: '일정이 저장되었습니다.', data: updated })
 })
 
 app.put('/work-orders/:id/status', async (c) => {
