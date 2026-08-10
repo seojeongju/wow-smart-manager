@@ -612,6 +612,15 @@ function injectProductModal() {
                   <label class="block text-sm font-semibold text-slate-700 mb-2">상품명</label>
                   <input type="text" id="prodName" class="w-full border border-slate-300 rounded-lg px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-indigo-500 transition-shadow placeholder-slate-400">
                 </div>
+                <div class="md:col-span-2">
+                  <label class="block text-sm font-semibold text-slate-700 mb-2">
+                    <i class="fas fa-barcode mr-1 text-slate-400"></i>바코드 (EAN/Code128 등)
+                  </label>
+                  <input type="text" id="prodBarcode" autocomplete="off"
+                    class="w-full border border-slate-300 rounded-lg px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-teal-500 font-mono"
+                    placeholder="바코드건으로 스캔하거나 직접 입력 (선택)">
+                  <p class="text-xs text-slate-400 mt-1">현장 QR 입고·출고·판매에서 바코드/SKU로도 조회됩니다.</p>
+                </div>
               </div>
 
               <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -910,6 +919,8 @@ async function editProduct(id) {
     if (btnGen) btnGen.classList.add('hidden');
 
     document.getElementById('prodName').value = product.name;
+    const prodBarcode = document.getElementById('prodBarcode');
+    if (prodBarcode) prodBarcode.value = product.barcode || '';
     document.getElementById('prodCategory').value = product.category;
     document.getElementById('prodCategoryMedium').value = product.category_medium || '';
     document.getElementById('prodCategorySmall').value = product.category_small || '';
@@ -978,6 +989,7 @@ async function submitProduct(e) {
 
   const payload = {
     sku: sku,
+    barcode: document.getElementById('prodBarcode')?.value?.trim() || null,
     name: name,
     category: document.getElementById('prodCategory').value || '미분류',
     category_medium: document.getElementById('prodCategoryMedium').value || null,

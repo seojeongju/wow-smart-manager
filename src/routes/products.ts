@@ -33,8 +33,8 @@ app.get('/', async (c) => {
   }
 
   if (search) {
-    query += ' AND (p.name LIKE ? OR p.sku LIKE ?)'
-    params.push(`%${search}%`, `%${search}%`)
+    query += ' AND (p.name LIKE ? OR p.sku LIKE ? OR IFNULL(p.barcode, \'\') LIKE ?)'
+    params.push(`%${search}%`, `%${search}%`, `%${search}%`)
   }
 
   if (category) {
@@ -216,14 +216,25 @@ app.post('/', async (c) => {
     return c.json({ success: false, error: 'SKU가 이미 존재합니다.' }, 400)
   }
 
+  const barcode = body.barcode?.trim() || null
+  if (barcode) {
+    const dupBarcode = await DB.prepare(
+      'SELECT id FROM products WHERE tenant_id = ? AND barcode = ? AND is_active = 1'
+    ).bind(tenantId, barcode).first()
+    if (dupBarcode) {
+      return c.json({ success: false, error: '바코드가 이미 등록되어 있습니다.' }, 400)
+    }
+  }
+
   try {
     const result = await DB.prepare(`
-      INSERT INTO products (tenant_id, sku, name, category, category_medium, category_small, description, purchase_price, selling_price, 
+      INSERT INTO products (tenant_id, sku, barcode, name, category, category_medium, category_small, description, purchase_price, selling_price, 
                             current_stock, min_stock_alert, supplier, image_url, brand, tags, status, specifications, product_type, has_options)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).bind(
       tenantId,
       body.sku,
+      barcode,
       body.name,
       body.category || '미분류',
       body.category_medium || null,
@@ -356,6 +367,19 @@ app.put('/:id', async (c) => {
   if (body.name !== undefined) {
     updates.push('name = ?')
     params.push(body.name)
+  }
+  if (body.barcode !== undefined) {
+    const barcode = body.barcode?.trim() || null
+    if (barcode) {
+      const dupBarcode = await DB.prepare(
+        'SELECT id FROM products WHERE tenant_id = ? AND barcode = ? AND id != ? AND is_active = 1'
+      ).bind(tenantId, barcode, id).first()
+      if (dupBarcode) {
+        return c.json({ success: false, error: '바코드가 이미 등록되어 있습니다.' }, 400)
+      }
+    }
+    updates.push('barcode = ?')
+    params.push(barcode)
   }
   if (body.category !== undefined) {
     updates.push('category = ?')

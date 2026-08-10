@@ -39,6 +39,7 @@ export interface Product {
   id: number;
   tenant_id: number;
   sku: string;
+  barcode?: string | null;
   name: string;
   category: string;
   category_medium?: string;
@@ -150,6 +151,7 @@ export interface StockMovement {
 // API 요청 타입
 export interface CreateProductRequest {
   sku: string;
+  barcode?: string | null;
   name: string;
   category: string;
   category_medium?: string;
@@ -186,6 +188,7 @@ export interface CreateProductRequest {
 
 export interface UpdateProductRequest {
   name?: string;
+  barcode?: string | null;
   category?: string;
   category_medium?: string;
   category_small?: string;

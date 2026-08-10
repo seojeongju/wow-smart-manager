@@ -193,8 +193,8 @@ async function renderQRDashboardPage(container) {
 const QR_OPS = {
   inbound: {
     type: 'inbound',
-    title: 'QR 입고',
-    subtitle: '스캔 → 수량·창고 확인 → 입고 확정',
+    title: '입고 스캔',
+    subtitle: 'QR·바코드·SKU 스캔 → 수량·창고 확인 → 입고 확정',
     icon: 'fa-sign-in-alt',
     accent: 'teal',
     confirmLabel: '입고 확정',
@@ -213,8 +213,8 @@ const QR_OPS = {
   },
   outbound: {
     type: 'outbound',
-    title: 'QR 출고',
-    subtitle: '스캔 → 수량·창고 확인 → 출고 확정',
+    title: '출고 스캔',
+    subtitle: 'QR·바코드·SKU 스캔 → 수량·창고 확인 → 출고 확정',
     icon: 'fa-dolly',
     accent: 'amber',
     confirmLabel: '출고 확정',
@@ -233,8 +233,8 @@ const QR_OPS = {
   },
   sale: {
     type: 'sale',
-    title: 'QR 판매',
-    subtitle: '스캔 → 수량·단가 확인 → 판매 확정',
+    title: '판매 스캔',
+    subtitle: 'QR·바코드·SKU 스캔 → 수량·단가 확인 → 판매 확정',
     icon: 'fa-cash-register',
     accent: 'emerald',
     confirmLabel: '판매 확정',
@@ -328,8 +328,8 @@ function renderQROpsWorkspace(container, type) {
               </div>
               <div id="${op.readerId}" class="min-h-[240px] sm:min-h-[280px] flex items-center justify-center text-slate-300 text-sm p-6 text-center">
                 <div>
-                  <i class="fas fa-qrcode text-4xl mb-2 opacity-40"></i>
-                  <p>아래 버튼으로 스캔을 시작하세요</p>
+                  <i class="fas fa-barcode text-4xl mb-2 opacity-40"></i>
+                  <p>QR / 바코드 스캔을 시작하세요</p>
                 </div>
               </div>
             </div>
@@ -348,13 +348,14 @@ function renderQROpsWorkspace(container, type) {
           <div class="bg-white border border-slate-200 rounded-2xl p-3 shadow-sm">
             <label class="text-xs font-bold text-slate-500 mb-1.5 block">수동 입력 / 바코드건</label>
             <div class="flex gap-2">
-              <input id="${op.manualId}" type="text" autocomplete="off"
-                placeholder="QR 코드 입력 후 Enter"
+              <input id="${op.manualId}" type="text" autocomplete="off" autofocus
+                placeholder="QR·바코드·SKU 입력 후 Enter"
                 class="flex-1 border border-slate-300 rounded-xl px-3 py-3 text-sm font-mono ${a.ring} focus:outline-none focus:ring-2"
-                onkeypress="if(event.key==='Enter') handleManualQRInput('${type}')">
+                onkeydown="if(event.key==='Enter'){event.preventDefault();handleManualQRInput('${type}')}">
               <button onclick="handleManualQRInput('${type}')"
                 class="px-4 py-3 rounded-xl ${a.btn} text-white text-sm font-bold whitespace-nowrap">조회</button>
             </div>
+            <p class="text-[11px] text-slate-400 mt-2">USB 바코드건은 이 칸에 포커스 후 스캔하세요.</p>
           </div>
         </section>
 
@@ -365,7 +366,7 @@ function renderQROpsWorkspace(container, type) {
               <i class="fas ${op.icon} text-2xl text-slate-400"></i>
             </div>
             <p class="font-bold text-slate-700">스캔 대기</p>
-            <p class="text-sm text-slate-500 mt-1">QR을 스캔하면 여기에 상품·수량 입력창이 열립니다</p>
+            <p class="text-sm text-slate-500 mt-1">QR·바코드·SKU를 스캔하면 상품·수량 입력창이 열립니다</p>
           </div>
           <div id="${op.resultId}" class="hidden"></div>
 
@@ -382,11 +383,16 @@ function renderQROpsWorkspace(container, type) {
       </div>
     </div>
   `;
+
+  // 바코드건 입력을 위해 수동 입력창에 포커스
+  setTimeout(() => {
+    const input = document.getElementById(op.manualId);
+    if (input) input.focus();
+  }, 50);
 }
 
 async function renderQRInboundPage(container) {
   renderQROpsWorkspace(container, 'inbound');
-  await loadWarehousesForQR('inbound-warehouse');
   await loadInboundHistory();
 }
 
@@ -429,6 +435,8 @@ function buildQRResultPanel(type, data) {
   const stockClass = stock > 0 ? 'text-emerald-600' : 'text-rose-600';
   const price = Number(data.product_price) || 0;
   const disabled = (type !== 'inbound' && stock <= 0);
+  const sourceMap = { qr: 'QR', barcode: '바코드', sku: 'SKU' };
+  const sourceLabel = sourceMap[data.scan_source] || '스캔';
 
   let extraFields = '';
   if (type === 'sale') {
@@ -481,12 +489,13 @@ function buildQRResultPanel(type, data) {
 
   return `
     <div class="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden">
-      <div class="px-4 py-3 ${a.bar} text-white flex items-center justify-between">
-        <div class="flex items-center gap-2">
+      <div class="px-4 py-3 ${a.bar} text-white flex items-center justify-between gap-2">
+        <div class="flex items-center gap-2 min-w-0">
           <i class="fas fa-check-circle"></i>
-          <span class="font-bold">스캔 완료 — 정보 확인 후 확정</span>
+          <span class="font-bold truncate">스캔 완료 — 정보 확인 후 확정</span>
+          <span class="text-[10px] bg-white/20 px-2 py-0.5 rounded-full whitespace-nowrap">${sourceLabel}</span>
         </div>
-        <span class="text-xs bg-white/20 px-2 py-0.5 rounded-full font-mono">${escapeQrHtml(data.qr_code || '')}</span>
+        <span class="text-xs bg-white/20 px-2 py-0.5 rounded-full font-mono truncate max-w-[40%]">${escapeQrHtml(data.qr_code || '')}</span>
       </div>
       <div class="p-4 space-y-4">
         <div class="flex items-start gap-3 p-3 rounded-xl ${a.soft} border">
@@ -498,7 +507,8 @@ function buildQRResultPanel(type, data) {
             <div class="mt-1 flex flex-wrap gap-3 text-sm">
               <span>재고 <strong class="${stockClass}">${stock}</strong></span>
               ${type === 'sale' ? `<span>기준가 <strong>${price.toLocaleString()}원</strong></span>` : ''}
-              ${data.sku ? `<span class="text-slate-500 font-mono text-xs">${escapeQrHtml(data.sku)}</span>` : ''}
+              ${data.sku ? `<span class="text-slate-500 font-mono text-xs">SKU ${escapeQrHtml(data.sku)}</span>` : ''}
+              ${data.barcode ? `<span class="text-slate-500 font-mono text-xs"><i class="fas fa-barcode mr-1"></i>${escapeQrHtml(data.barcode)}</span>` : ''}
             </div>
             ${stock === 0 && type !== 'inbound' ? '<p class="text-xs text-rose-600 mt-1 font-semibold">재고가 없어 처리할 수 없습니다</p>' : ''}
           </div>
@@ -1010,25 +1020,35 @@ async function startQRScan(type) {
   try {
     html5QrcodeScanner = new Html5Qrcode(readerId);
 
-    await html5QrcodeScanner.start(
-      { facingMode: "environment" }, // 후면 카메라 우선
-      {
-        fps: 10,
-        qrbox: { width: 250, height: 250 }
+    const formats = [];
+    if (typeof Html5QrcodeSupportedFormats !== 'undefined') {
+      const F = Html5QrcodeSupportedFormats;
+      [
+        F.QR_CODE, F.CODE_128, F.CODE_39, F.CODE_93,
+        F.EAN_13, F.EAN_8, F.UPC_A, F.UPC_E, F.ITF, F.CODABAR
+      ].forEach((f) => { if (f != null) formats.push(f); });
+    }
+
+    const config = {
+      fps: 12,
+      qrbox: (viewfinderWidth, viewfinderHeight) => {
+        const w = Math.floor(Math.min(viewfinderWidth * 0.92, 360));
+        const h = Math.floor(Math.min(viewfinderHeight * 0.38, 160));
+        return { width: Math.max(220, w), height: Math.max(100, h) };
       },
+      aspectRatio: 1.777
+    };
+    if (formats.length) config.formatsToSupport = formats;
+
+    await html5QrcodeScanner.start(
+      { facingMode: 'environment' },
+      config,
       async (decodedText) => {
-        // 스캔 성공
-        console.log(`QR 스캔 성공: ${decodedText}`);
-
-        // 스캔 중지
+        console.log(`스캔 성공: ${decodedText}`);
         await stopQRScan(type);
-
-        // 스캔된 QR 코드 처리
         await processScannedQR(decodedText, type);
       },
-      (error) => {
-        // 스캔 실패 (무시)
-      }
+      () => { /* 프레임 단위 미인식 — 무시 */ }
     );
 
     if (startBtn) startBtn.classList.add('hidden');
@@ -1037,10 +1057,10 @@ async function startQRScan(type) {
     // 스캔 가이드 표시 (type 전달)
     toggleScanGuide(true, type);
 
-    showToast('✨ 스캔 시작! QR 코드를 카메라에 비춰주세요', 'info');
+    showToast('스캔 시작 — QR 또는 바코드를 비춰주세요', 'info');
 
   } catch (error) {
-    console.error('QR 스캔 시작 실패:', error);
+    console.error('스캔 시작 실패:', error);
     showToast('❌ 카메라 접근에 실패했습니다. 권한을 확인해주세요', 'error');
     html5QrcodeScanner = null;
   }
@@ -1077,32 +1097,43 @@ async function stopQRScan(type = 'inbound') {
   toggleScanGuide(false, type);
 }
 
-// 스캔된 QR 코드 처리
+// 스캔된 QR/바코드/SKU 처리
 async function processScannedQR(qrCode, type) {
   try {
-    const res = await fetch(`/api/qr/scan/${qrCode}`, {
+    const encoded = encodeURIComponent(String(qrCode).trim());
+    const res = await fetch(`/api/qr/scan/${encoded}`, {
       headers: { 'Authorization': `Bearer ${window.authToken}` }
     });
 
     if (!res.ok) {
-      const error = await res.json();
-      throw new Error(error.error || 'QR 코드 조회 실패');
+      const error = await res.json().catch(() => ({}));
+      throw new Error(error.error || '코드 조회 실패');
     }
 
     const data = await res.json();
+    const payload = data.qr_code || {};
 
     currentScannedData = {
-      qr_code: qrCode,
-      ...data.qr_code,
+      ...payload,
+      qr_code: payload.qr_code || qrCode,
       type
-    };    // 스캔 결과 표시
+    };
     displayScannedResult(currentScannedData, type);
 
-    showToast('✅ QR 코드 스캔 성공!', 'success');
+    const sourceMap = { qr: 'QR', barcode: '바코드', sku: 'SKU' };
+    const src = sourceMap[payload.scan_source] || '스캔';
+    showToast(`✅ ${src} 인식 성공`, 'success');
 
   } catch (error) {
-    console.error('QR 스캔 처리 실패:', error);
-    showToast(error.message || 'QR 코드 처리에 실패했습니다', 'error');
+    console.error('스캔 처리 실패:', error);
+    showToast(error.message || '스캔 처리에 실패했습니다', 'error');
+    // 실패 시 바코드건 재입력을 위해 포커스 복구
+    const op = QR_OPS[type];
+    const input = document.getElementById(op?.manualId);
+    if (input) {
+      input.focus();
+      input.select();
+    }
   }
 }
 
@@ -1132,12 +1163,15 @@ async function handleManualQRInput(type) {
   const qrCode = input?.value?.trim();
 
   if (!qrCode) {
-    showToast('QR 코드를 입력하세요', 'error');
+    showToast('QR·바코드·SKU를 입력하세요', 'error');
     return;
   }
 
   await processScannedQR(qrCode, type);
-  if (input) input.value = '';
+  if (input) {
+    input.value = '';
+    input.focus();
+  }
 }
 
 async function confirmQRInbound() {

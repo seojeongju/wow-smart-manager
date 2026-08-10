@@ -1327,12 +1327,12 @@ app.get('/', (c: Context) => {
                                             <script src="/static/js/outbound.js?v=10"></script>
                                             <script src="/static/js/purchases.js?v=1"></script>
                                             <script src="/static/js/options.js?v=1"></script>
-                                            <script src="/static/js/products.js?v=7"></script>
+                                            <script src="/static/js/products.js?v=8"></script>
                                             <script src="/static/js/prices.js?v=1"></script>
                                             <script src="/static/js/system-settings.js?v=2"></script>
                                             <script src="/static/js/tracking.js?v=1"></script>
                                             <script src="/static/js/transaction-statement.js?v=1"></script>
-                                            <script src="/static/js/qr-mes.js?v=3"></script>
+                                            <script src="/static/js/qr-mes.js?v=4"></script>
                                             <script src="/static/js/production.js?v=9"></script>
                                             <script src="/static/js/shopfloor.js?v=1"></script>
                                         </body>
