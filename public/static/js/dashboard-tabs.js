@@ -46,7 +46,7 @@ async function loadDashboard(content, initialTab = 'erp') {
         <div class="flex gap-1 overflow-x-auto">
           <button type="button" id="dash-tab-erp" data-dash-tab="erp"
             class="px-6 py-3.5 text-sm font-bold border-b-2 -mb-px transition-colors flex items-center whitespace-nowrap border-transparent text-slate-500">
-            <i class="fas fa-store mr-2"></i>ERP
+            <i class="fas fa-store mr-2"></i>ERP 판매지표
           </button>
           <button type="button" id="dash-tab-mes" data-dash-tab="mes"
             class="px-6 py-3.5 text-sm font-bold border-b-2 -mb-px transition-colors flex items-center whitespace-nowrap border-transparent text-slate-500">
@@ -88,7 +88,7 @@ async function switchDashboardTab(tab, opts = {}) {
     if (resolved === 'mes') {
       updatePageTitle('대시보드 · MES', '제조 성과지표 · OEE · 작업지시');
     } else {
-      updatePageTitle('대시보드 · ERP', '매출 · 재고 · 오늘의 업무');
+      updatePageTitle('대시보드 · ERP 판매지표', '매출 · 재고 · 오늘의 업무');
     }
   }
 

@@ -764,7 +764,7 @@ async function loadPage(page, subPage = null, opts = {}) {
       break;
     case 'dashboard':
       updatePageTitle(
-        subPage === 'mes' ? '대시보드 · MES' : '대시보드 · ERP',
+        subPage === 'mes' ? '대시보드 · MES' : '대시보드 · ERP 판매지표',
         subPage === 'mes' ? '제조 성과지표 · OEE · 작업지시' : '매출 · 재고 · 오늘의 업무'
       );
       // 탭 셸이 이미 있으면 전체 리마운트하지 않고 패널만 전환 (탭 소실 방지)

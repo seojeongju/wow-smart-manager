@@ -21,11 +21,11 @@ const HELP_GUIDES = {
 
   // ---------- 공통 ----------
   dashboard: {
-    title: '대시보드 · ERP',
-    summary: '매출·재고·오늘의 업무를 한눈에 보는 ERP 시작 화면입니다.',
+    title: '대시보드 · ERP 판매지표',
+    summary: '매출·재고·오늘의 업무를 한눈에 보는 ERP 판매지표 화면입니다.',
     steps: [
-      '상단 탭에서 ERP / MES 성과지표를 전환합니다.',
-      'ERP 탭에서 오늘 매출·주문·재고 경고를 확인합니다.',
+      '상단 탭에서 ERP 판매지표 / MES 성과지표를 전환합니다.',
+      'ERP 판매지표 탭에서 오늘 매출·주문·재고 경고를 확인합니다.',
       '빠른 업무가 필요하면 카드/메뉴로 해당 화면으로 이동합니다.'
     ],
     tips: ['제조 지표는 MES 성과지표 탭을 이용하세요.'],
@@ -44,7 +44,7 @@ const HELP_GUIDES = {
     ],
     tips: ['기간 기본값은 최근 30일, OEE는 7일 기준입니다.'],
     related: [
-      { label: 'ERP 대시보드', page: 'dashboard', tab: 'erp' },
+      { label: 'ERP 판매지표', page: 'dashboard', tab: 'erp' },
       { label: 'OEE', page: 'mes-oee' },
       { label: '현장 실행', page: 'shopfloor' }
     ]
