@@ -1115,8 +1115,8 @@ app.get('/', (c: Context) => {
                                                                         <i class="fas fa-chevron-down text-[10px] submenu-arrow"></i>
                                                                     </button>
                                                                     <div id="mes-exec-submenu" class="nav-submenu ml-4 space-y-1 open">
-                                                                        <a href="#" data-page="shopfloor" class="nav-link flex items-center px-4 py-2 rounded-lg group text-sm" onclick="closeSidebarOnMobile()">
-                                                                            <i class="fas fa-mobile-alt w-5 text-center mr-3 text-xs opacity-70"></i>
+                                                                        <a href="#" data-page="production" data-tab="shopfloor" class="nav-link flex items-center px-4 py-2 rounded-lg group text-sm" onclick="closeSidebarOnMobile()">
+                                                                            <i class="fas fa-hard-hat w-5 text-center mr-3 text-xs opacity-70"></i>
                                                                             <span>1. 현장 실행</span>
                                                                         </a>
                                                                         <a href="#" data-page="production" data-tab="kpi" class="nav-link flex items-center px-4 py-2 rounded-lg group text-sm" onclick="closeSidebarOnMobile()">
@@ -1333,8 +1333,8 @@ app.get('/', (c: Context) => {
                                             <script src="/static/js/tracking.js?v=1"></script>
                                             <script src="/static/js/transaction-statement.js?v=1"></script>
                                             <script src="/static/js/qr-mes.js?v=4"></script>
-                                            <script src="/static/js/production.js?v=9"></script>
-                                            <script src="/static/js/shopfloor.js?v=1"></script>
+                                            <script src="/static/js/production.js?v=10"></script>
+                                            <script src="/static/js/shopfloor.js?v=2"></script>
                                         </body>
                                     </html>
                                     `)

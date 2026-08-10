@@ -34,7 +34,7 @@ window.loadProductionPage = async function (initialTab = 'kpi') {
     </div>
 
     <div class="flex mb-6 border-b border-slate-200 overflow-x-auto">
-      <button onclick="loadPage('shopfloor')" class="px-4 py-3 text-sm font-medium border-b-2 border-transparent text-slate-500 whitespace-nowrap hover:text-orange-600">1.현장실행</button>
+      <button onclick="switchMesTab('shopfloor')" id="mes-tab-shopfloor" class="px-4 py-3 text-sm font-medium border-b-2 whitespace-nowrap">1.현장실행</button>
       <button onclick="switchMesTab('kpi')" id="mes-tab-kpi" class="px-4 py-3 text-sm font-medium border-b-2 whitespace-nowrap">2.현황</button>
       <button onclick="switchMesTab('masters')" id="mes-tab-masters" class="px-4 py-3 text-sm font-medium border-b-2 whitespace-nowrap">3.기준정보</button>
       <button onclick="switchMesTab('work-orders')" id="mes-tab-work-orders" class="px-4 py-3 text-sm font-medium border-b-2 whitespace-nowrap">4.작업지시</button>
@@ -72,7 +72,7 @@ window.switchMesTab = function (tabName) {
   const alias = { boms: 'masters', processes: 'masters', equipment: 'masters' };
   const resolved = alias[tabName] || tabName;
 
-  ['kpi', 'masters', 'work-orders', 'materials', 'trace', 'quality'].forEach((t) => {
+  ['shopfloor', 'kpi', 'masters', 'work-orders', 'materials', 'trace', 'quality'].forEach((t) => {
     const btn = document.getElementById(`mes-tab-${t}`);
     if (!btn) return;
     if (t === resolved) {
@@ -84,7 +84,18 @@ window.switchMesTab = function (tabName) {
     }
   });
 
-  if (resolved === 'kpi') loadMesKpi();
+  // 현장 실행 탭 이탈 시 카메라 정리
+  if (resolved !== 'shopfloor' && typeof window.sfStopScan === 'function') {
+    window.sfStopScan();
+  }
+
+  if (resolved === 'shopfloor') {
+    if (window.loadShopfloorPage) window.loadShopfloorPage();
+    else {
+      const c = document.getElementById('mes-tab-content');
+      if (c) c.innerHTML = '<div class="text-center py-10 text-slate-500">현장 모듈 로딩 중...</div>';
+    }
+  } else if (resolved === 'kpi') loadMesKpi();
   else if (resolved === 'masters') loadMesMasters(tabName === 'processes' ? 'processes' : tabName === 'equipment' ? 'equipment' : 'boms');
   else if (resolved === 'work-orders') loadMesWorkOrders();
   else if (resolved === 'materials') loadMesMaterials();

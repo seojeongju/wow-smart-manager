@@ -307,11 +307,13 @@ async function loadPage(page, subPage = null) {
       break;
     case 'shopfloor':
       updatePageTitle('현장 실행', '작업지시 · QR 스캔 · 투입/공정/실적');
-      if (window.loadShopfloorPage) await window.loadShopfloorPage();
+      if (window.loadProductionPage) await window.loadProductionPage('shopfloor');
+      else if (window.loadShopfloorPage) await window.loadShopfloorPage();
       else content.innerHTML = '<div class="text-center py-10">현장 모듈 로딩 중...</div>';
       break;
     case 'production': {
       const mesTitles = {
+        shopfloor: ['현장 실행', '작업지시 · QR 스캔 · 투입/공정/실적'],
         kpi: ['제조 현황', 'KPI · 원가 · 월간 성과'],
         masters: ['기준정보', 'BOM · 공정 · 설비 마스터'],
         'work-orders': ['작업지시', '생산계획 · 실적 · 재고연동'],

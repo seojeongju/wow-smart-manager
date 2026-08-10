@@ -1,4 +1,4 @@
-// Phase 6 — 현장 실행 UX (모바일 스캔 우선)
+// 현장 실행 — MES 공통 셸 내부 탭 (다른 MES 페이지와 동일 디자인)
 
 const SF_STATUS_LABEL = {
   planned: '계획',
@@ -9,11 +9,11 @@ const SF_STATUS_LABEL = {
 };
 
 const SF_STATUS_CLASS = {
-  planned: 'bg-slate-200 text-slate-700',
-  released: 'bg-sky-100 text-sky-800',
-  in_progress: 'bg-amber-100 text-amber-900',
-  completed: 'bg-emerald-100 text-emerald-800',
-  cancelled: 'bg-rose-100 text-rose-800'
+  planned: 'bg-slate-100 text-slate-700',
+  released: 'bg-blue-100 text-blue-700',
+  in_progress: 'bg-amber-100 text-amber-800',
+  completed: 'bg-emerald-100 text-emerald-700',
+  cancelled: 'bg-rose-100 text-rose-700'
 };
 
 const SF_EVENT_LABEL = {
@@ -25,14 +25,14 @@ const SF_EVENT_LABEL = {
 };
 
 const SF_ACTIONS = [
-  { id: 'issue', label: '자재 투입', icon: 'fa-box-open', color: 'bg-blue-600' },
-  { id: 'process', label: '공정 완료', icon: 'fa-cogs', color: 'bg-amber-600' },
-  { id: 'pack', label: '완제품 포장', icon: 'fa-cube', color: 'bg-violet-600' },
-  { id: 'record', label: '실적 등록', icon: 'fa-check-double', color: 'bg-emerald-600' }
+  { id: 'issue', label: '자재 투입', icon: 'fa-box-open', color: 'bg-blue-600 hover:bg-blue-700' },
+  { id: 'process', label: '공정 완료', icon: 'fa-cogs', color: 'bg-amber-600 hover:bg-amber-700' },
+  { id: 'pack', label: '완제품 포장', icon: 'fa-cube', color: 'bg-violet-600 hover:bg-violet-700' },
+  { id: 'record', label: '실적 등록', icon: 'fa-check-double', color: 'bg-emerald-600 hover:bg-emerald-700' }
 ];
 
 window._sfState = {
-  filter: 'active', // active | in_progress | released | all
+  filter: 'active',
   selectedWo: null,
   action: 'issue',
   processes: [],
@@ -40,38 +40,54 @@ window._sfState = {
 };
 
 window.loadShopfloorPage = async function () {
-  const content = document.getElementById('content');
+  // MES 탭 안으로 렌더 (없으면 content — 하위 호환)
+  const content = document.getElementById('mes-tab-content') || document.getElementById('content');
+  if (!content) return;
+
   content.innerHTML = `
-    <div class="max-w-xl mx-auto pb-24">
-      <div class="mb-4">
-        <h1 class="text-xl font-bold text-slate-800 flex items-center gap-2">
-          <i class="fas fa-mobile-alt text-orange-600"></i>현장 실행
-        </h1>
-        <p class="text-sm text-slate-500 mt-1">작업지시 선택 → 스캔 → 투입/공정/포장/실적</p>
+    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
+      <div>
+        <h2 class="text-lg font-bold text-slate-800">
+          <i class="fas fa-hard-hat mr-2 text-orange-600"></i>현장 실행
+        </h2>
+        <p class="text-sm text-slate-500 mt-0.5">작업지시 선택 → QR 스캔 → 투입 / 공정 / 포장 / 실적</p>
+      </div>
+      <div class="flex flex-wrap gap-2 items-center">
+        <select id="sf-filter" onchange="sfSetFilter(this.value)"
+          class="border border-slate-300 rounded-lg px-3 py-2 text-sm bg-white">
+          <option value="active">오늘 작업 (확정·진행)</option>
+          <option value="in_progress">진행중</option>
+          <option value="released">확정</option>
+          <option value="all">전체</option>
+        </select>
+        <button type="button" onclick="sfLoadWorkOrders()"
+          class="px-3 py-2 border border-slate-300 rounded-lg text-sm text-slate-600 hover:bg-slate-50">
+          <i class="fas fa-sync-alt mr-1"></i>새로고침
+        </button>
+      </div>
+    </div>
+
+    <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+      <div class="lg:col-span-5">
+        <div class="bg-white border border-slate-200 rounded-xl overflow-hidden">
+          <div class="px-4 py-3 border-b border-slate-100 flex items-center justify-between">
+            <h3 class="text-sm font-bold text-slate-700"><i class="fas fa-clipboard-list mr-2 text-orange-600"></i>작업지시</h3>
+            <span id="sf-wo-count" class="text-xs text-slate-400"></span>
+          </div>
+          <div id="sf-wo-list" class="divide-y divide-slate-100 max-h-[70vh] overflow-y-auto">
+            <div class="text-center py-12 text-slate-400"><i class="fas fa-spinner fa-spin text-2xl"></i></div>
+          </div>
+        </div>
       </div>
 
-      <div id="sf-view-list">
-        <div class="flex gap-2 mb-3 overflow-x-auto pb-1">
-          ${[
-            ['active', '오늘 작업'],
-            ['in_progress', '진행중'],
-            ['released', '확정'],
-            ['all', '전체']
-          ].map(([k, label]) => `
-            <button type="button" onclick="sfSetFilter('${k}')"
-              id="sf-filter-${k}"
-              class="px-3 py-2 rounded-full text-sm font-medium whitespace-nowrap border ${k === 'active' ? 'bg-orange-600 text-white border-orange-600' : 'bg-white text-slate-600 border-slate-200'}">
-              ${label}
-            </button>`).join('')}
-        </div>
-        <div id="sf-wo-list" class="space-y-3">
-          <div class="text-center py-12 text-slate-400"><i class="fas fa-spinner fa-spin text-2xl"></i></div>
-        </div>
+      <div class="lg:col-span-7" id="sf-view-detail">
+        ${sfEmptyDetailHtml()}
       </div>
-
-      <div id="sf-view-detail" class="hidden"></div>
     </div>
   `;
+
+  const filterEl = document.getElementById('sf-filter');
+  if (filterEl) filterEl.value = window._sfState.filter || 'active';
 
   try {
     const procRes = await axios.get(`${API_BASE}/production/processes`);
@@ -81,19 +97,27 @@ window.loadShopfloorPage = async function () {
   }
 
   await sfLoadWorkOrders();
+
+  if (window._sfState.selectedWo?.id) {
+    await sfOpenWorkOrder(window._sfState.selectedWo.id);
+  }
 };
+
+function sfEmptyDetailHtml() {
+  return `
+    <div class="bg-white border border-dashed border-slate-300 rounded-xl p-10 text-center min-h-[420px] flex flex-col items-center justify-center">
+      <div class="w-14 h-14 rounded-xl bg-orange-50 flex items-center justify-center mb-3">
+        <i class="fas fa-hand-pointer text-xl text-orange-500"></i>
+      </div>
+      <p class="font-bold text-slate-700">작업지시를 선택하세요</p>
+      <p class="text-sm text-slate-500 mt-1">왼쪽 목록에서 WO를 고르면 스캔·실행 패널이 열립니다</p>
+    </div>`;
+}
 
 window.sfSetFilter = function (filter) {
   window._sfState.filter = filter;
-  ['active', 'in_progress', 'released', 'all'].forEach((k) => {
-    const btn = document.getElementById(`sf-filter-${k}`);
-    if (!btn) return;
-    if (k === filter) {
-      btn.className = 'px-3 py-2 rounded-full text-sm font-medium whitespace-nowrap border bg-orange-600 text-white border-orange-600';
-    } else {
-      btn.className = 'px-3 py-2 rounded-full text-sm font-medium whitespace-nowrap border bg-white text-slate-600 border-slate-200';
-    }
-  });
+  const el = document.getElementById('sf-filter');
+  if (el && el.value !== filter) el.value = filter;
   sfLoadWorkOrders();
 };
 
@@ -113,76 +137,81 @@ async function sfLoadWorkOrders() {
       rows = rows.filter((w) => w.status === filter);
     }
 
+    const countEl = document.getElementById('sf-wo-count');
+    if (countEl) countEl.textContent = `${rows.length}건`;
+
     if (!rows.length) {
       list.innerHTML = `
-        <div class="bg-white border border-dashed border-slate-300 rounded-2xl p-8 text-center">
+        <div class="p-8 text-center">
           <i class="fas fa-clipboard-list text-3xl text-slate-300 mb-3"></i>
           <p class="text-slate-500 text-sm">표시할 작업지시가 없습니다.</p>
-          <p class="text-xs text-slate-400 mt-1">관리 화면에서 작업지시를 확정(released)해 주세요.</p>
+          <p class="text-xs text-slate-400 mt-1">작업지시 탭에서 확정(released)해 주세요.</p>
         </div>`;
       return;
     }
 
+    const selectedId = window._sfState.selectedWo?.id;
     list.innerHTML = rows.map((w) => {
       const pct = w.planned_qty > 0
         ? Math.min(100, Math.round((Number(w.completed_qty || 0) / Number(w.planned_qty)) * 100))
         : 0;
+      const active = Number(selectedId) === Number(w.id);
       return `
         <button type="button" onclick="sfOpenWorkOrder(${w.id})"
-          class="w-full text-left bg-white border border-slate-200 rounded-2xl p-4 shadow-sm active:scale-[0.99] transition hover:border-orange-300">
+          class="w-full text-left px-4 py-3 hover:bg-orange-50/60 transition ${active ? 'bg-orange-50 border-l-4 border-orange-500' : 'border-l-4 border-transparent'}">
           <div class="flex items-start justify-between gap-2">
-            <div>
-              <div class="font-bold text-slate-800">${escapeHtml(w.wo_number)}</div>
-              <div class="text-sm text-slate-600 mt-0.5">${escapeHtml(w.product_name || '')}</div>
-              <div class="text-xs text-slate-400 mt-1">${escapeHtml(w.product_sku || '')}${w.process_name ? ` · ${escapeHtml(w.process_name)}` : ''}</div>
+            <div class="min-w-0">
+              <div class="font-bold text-slate-800 text-sm">${escapeHtml(w.wo_number)}</div>
+              <div class="text-sm text-slate-600 mt-0.5 truncate">${escapeHtml(w.product_name || '')}</div>
+              <div class="text-xs text-slate-400 mt-1 truncate">${escapeHtml(w.product_sku || '')}${w.process_name ? ` · ${escapeHtml(w.process_name)}` : ''}</div>
             </div>
-            <span class="text-xs px-2 py-1 rounded-full font-medium ${SF_STATUS_CLASS[w.status] || 'bg-slate-100'}">${SF_STATUS_LABEL[w.status] || w.status}</span>
+            <span class="text-xs px-2 py-1 rounded-full font-medium whitespace-nowrap ${SF_STATUS_CLASS[w.status] || 'bg-slate-100'}">${SF_STATUS_LABEL[w.status] || w.status}</span>
           </div>
-          <div class="mt-3">
+          <div class="mt-2">
             <div class="flex justify-between text-xs text-slate-500 mb-1">
-              <span>실적 ${Number(w.completed_qty || 0)} / ${Number(w.planned_qty || 0)}</span>
+              <span>${Number(w.completed_qty || 0)} / ${Number(w.planned_qty || 0)}</span>
               <span>${pct}%</span>
             </div>
-            <div class="h-2 bg-slate-100 rounded-full overflow-hidden">
+            <div class="h-1.5 bg-slate-100 rounded-full overflow-hidden">
               <div class="h-full bg-orange-500 rounded-full" style="width:${pct}%"></div>
             </div>
           </div>
-          ${w.equipment_name ? `<div class="mt-2 text-xs text-slate-500"><i class="fas fa-industry mr-1"></i>${escapeHtml(w.equipment_name)}</div>` : ''}
         </button>`;
     }).join('');
   } catch (e) {
-    list.innerHTML = `<div class="text-center py-10 text-rose-600 text-sm">${escapeHtml(e.response?.data?.error || e.message)}</div>`;
+    list.innerHTML = `<div class="text-center py-10 text-rose-600 text-sm px-4">${escapeHtml(e.response?.data?.error || e.message)}</div>`;
   }
 }
+window.sfLoadWorkOrders = sfLoadWorkOrders;
 
 window.sfOpenWorkOrder = async function (woId) {
   await sfStopScan();
   const detail = document.getElementById('sf-view-detail');
-  const listView = document.getElementById('sf-view-list');
-  if (!detail || !listView) return;
+  if (!detail) return;
 
-  detail.innerHTML = '<div class="text-center py-16 text-slate-400"><i class="fas fa-spinner fa-spin text-2xl"></i></div>';
-  listView.classList.add('hidden');
-  detail.classList.remove('hidden');
+  detail.innerHTML = '<div class="bg-white border border-slate-200 rounded-xl p-10 text-center text-slate-400"><i class="fas fa-spinner fa-spin text-2xl"></i></div>';
 
   try {
     const res = await axios.get(`${API_BASE}/production/work-orders/${woId}`);
     const wo = res.data.data;
     window._sfState.selectedWo = wo;
     if (!window._sfState.action) window._sfState.action = 'issue';
+    // 목록 선택 강조 갱신
+    await sfLoadWorkOrders();
     await sfRenderDetail();
   } catch (e) {
     detail.innerHTML = `
-      <button type="button" onclick="sfBackToList()" class="text-orange-600 text-sm mb-4"><i class="fas fa-arrow-left mr-1"></i>목록</button>
-      <div class="text-rose-600 text-sm">${escapeHtml(e.response?.data?.error || e.message)}</div>`;
+      <div class="bg-white border border-slate-200 rounded-xl p-6">
+        <div class="text-rose-600 text-sm">${escapeHtml(e.response?.data?.error || e.message)}</div>
+      </div>`;
   }
 };
 
 window.sfBackToList = async function () {
   await sfStopScan();
   window._sfState.selectedWo = null;
-  document.getElementById('sf-view-detail')?.classList.add('hidden');
-  document.getElementById('sf-view-list')?.classList.remove('hidden');
+  const detail = document.getElementById('sf-view-detail');
+  if (detail) detail.innerHTML = sfEmptyDetailHtml();
   await sfLoadWorkOrders();
 };
 
@@ -198,134 +227,140 @@ async function sfRenderDetail() {
   const processes = window._sfState.processes || [];
 
   detail.innerHTML = `
-    <button type="button" onclick="sfBackToList()" class="inline-flex items-center text-sm text-orange-700 font-medium mb-3">
-      <i class="fas fa-arrow-left mr-2"></i>작업 목록
-    </button>
-
-    <div class="bg-white border border-slate-200 rounded-2xl p-4 mb-4 shadow-sm">
-      <div class="flex justify-between items-start gap-2">
-        <div>
-          <div class="font-bold text-lg text-slate-800">${escapeHtml(wo.wo_number)}</div>
-          <div class="text-sm text-slate-600">${escapeHtml(wo.product_name || '')}</div>
-        </div>
-        <span class="text-xs px-2 py-1 rounded-full font-medium ${SF_STATUS_CLASS[wo.status] || ''}">${SF_STATUS_LABEL[wo.status] || wo.status}</span>
-      </div>
-      <div class="mt-3 text-xs text-slate-500 flex flex-wrap gap-x-3 gap-y-1">
-        <span>계획 ${Number(wo.planned_qty || 0)}</span>
-        <span>완료 ${Number(wo.completed_qty || 0)} (${pct}%)</span>
-        ${wo.warehouse_name ? `<span>창고 ${escapeHtml(wo.warehouse_name)}</span>` : ''}
-        ${wo.equipment_name ? `<span>설비 ${escapeHtml(wo.equipment_name)}</span>` : ''}
-      </div>
-      ${wo.status === 'released' ? `
-        <button type="button" onclick="sfStartWorkOrder(${wo.id})"
-          class="mt-3 w-full py-3 rounded-xl bg-amber-500 text-white font-semibold text-sm active:bg-amber-600">
-          <i class="fas fa-play mr-2"></i>작업 시작 (진행중으로 변경)
-        </button>` : ''}
-    </div>
-
-    <div class="grid grid-cols-2 gap-2 mb-4">
-      ${SF_ACTIONS.map((a) => `
-        <button type="button" onclick="sfSelectAction('${a.id}')"
-          class="py-3 px-2 rounded-xl text-sm font-semibold text-white ${a.color} ${action === a.id ? 'ring-4 ring-offset-1 ring-slate-300' : 'opacity-90'}">
-          <i class="fas ${a.icon} mr-1"></i>${a.label}
-        </button>`).join('')}
-    </div>
-
-    <div class="bg-white border border-slate-200 rounded-2xl p-4 mb-4 shadow-sm space-y-3">
-      <div class="text-sm font-semibold text-slate-700">
-        ${SF_ACTIONS.find((a) => a.id === action)?.label || '작업'}
-      </div>
-
-      ${action !== 'record' ? `
-        <div>
-          <label class="block text-xs text-slate-500 mb-1">QR 코드</label>
-          <div class="flex gap-2">
-            <input id="sf-qr" type="text" inputmode="text" autocomplete="off"
-              class="flex-1 border border-slate-300 rounded-xl px-3 py-3 text-sm font-mono"
-              placeholder="스캔 또는 직접 입력">
-            <button type="button" onclick="sfApplyManualQr()" class="px-3 py-2 rounded-xl bg-slate-100 text-slate-700 text-sm">적용</button>
-          </div>
-        </div>
-
-        <div id="sf-reader-wrap" class="rounded-xl overflow-hidden bg-slate-900 relative min-h-[180px]">
-          <div id="sf-qr-reader" class="w-full"></div>
-          <div id="sf-scan-idle" class="absolute inset-0 flex flex-col items-center justify-center text-slate-300 text-sm p-4">
-            <i class="fas fa-camera text-3xl mb-2 opacity-60"></i>
-            카메라로 QR을 스캔하세요
-          </div>
-        </div>
-        <div class="grid grid-cols-2 gap-2">
-          <button type="button" id="sf-start-scan" onclick="sfStartScan()"
-            class="py-3 rounded-xl bg-slate-800 text-white text-sm font-medium">
-            <i class="fas fa-qrcode mr-1"></i>카메라 스캔
-          </button>
-          <button type="button" id="sf-stop-scan" onclick="sfStopScan()" class="hidden py-3 rounded-xl bg-rose-600 text-white text-sm font-medium">
-            스캔 중지
-          </button>
-        </div>
-      ` : ''}
-
-      <div class="grid grid-cols-2 gap-2">
-        <div>
-          <label class="block text-xs text-slate-500 mb-1">${action === 'record' ? '양품 수량' : '수량'}</label>
-          <input id="sf-qty" type="number" min="1" value="1"
-            class="w-full border border-slate-300 rounded-xl px-3 py-3 text-sm">
-        </div>
-        ${action === 'record' ? `
+    <div class="space-y-4">
+      <div class="bg-white border border-slate-200 rounded-xl p-5">
+        <div class="flex flex-wrap items-start justify-between gap-3">
           <div>
-            <label class="block text-xs text-slate-500 mb-1">불량 수량</label>
-            <input id="sf-scrap" type="number" min="0" value="0"
-              class="w-full border border-slate-300 rounded-xl px-3 py-3 text-sm">
-          </div>` : `
-          <div>
-            <label class="block text-xs text-slate-500 mb-1">공정 (선택)</label>
-            <select id="sf-process" class="w-full border border-slate-300 rounded-xl px-3 py-3 text-sm">
-              <option value="">기본/없음</option>
-              ${processes.map((p) => `<option value="${p.id}" ${Number(wo.process_id) === Number(p.id) ? 'selected' : ''}>${escapeHtml(p.name)}</option>`).join('')}
-            </select>
-          </div>`}
-      </div>
-
-      ${action === 'record' ? `
-        <label class="flex items-center gap-2 text-sm text-slate-700">
-          <input id="sf-apply-stock" type="checkbox" checked class="rounded border-slate-300">
-          재고 즉시 반영 (자재 차감 + 완제품 입고)
-        </label>
-        <div>
-          <label class="block text-xs text-slate-500 mb-1">공정 (선택)</label>
-          <select id="sf-process" class="w-full border border-slate-300 rounded-xl px-3 py-3 text-sm">
-            <option value="">기본/없음</option>
-            ${processes.map((p) => `<option value="${p.id}" ${Number(wo.process_id) === Number(p.id) ? 'selected' : ''}>${escapeHtml(p.name)}</option>`).join('')}
-          </select>
+            <div class="flex items-center gap-2 flex-wrap">
+              <h3 class="font-bold text-lg text-slate-800">${escapeHtml(wo.wo_number)}</h3>
+              <span class="text-xs px-2 py-1 rounded-full font-medium ${SF_STATUS_CLASS[wo.status] || ''}">${SF_STATUS_LABEL[wo.status] || wo.status}</span>
+            </div>
+            <div class="text-sm text-slate-600 mt-1">${escapeHtml(wo.product_name || '')}</div>
+            <div class="mt-2 text-xs text-slate-500 flex flex-wrap gap-x-3 gap-y-1">
+              <span>계획 ${Number(wo.planned_qty || 0)}</span>
+              <span>완료 ${Number(wo.completed_qty || 0)} (${pct}%)</span>
+              ${wo.warehouse_name ? `<span>창고 ${escapeHtml(wo.warehouse_name)}</span>` : ''}
+              ${wo.equipment_name ? `<span>설비 ${escapeHtml(wo.equipment_name)}</span>` : ''}
+            </div>
+          </div>
+          ${wo.status === 'released' ? `
+            <button type="button" onclick="sfStartWorkOrder(${wo.id})"
+              class="px-4 py-2 rounded-lg bg-amber-500 hover:bg-amber-600 text-white text-sm font-semibold">
+              <i class="fas fa-play mr-1"></i>작업 시작
+            </button>` : ''}
         </div>
-      ` : ''}
-
-      ${action === 'issue' ? `
-        <p class="text-xs text-slate-500">자재 QR을 스캔한 뒤 투입합니다. 필요 시 자재 QR을 먼저 발행하세요.</p>
-        <button type="button" onclick="sfGenerateMaterialQr()" class="w-full py-2.5 rounded-xl border border-blue-300 text-blue-700 text-sm font-medium">
-          <i class="fas fa-plus mr-1"></i>자재 QR 빠른 발행
-        </button>
-      ` : ''}
-
-      ${action === 'pack' ? `
-        <p class="text-xs text-slate-500">완제품 QR이 없으면 포장 시 자동 생성됩니다.</p>
-      ` : ''}
-
-      <button type="button" onclick="sfSubmitAction()"
-        class="w-full py-4 rounded-2xl bg-orange-600 text-white text-base font-bold shadow-sm active:bg-orange-700">
-        <i class="fas fa-check mr-2"></i>확인 · 실행
-      </button>
-
-      <div id="sf-action-result" class="hidden text-sm rounded-xl px-3 py-2"></div>
-    </div>
-
-    <div class="bg-white border border-slate-200 rounded-2xl p-4 shadow-sm">
-      <div class="flex items-center justify-between mb-2">
-        <h3 class="text-sm font-semibold text-slate-700">최근 타임라인</h3>
-        <button type="button" onclick="sfRefreshTimeline()" class="text-xs text-orange-600">새로고침</button>
+        <div class="mt-3 h-2 bg-slate-100 rounded-full overflow-hidden">
+          <div class="h-full bg-orange-500 rounded-full" style="width:${pct}%"></div>
+        </div>
       </div>
-      <div id="sf-timeline" class="space-y-2 max-h-64 overflow-y-auto text-sm">
-        <div class="text-slate-400 text-center py-4 text-xs">불러오는 중...</div>
+
+      <div class="bg-white border border-slate-200 rounded-xl p-5">
+        <div class="grid grid-cols-2 sm:grid-cols-4 gap-2 mb-4">
+          ${SF_ACTIONS.map((a) => `
+            <button type="button" onclick="sfSelectAction('${a.id}')"
+              class="py-2.5 px-2 rounded-lg text-sm font-semibold text-white ${a.color} ${action === a.id ? 'ring-2 ring-offset-2 ring-slate-400' : 'opacity-90'}">
+              <i class="fas ${a.icon} mr-1"></i>${a.label}
+            </button>`).join('')}
+        </div>
+
+        <div class="border-t border-slate-100 pt-4 space-y-3">
+          <div class="text-sm font-bold text-slate-700">
+            ${SF_ACTIONS.find((a) => a.id === action)?.label || '작업'}
+          </div>
+
+          ${action !== 'record' ? `
+            <div>
+              <label class="block text-xs font-semibold text-slate-500 mb-1">QR / 바코드</label>
+              <div class="flex gap-2">
+                <input id="sf-qr" type="text" autocomplete="off"
+                  class="flex-1 border border-slate-300 rounded-lg px-3 py-2.5 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-orange-500"
+                  placeholder="스캔 또는 직접 입력"
+                  onkeydown="if(event.key==='Enter'){event.preventDefault();sfApplyManualQr();}">
+                <button type="button" onclick="sfApplyManualQr()" class="px-3 py-2 rounded-lg border border-slate-300 text-slate-700 text-sm hover:bg-slate-50">적용</button>
+              </div>
+            </div>
+
+            <div id="sf-reader-wrap" class="rounded-lg overflow-hidden bg-slate-900 relative min-h-[180px] border border-slate-700">
+              <div id="sf-qr-reader" class="w-full"></div>
+              <div id="sf-scan-idle" class="absolute inset-0 flex flex-col items-center justify-center text-slate-300 text-sm p-4">
+                <i class="fas fa-camera text-3xl mb-2 opacity-60"></i>
+                카메라로 QR/바코드를 스캔하세요
+              </div>
+            </div>
+            <div class="grid grid-cols-2 gap-2">
+              <button type="button" id="sf-start-scan" onclick="sfStartScan()"
+                class="py-2.5 rounded-lg bg-slate-800 hover:bg-slate-900 text-white text-sm font-medium">
+                <i class="fas fa-qrcode mr-1"></i>카메라 스캔
+              </button>
+              <button type="button" id="sf-stop-scan" onclick="sfStopScan()" class="hidden py-2.5 rounded-lg bg-rose-600 hover:bg-rose-700 text-white text-sm font-medium">
+                스캔 중지
+              </button>
+            </div>
+          ` : ''}
+
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+              <label class="block text-xs font-semibold text-slate-500 mb-1">${action === 'record' ? '양품 수량' : '수량'}</label>
+              <input id="sf-qty" type="number" min="1" value="1"
+                class="w-full border border-slate-300 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500">
+            </div>
+            ${action === 'record' ? `
+              <div>
+                <label class="block text-xs font-semibold text-slate-500 mb-1">불량 수량</label>
+                <input id="sf-scrap" type="number" min="0" value="0"
+                  class="w-full border border-slate-300 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500">
+              </div>` : `
+              <div>
+                <label class="block text-xs font-semibold text-slate-500 mb-1">공정 (선택)</label>
+                <select id="sf-process" class="w-full border border-slate-300 rounded-lg px-3 py-2.5 text-sm bg-white">
+                  <option value="">기본/없음</option>
+                  ${processes.map((p) => `<option value="${p.id}" ${Number(wo.process_id) === Number(p.id) ? 'selected' : ''}>${escapeHtml(p.name)}</option>`).join('')}
+                </select>
+              </div>`}
+          </div>
+
+          ${action === 'record' ? `
+            <label class="flex items-center gap-2 text-sm text-slate-700">
+              <input id="sf-apply-stock" type="checkbox" checked class="rounded border-slate-300 text-orange-600 focus:ring-orange-500">
+              재고 즉시 반영 (자재 차감 + 완제품 입고)
+            </label>
+            <div>
+              <label class="block text-xs font-semibold text-slate-500 mb-1">공정 (선택)</label>
+              <select id="sf-process" class="w-full border border-slate-300 rounded-lg px-3 py-2.5 text-sm bg-white">
+                <option value="">기본/없음</option>
+                ${processes.map((p) => `<option value="${p.id}" ${Number(wo.process_id) === Number(p.id) ? 'selected' : ''}>${escapeHtml(p.name)}</option>`).join('')}
+              </select>
+            </div>
+          ` : ''}
+
+          ${action === 'issue' ? `
+            <p class="text-xs text-slate-500">자재 QR을 스캔한 뒤 투입합니다. 필요 시 자재 QR을 먼저 발행하세요.</p>
+            <button type="button" onclick="sfGenerateMaterialQr()" class="w-full py-2.5 rounded-lg border border-blue-300 text-blue-700 text-sm font-medium hover:bg-blue-50">
+              <i class="fas fa-plus mr-1"></i>자재 QR 빠른 발행
+            </button>
+          ` : ''}
+
+          ${action === 'pack' ? `
+            <p class="text-xs text-slate-500">완제품 QR이 없으면 포장 시 자동 생성됩니다.</p>
+          ` : ''}
+
+          <button type="button" onclick="sfSubmitAction()"
+            class="w-full py-3 rounded-lg bg-orange-600 hover:bg-orange-700 text-white text-sm font-bold">
+            <i class="fas fa-check mr-2"></i>확인 · 실행
+          </button>
+
+          <div id="sf-action-result" class="hidden text-sm rounded-lg px-3 py-2"></div>
+        </div>
+      </div>
+
+      <div class="bg-white border border-slate-200 rounded-xl p-5">
+        <div class="flex items-center justify-between mb-3">
+          <h3 class="text-sm font-bold text-slate-700"><i class="fas fa-stream mr-2 text-slate-400"></i>최근 타임라인</h3>
+          <button type="button" onclick="sfRefreshTimeline()" class="text-xs text-orange-600 font-semibold hover:underline">새로고침</button>
+        </div>
+        <div id="sf-timeline" class="space-y-2 max-h-64 overflow-y-auto text-sm">
+          <div class="text-slate-400 text-center py-4 text-xs">불러오는 중...</div>
+        </div>
       </div>
     </div>
   `;
@@ -365,15 +400,28 @@ window.sfStartScan = async function () {
   try {
     const scanner = new Html5Qrcode('sf-qr-reader');
     window._sfState.scanner = scanner;
+
+    const formats = [];
+    if (typeof Html5QrcodeSupportedFormats !== 'undefined') {
+      const F = Html5QrcodeSupportedFormats;
+      [F.QR_CODE, F.CODE_128, F.EAN_13, F.EAN_8, F.CODE_39, F.UPC_A].forEach((f) => {
+        if (f != null) formats.push(f);
+      });
+    }
+    const config = {
+      fps: 12,
+      qrbox: (w, h) => ({ width: Math.min(300, Math.floor(w * 0.9)), height: Math.min(140, Math.floor(h * 0.35)) })
+    };
+    if (formats.length) config.formatsToSupport = formats;
+
     await scanner.start(
       { facingMode: 'environment' },
-      { fps: 10, qrbox: { width: 220, height: 220 } },
+      config,
       async (decodedText) => {
         const qrEl = document.getElementById('sf-qr');
         if (qrEl) qrEl.value = decodedText;
         await sfStopScan();
-        showToast('QR 스캔 완료', 'success');
-        // 투입/공정은 스캔 후 바로 실행 가능하도록 포커스만 유지
+        showToast('스캔 완료', 'success');
       },
       () => {}
     );
@@ -546,7 +594,7 @@ window.sfRefreshTimeline = async function () {
       return;
     }
     el.innerHTML = events.slice(0, 30).map((e) => `
-      <div class="border border-slate-100 rounded-xl px-3 py-2">
+      <div class="border border-slate-100 rounded-lg px-3 py-2 bg-slate-50/50">
         <div class="flex justify-between gap-2">
           <span class="font-medium text-slate-700">${SF_EVENT_LABEL[e.event_type] || e.event_type}</span>
           <span class="text-[11px] text-slate-400">${(e.created_at || '').replace('T', ' ').slice(0, 19)}</span>
