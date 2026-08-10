@@ -328,6 +328,28 @@ async function loadPage(page, subPage = null) {
       else content.innerHTML = '<div class="text-center py-10">모듈 로딩 중...</div>';
       break;
     }
+    case 'barcode':
+    case 'barcode-dashboard':
+    case 'barcode-register':
+    case 'barcode-labels': {
+      const bcAlias = {
+        barcode: 'dashboard',
+        'barcode-dashboard': 'dashboard',
+        'barcode-register': 'register',
+        'barcode-labels': 'labels'
+      };
+      const bcTab = subPage || bcAlias[page] || 'dashboard';
+      const bcTitles = {
+        dashboard: ['바코드 현황', '등록·미등록 제품 현황'],
+        register: ['바코드 등록·수정', '제품별 바코드 매핑'],
+        labels: ['바코드 라벨', 'Code128 / EAN 라벨 미리보기·출력']
+      };
+      const [bcTitle, bcDesc] = bcTitles[bcTab] || bcTitles.dashboard;
+      updatePageTitle(bcTitle, bcDesc);
+      if (window.loadBarcodePage) await window.loadBarcodePage(bcTab);
+      else content.innerHTML = '<div class="text-center py-10">바코드 모듈 로딩 중...</div>';
+      break;
+    }
     case 'qr':
     case 'qr-dashboard':
     case 'qr-inbound':
