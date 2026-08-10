@@ -331,7 +331,46 @@ async function loadPage(page, subPage = null) {
     window.syncSidebarNav(navPage, navTab);
   }
 
+  if (typeof window.setHelpContext === 'function') {
+    let helpPage = page;
+    let helpTab = subPage;
+    if (page === 'shopfloor') {
+      helpPage = 'production';
+      helpTab = 'shopfloor';
+    } else if (String(page).startsWith('qr-') || page === 'qr') {
+      helpPage = 'qr';
+      const qrAlias = {
+        'qr-dashboard': 'dashboard',
+        'qr-inbound': 'inbound',
+        'qr-outbound': 'outbound',
+        'qr-sale': 'sale',
+        'qr-management': 'management'
+      };
+      helpTab = subPage || qrAlias[page] || 'dashboard';
+    } else if (String(page).startsWith('barcode-') || page === 'barcode') {
+      helpPage = 'barcode';
+      const bcAlias = {
+        'barcode-dashboard': 'dashboard',
+        'barcode-register': 'register',
+        'barcode-labels': 'labels'
+      };
+      helpTab = subPage || bcAlias[page] || 'dashboard';
+    } else if (page === 'production') {
+      helpTab = subPage || 'kpi';
+    } else if (page === 'help') {
+      helpPage = 'help';
+      helpTab = null;
+    }
+    window.setHelpContext(helpPage, helpTab);
+  }
+
   switch (page) {
+    case 'help':
+    case 'guide':
+      updatePageTitle('사용안내', '메뉴별 기능 설명서');
+      if (window.loadHelpHubPage) await window.loadHelpHubPage();
+      else content.innerHTML = '<div class="text-center py-10">도움말 모듈 로딩 중...</div>';
+      break;
     case 'dashboard':
       updatePageTitle('대시보드', '실시간 매출 및 재고 현황');
       await loadDashboard(content);

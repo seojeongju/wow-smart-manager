@@ -78,6 +78,9 @@ window.switchBarcodeTab = function (tabName) {
   if (typeof window.syncSidebarNav === 'function') {
     window.syncSidebarNav('barcode', tabName);
   }
+  if (typeof window.setHelpContext === 'function') {
+    window.setHelpContext('barcode', tabName);
+  }
 
   if (tabName === 'dashboard') renderBarcodeDashboard();
   else if (tabName === 'register') renderBarcodeRegister();

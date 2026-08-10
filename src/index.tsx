@@ -1215,6 +1215,10 @@ app.get('/', (c: Context) => {
                                                                 시스템
                                                             </p>
                                                             <div class="space-y-1">
+                                                                <a href="#" data-page="help" class="nav-link flex items-center px-4 py-3 rounded-lg group" onclick="closeSidebarOnMobile()">
+                                                                    <i class="fas fa-book-open w-6 text-center text-lg mr-3"></i>
+                                                                    <span class="font-medium">사용안내</span>
+                                                                </a>
                                                                 <a href="#" id="nav-super-admin" data-page="super-admin" class="nav-link flex items-center px-4 py-3 rounded-lg group hidden" onclick="closeSidebarOnMobile()">
                                                                     <i class="fas fa-shield-alt w-6 text-center text-lg mr-3"></i>
                                                                     <span class="font-medium">시스템 관리</span>
@@ -1263,7 +1267,13 @@ app.get('/', (c: Context) => {
                                                             </button>
                                                             <h2 id="page-title" class="text-xl font-bold text-slate-800 truncate">대시보드</h2>
                                                         </div>
-                                                        <div class="flex items-center gap-4">
+                                                        <div class="flex items-center gap-2 sm:gap-4">
+                                                            <button type="button" id="help-page-btn" onclick="openCurrentHelp()"
+                                                              class="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-teal-200 bg-teal-50 text-teal-700 text-sm font-semibold hover:bg-teal-100 transition-colors"
+                                                              title="현재 화면 사용설명">
+                                                              <i class="fas fa-circle-question"></i>
+                                                              <span class="hidden sm:inline">도움말</span>
+                                                            </button>
                                                             <div class="text-right hidden sm:block">
                                                                 <p class="text-xs font-medium text-slate-500" id="current-date"></p>
                                                                 <p class="text-sm font-bold text-slate-700 font-mono" id="current-time"></p>
@@ -1352,7 +1362,7 @@ app.get('/', (c: Context) => {
                                             <script src="/static/js/utils.js?v=2"></script>
                                             <script src="/static/js/utils_address.js?v=1"></script>
                                             <script src="/static/js/auth.js?v=1"></script>
-                                            <script src="/static/app.js?v=39"></script>
+                                            <script src="/static/app.js?v=40"></script>
                                             <script src="/static/js/outbound.js?v=10"></script>
                                             <script src="/static/js/purchases.js?v=2"></script>
                                             <script src="/static/js/options.js?v=1"></script>
@@ -1361,11 +1371,12 @@ app.get('/', (c: Context) => {
                                             <script src="/static/js/system-settings.js?v=2"></script>
                                             <script src="/static/js/tracking.js?v=1"></script>
                                             <script src="/static/js/transaction-statement.js?v=1"></script>
-                                            <script src="/static/js/qr-mes.js?v=5"></script>
-                                            <script src="/static/js/production.js?v=13"></script>
+                                            <script src="/static/js/qr-mes.js?v=6"></script>
+                                            <script src="/static/js/production.js?v=14"></script>
                                             <script src="/static/js/shopfloor.js?v=2"></script>
                                             <script src="/static/js/mes-schedule.js?v=1"></script>
-                                            <script src="/static/js/barcode-manager.js?v=2"></script>
+                                            <script src="/static/js/barcode-manager.js?v=3"></script>
+                                            <script src="/static/js/help-guides.js?v=1"></script>
                                         </body>
                                     </html>
                                     `)

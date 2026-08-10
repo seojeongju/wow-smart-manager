@@ -1641,6 +1641,9 @@ window.switchQrTab = async function (tabName) {
       else if (page === 'qr') link.classList.remove('active');
     });
   }
+  if (typeof window.setHelpContext === 'function') {
+    window.setHelpContext('qr', tabName);
+  }
 
   const titles = {
     dashboard: ['QR 현황', '실시간 QR 작업 현황 및 통계'],

@@ -102,6 +102,9 @@ window.switchMesTab = function (tabName) {
   if (typeof window.syncSidebarNav === 'function') {
     window.syncSidebarNav('production', resolved);
   }
+  if (typeof window.setHelpContext === 'function') {
+    window.setHelpContext('production', resolved);
+  }
 
   // 현장 실행 탭 이탈 시 카메라 정리
   if (resolved !== 'shopfloor' && typeof window.sfStopScan === 'function') {
