@@ -2090,27 +2090,33 @@ async function loadMesMaterials() {
             <span>자재 소요 (미완료 WO × BOM)</span>
             <div class="flex gap-2">
               <button onclick="showMesMaterialIssueModal()" class="text-xs border px-3 py-1.5 rounded-lg hover:bg-white">자재 불출</button>
-              <button onclick="showMesMrpCreatePoModal()" class="text-xs bg-orange-600 text-white px-3 py-1.5 rounded-lg ${mrp.shortage_count ? '' : 'opacity-50'}" ${mrp.shortage_count ? '' : 'disabled'}>부족분 발주</button>
+              <button onclick="showMesMrpCreatePoModal()" class="text-xs bg-orange-600 text-white px-3 py-1.5 rounded-lg ${mrp.shortage_count ? '' : 'opacity-50'}" ${mrp.shortage_count ? '' : 'disabled'}>부족분 발주 초안</button>
             </div>
           </div>
           <div class="overflow-x-auto max-h-96">
             <table class="w-full text-sm">
               <thead class="text-xs border-b sticky top-0 bg-white"><tr>
+                <th class="px-3 py-2 text-left w-8"><input type="checkbox" id="mes-mrp-check-all" onchange="mesMrpToggleAll(this.checked)" class="rounded border-slate-300" ${mrp.shortage_count ? '' : 'disabled'}></th>
                 <th class="px-3 py-2 text-left">자재</th><th class="px-3 py-2 text-right">소요</th>
                 <th class="px-3 py-2 text-right">재고</th><th class="px-3 py-2 text-right">부족</th>
               </tr></thead>
               <tbody>
                 ${items.length ? items.map((i) => `
                   <tr class="border-t ${i.shortage_qty > 0 ? 'bg-rose-50/40' : ''}">
+                    <td class="px-3 py-2">
+                      ${i.shortage_qty > 0
+                        ? `<input type="checkbox" class="mes-mrp-check rounded border-slate-300" value="${i.product_id}" data-qty="${i.shortage_qty}" checked>`
+                        : ''}
+                    </td>
                     <td class="px-3 py-2">${i.product_name}<div class="text-xs text-slate-400">${i.product_sku || ''}</div></td>
                     <td class="px-3 py-2 text-right">${Math.round(i.required_qty * 1000) / 1000}</td>
                     <td class="px-3 py-2 text-right">${i.current_stock}</td>
                     <td class="px-3 py-2 text-right font-medium ${i.shortage_qty > 0 ? 'text-rose-600' : 'text-emerald-600'}">${Math.round(i.shortage_qty * 1000) / 1000}</td>
-                  </tr>`).join('') : '<tr><td colspan="4" class="px-3 py-8 text-center text-slate-400">미완료 작업지시·BOM이 있으면 표시됩니다.</td></tr>'}
+                  </tr>`).join('') : '<tr><td colspan="5" class="px-3 py-8 text-center text-slate-400">미완료 작업지시·BOM이 있으면 표시됩니다.</td></tr>'}
               </tbody>
             </table>
           </div>
-          <div class="px-4 py-3 border-t text-xs text-slate-500">부족분이 있으면 [부족분 발주]로 발주서를 바로 생성할 수 있습니다.</div>
+          <div class="px-4 py-3 border-t text-xs text-slate-500">부족 품목을 선택하고 [부족분 발주 초안]으로 구매 발주 초안을 만들 수 있습니다.</div>
         </div>
 
         <div class="bg-white border rounded-xl overflow-hidden">
@@ -2253,6 +2259,10 @@ window.mesOsReceive = async function (id) {
   }
 };
 
+window.mesMrpToggleAll = function (checked) {
+  document.querySelectorAll('.mes-mrp-check').forEach((el) => { el.checked = checked; });
+};
+
 window.showMesMrpCreatePoModal = async function () {
   const [mrpRes, suppliersRes] = await Promise.all([
     axios.get(`${API_BASE}/production/ops/mrp`),
@@ -2261,52 +2271,157 @@ window.showMesMrpCreatePoModal = async function () {
   const shortages = (mrpRes.data.data?.items || []).filter((i) => i.shortage_qty > 0);
   const suppliers = suppliersRes.data.data || [];
   if (!shortages.length) {
-    alert('부족 자재가 없습니다.');
+    showToast('부족 자재가 없습니다.', 'warning');
     return;
   }
   if (!suppliers.length) {
-    alert('공급사를 먼저 등록해주세요. (입고/발주 → 공급사)');
+    showToast('공급사를 먼저 등록해주세요. (입고/발주 → 공급사)', 'warning');
     return;
   }
 
+  // 목록에서 체크된 품목 우선
+  const checked = Array.from(document.querySelectorAll('.mes-mrp-check:checked')).map((el) => Number(el.value));
+  const preselect = checked.length ? new Set(checked) : null;
+
   document.getElementById('mes-modals').innerHTML = `
     <div class="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4" onclick="if(event.target===this)closeMesModal()">
-      <div class="bg-white rounded-xl w-full max-w-lg p-6 max-h-[90vh] overflow-y-auto">
-        <h3 class="text-lg font-bold mb-2">부족 자재 발주 생성</h3>
-        <p class="text-xs text-slate-500 mb-4">부족 ${shortages.length}품목을 발주서로 생성합니다. 단가는 상품 매입가를 사용합니다.</p>
-        <div class="mb-3">
-          <label class="text-sm">공급사 *</label>
-          <select id="mes-mrp-supplier" class="w-full border rounded-lg px-3 py-2 mt-1">
-            ${suppliers.map((s) => `<option value="${s.id}">${s.name}</option>`).join('')}
-          </select>
+      <div class="bg-white rounded-xl w-full max-w-2xl p-6 max-h-[90vh] overflow-y-auto">
+        <h3 class="text-lg font-bold mb-1">부족 자재 → 발주 초안</h3>
+        <p class="text-xs text-slate-500 mb-4">품목·수량을 확인한 뒤 초안으로 저장하거나 바로 발주 확정할 수 있습니다. 단가는 상품 매입가입니다.</p>
+
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-3">
+          <div>
+            <label class="text-sm font-medium">공급사 *</label>
+            <select id="mes-mrp-supplier" class="w-full border rounded-lg px-3 py-2 mt-1 text-sm">
+              ${suppliers.map((s) => `<option value="${s.id}">${s.name}</option>`).join('')}
+            </select>
+          </div>
+          <div>
+            <label class="text-sm font-medium">납기 예정일</label>
+            <input id="mes-mrp-expected" type="date" class="w-full border rounded-lg px-3 py-2 mt-1 text-sm">
+          </div>
         </div>
         <div class="mb-3">
-          <label class="text-sm">납기 예정일</label>
-          <input id="mes-mrp-expected" type="date" class="w-full border rounded-lg px-3 py-2 mt-1">
+          <label class="text-sm font-medium">메모</label>
+          <input id="mes-mrp-notes" type="text" class="w-full border rounded-lg px-3 py-2 mt-1 text-sm" placeholder="선택 사항" value="MES 자재소요(MRP) 기반 발주 초안">
         </div>
-        <div class="border rounded-lg max-h-48 overflow-y-auto text-sm mb-4">
-          ${shortages.map((i) => `<div class="px-3 py-2 border-b flex justify-between"><span>${i.product_name}</span><span class="text-rose-600 font-medium">${Math.round(i.shortage_qty * 1000) / 1000}</span></div>`).join('')}
+
+        <div class="border rounded-lg overflow-hidden mb-4">
+          <div class="px-3 py-2 bg-slate-50 border-b flex items-center justify-between text-xs">
+            <label class="inline-flex items-center gap-2 font-semibold text-slate-600">
+              <input type="checkbox" checked onchange="document.querySelectorAll('.mes-mrp-modal-check').forEach(c=>c.checked=this.checked);mesMrpModalRecalc()" class="rounded border-slate-300">
+              품목 선택
+            </label>
+            <span id="mes-mrp-modal-sum" class="text-slate-500"></span>
+          </div>
+          <div class="max-h-64 overflow-y-auto">
+            <table class="w-full text-sm">
+              <thead class="text-xs text-slate-500 border-b sticky top-0 bg-white"><tr>
+                <th class="px-3 py-2 w-8"></th>
+                <th class="px-3 py-2 text-left">자재</th>
+                <th class="px-3 py-2 text-right">부족</th>
+                <th class="px-3 py-2 text-right w-28">발주수량</th>
+                <th class="px-3 py-2 text-right">매입가</th>
+              </tr></thead>
+              <tbody>
+                ${shortages.map((i) => {
+                  const qty = Math.round(i.shortage_qty * 1000) / 1000;
+                  const checkedAttr = !preselect || preselect.has(Number(i.product_id)) ? 'checked' : '';
+                  const price = Number(i.purchase_price) || 0;
+                  return `
+                    <tr class="border-t">
+                      <td class="px-3 py-2">
+                        <input type="checkbox" class="mes-mrp-modal-check rounded border-slate-300" value="${i.product_id}" ${checkedAttr}
+                          onchange="mesMrpModalRecalc()">
+                      </td>
+                      <td class="px-3 py-2">${i.product_name}<div class="text-xs text-slate-400 font-mono">${i.product_sku || ''}</div></td>
+                      <td class="px-3 py-2 text-right text-rose-600 font-medium">${qty}</td>
+                      <td class="px-3 py-2 text-right">
+                        <input type="number" min="0.001" step="any" value="${qty}"
+                          class="mes-mrp-modal-qty w-24 border rounded-lg px-2 py-1 text-right text-sm"
+                          data-product-id="${i.product_id}" data-price="${price}"
+                          oninput="mesMrpModalRecalc()">
+                      </td>
+                      <td class="px-3 py-2 text-right text-xs text-slate-500">${price.toLocaleString()}</td>
+                    </tr>`;
+                }).join('')}
+              </tbody>
+            </table>
+          </div>
         </div>
-        <div class="flex justify-end gap-2">
-          <button onclick="closeMesModal()" class="px-4 py-2 rounded-lg border">취소</button>
-          <button onclick="submitMesMrpCreatePo()" class="px-4 py-2 rounded-lg bg-orange-600 text-white">발주 생성</button>
+
+        <div class="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-2">
+          <button type="button" onclick="closeMesModal(); if(typeof loadPage==='function') loadPage('purchases','purchases');"
+            class="text-xs text-slate-500 hover:text-orange-600 text-left">발주 목록으로 이동 →</button>
+          <div class="flex justify-end gap-2">
+            <button onclick="closeMesModal()" class="px-4 py-2 rounded-lg border text-sm">취소</button>
+            <button onclick="submitMesMrpCreatePo('DRAFT')" class="px-4 py-2 rounded-lg border border-orange-300 text-orange-700 text-sm font-semibold hover:bg-orange-50">초안 저장</button>
+            <button onclick="submitMesMrpCreatePo('ORDERED')" class="px-4 py-2 rounded-lg bg-orange-600 text-white text-sm font-semibold hover:bg-orange-700">발주 확정</button>
+          </div>
         </div>
       </div>
     </div>
   `;
+  mesMrpModalRecalc();
 };
 
-window.submitMesMrpCreatePo = async function () {
+window.mesMrpModalRecalc = function () {
+  let count = 0;
+  let total = 0;
+  document.querySelectorAll('.mes-mrp-modal-check:checked').forEach((chk) => {
+    const pid = chk.value;
+    const qtyEl = document.querySelector(`.mes-mrp-modal-qty[data-product-id="${pid}"]`);
+    const qty = Number(qtyEl?.value) || 0;
+    const price = Number(qtyEl?.dataset.price) || 0;
+    if (qty > 0) {
+      count += 1;
+      total += qty * price;
+    }
+  });
+  const el = document.getElementById('mes-mrp-modal-sum');
+  if (el) el.textContent = `선택 ${count}품목 · 예상 금액 ${Math.round(total).toLocaleString()}원`;
+};
+
+window.submitMesMrpCreatePo = async function (status = 'DRAFT') {
+  const supplierId = Number(document.getElementById('mes-mrp-supplier')?.value);
+  if (!supplierId) {
+    showToast('공급사를 선택하세요', 'warning');
+    return;
+  }
+
+  const items = [];
+  document.querySelectorAll('.mes-mrp-modal-check:checked').forEach((chk) => {
+    const pid = Number(chk.value);
+    const qtyEl = document.querySelector(`.mes-mrp-modal-qty[data-product-id="${pid}"]`);
+    const qty = Number(qtyEl?.value);
+    const price = Number(qtyEl?.dataset.price) || 0;
+    if (pid && qty > 0) items.push({ product_id: pid, quantity: qty, unit_price: price });
+  });
+
+  if (!items.length) {
+    showToast('발주할 품목을 선택하고 수량을 입력하세요', 'warning');
+    return;
+  }
+
+  const label = status === 'DRAFT' ? '발주 초안' : '발주 확정';
+  if (!confirm(`${items.length}품목을 ${label}할까요?`)) return;
+
   try {
     const res = await axios.post(`${API_BASE}/production/ops/mrp/create-po`, {
-      supplier_id: Number(document.getElementById('mes-mrp-supplier').value),
-      expected_at: document.getElementById('mes-mrp-expected').value || null
+      supplier_id: supplierId,
+      expected_at: document.getElementById('mes-mrp-expected')?.value || null,
+      notes: document.getElementById('mes-mrp-notes')?.value || null,
+      status,
+      items
     });
-    alert(`${res.data.message}\n발주번호: ${res.data.data.code}`);
+    showToast(`${res.data.message} (${res.data.data.code})`, 'success');
     closeMesModal();
     loadMesMaterials();
+    if (status === 'DRAFT' && confirm('발주 목록에서 초안을 확인할까요?')) {
+      if (typeof loadPage === 'function') loadPage('purchases', 'purchases');
+    }
   } catch (e) {
-    alert(e.response?.data?.error || e.message);
+    showToast(e.response?.data?.error || e.message, 'error');
   }
 };
 

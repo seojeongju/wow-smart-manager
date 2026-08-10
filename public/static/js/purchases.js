@@ -245,7 +245,8 @@ async function loadPurchasesList() {
                   <td class="px-6 py-4 text-xs text-slate-400">${new Date(o.created_at).toLocaleDateString()}</td>
                   <td class="px-6 py-4 text-right" onclick="event.stopPropagation()">
                     <button onclick="showPurchaseDetailModal(${o.id})" class="text-indigo-600 hover:text-indigo-800 text-xs border border-indigo-200 px-2 py-1 rounded hover:bg-indigo-50">상세/입고</button>
-                    ${o.status === 'ORDERED' ? `<button onclick="showEditPurchaseModal(${o.id})" class="text-slate-500 hover:text-slate-700 text-xs border border-slate-200 px-2 py-1 rounded hover:bg-slate-50 ml-1">수정</button><button onclick="deletePurchaseOrder(${o.id})" class="text-red-500 hover:text-red-700 text-xs border border-red-200 px-2 py-1 rounded hover:bg-red-50 ml-1">삭제</button>` : ''}
+                    ${o.status === 'ORDERED' || o.status === 'DRAFT' ? `<button onclick="showEditPurchaseModal(${o.id})" class="text-slate-500 hover:text-slate-700 text-xs border border-slate-200 px-2 py-1 rounded hover:bg-slate-50 ml-1">수정</button><button onclick="deletePurchaseOrder(${o.id})" class="text-red-500 hover:text-red-700 text-xs border border-red-200 px-2 py-1 rounded hover:bg-red-50 ml-1">삭제</button>` : ''}
+                    ${o.status === 'DRAFT' ? `<button onclick="confirmPurchaseDraft(${o.id}, '${o.code || ''}')" class="text-orange-600 hover:text-orange-800 text-xs border border-orange-200 px-2 py-1 rounded hover:bg-orange-50 ml-1">발주확정</button>` : ''}
                   </td>
                 </tr>
               `).join('')}
@@ -261,6 +262,7 @@ async function loadPurchasesList() {
 
 function getStatusClass(status) {
   switch (status) {
+    case 'DRAFT': return 'bg-slate-100 text-slate-700';
     case 'ORDERED': return 'bg-yellow-100 text-yellow-800';
     case 'PARTIAL_RECEIVED': return 'bg-blue-100 text-blue-800';
     case 'COMPLETED': return 'bg-green-100 text-green-800';
@@ -271,6 +273,7 @@ function getStatusClass(status) {
 
 function getStatusLabel(status) {
   switch (status) {
+    case 'DRAFT': return '초안';
     case 'ORDERED': return '발주완료';
     case 'PARTIAL_RECEIVED': return '부분입고';
     case 'COMPLETED': return '입고완료';
@@ -697,3 +700,19 @@ window.submitReceive = async function (poId) {
     alert(err.response?.data?.error || '입고 처리 실패');
   }
 }
+
+window.confirmPurchaseDraft = async function (poId, code) {
+  const label = code || poId;
+  if (!confirm('발주 초안 ' + label + ' 을(를) 발주완료(ORDERED)로 확정할까요?')) return;
+  try {
+    await axios.put(API_BASE + '/purchases/' + poId + '/status', { status: 'ORDERED' });
+    if (typeof showToast === 'function') showToast('발주가 확정되었습니다', 'success');
+    else alert('발주가 확정되었습니다');
+    if (typeof loadPurchasesList === 'function') loadPurchasesList();
+    else if (typeof window.loadPurchasesPage === 'function') window.loadPurchasesPage('purchases');
+  } catch (err) {
+    const msg = err.response?.data?.error || '발주 확정 실패';
+    if (typeof showToast === 'function') showToast(msg, 'error');
+    else alert(msg);
+  }
+};

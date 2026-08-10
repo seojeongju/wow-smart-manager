@@ -128,8 +128,8 @@ app.put('/:id', async (c) => {
     const po = await DB.prepare('SELECT status FROM purchase_orders WHERE id = ? AND tenant_id = ?').bind(id, tenantId).first()
     if (!po) return c.json({ success: false, error: 'Purchase Order not found' }, 404)
 
-    if (po.status !== 'ORDERED') {
-        return c.json({ success: false, error: '발주 완료(ORDERED) 상태인 경우에만 수정할 수 있습니다.' }, 400)
+    if (po.status !== 'ORDERED' && po.status !== 'DRAFT') {
+        return c.json({ success: false, error: '초안(DRAFT) 또는 발주완료(ORDERED) 상태만 수정할 수 있습니다.' }, 400)
     }
 
     if (!body.supplier_id || !body.items || body.items.length === 0) {
@@ -180,8 +180,8 @@ app.delete('/:id', async (c) => {
     if (!po) return c.json({ success: false, error: 'Purchase Order not found' }, 404)
 
     // 입고가 시작된 경우 삭제 불가
-    if (po.status !== 'ORDERED') {
-        return c.json({ success: false, error: '발주완료(ORDERED) 상태인 경우에만 삭제할 수 있습니다.' }, 400)
+    if (po.status !== 'ORDERED' && po.status !== 'DRAFT') {
+        return c.json({ success: false, error: '초안(DRAFT) 또는 발주완료(ORDERED) 상태만 삭제할 수 있습니다.' }, 400)
     }
 
     try {

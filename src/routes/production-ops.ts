@@ -21,6 +21,7 @@ app.get('/mrp', async (c) => {
       p.name as product_name,
       p.sku as product_sku,
       p.current_stock,
+      COALESCE(p.purchase_price, 0) as purchase_price,
       COALESCE(SUM(
         bi.quantity * CASE
           WHEN (wo.planned_qty - wo.completed_qty) > 0 THEN (wo.planned_qty - wo.completed_qty)
@@ -34,7 +35,7 @@ app.get('/mrp', async (c) => {
       AND wo.status IN ('planned', 'released', 'in_progress')
       AND wo.bom_id IS NOT NULL
       AND (wo.planned_qty - wo.completed_qty) > 0
-    GROUP BY bi.component_product_id, p.name, p.sku, p.current_stock
+    GROUP BY bi.component_product_id, p.name, p.sku, p.current_stock, p.purchase_price
     ORDER BY required_qty DESC
   `).bind(tenantId).all()
 
@@ -46,6 +47,7 @@ app.get('/mrp', async (c) => {
       ...r,
       required_qty: required,
       current_stock: stock,
+      purchase_price: Number(r.purchase_price) || 0,
       shortage_qty: shortage,
       status: shortage > 0 ? 'shortage' : 'ok'
     }
@@ -70,6 +72,11 @@ app.post('/mrp/create-po', async (c) => {
 
   if (!body.supplier_id) {
     return c.json({ success: false, error: '공급사를 선택해주세요.' }, 400)
+  }
+
+  const poStatus = String(body.status || 'DRAFT').toUpperCase()
+  if (!['DRAFT', 'ORDERED'].includes(poStatus)) {
+    return c.json({ success: false, error: 'status는 DRAFT 또는 ORDERED 이어야 합니다.' }, 400)
   }
 
   const supplier = await DB.prepare(
@@ -111,11 +118,28 @@ app.post('/mrp/create-po', async (c) => {
       product_id: Number(r.product_id),
       quantity: shortage,
       unit_price: Number(r.purchase_price) || 0,
-      product_name: r.product_name
+      product_name: r.product_name,
+      product_sku: r.product_sku
     }
   }).filter((i: any) => i.quantity > 0)
 
-  if (Array.isArray(body.product_ids) && body.product_ids.length) {
+  // 클라이언트가 수량/품목을 명시한 경우
+  if (Array.isArray(body.items) && body.items.length) {
+    const byId = new Map(items.map((i: any) => [i.product_id, i]))
+    items = body.items.map((row: any) => {
+      const pid = Number(row.product_id)
+      const base = byId.get(pid)
+      const qty = Number(row.quantity)
+      if (!base || !(qty > 0)) return null
+      return {
+        product_id: pid,
+        quantity: qty,
+        unit_price: row.unit_price != null ? Number(row.unit_price) : base.unit_price,
+        product_name: base.product_name,
+        product_sku: base.product_sku
+      }
+    }).filter(Boolean) as any[]
+  } else if (Array.isArray(body.product_ids) && body.product_ids.length) {
     const set = new Set(body.product_ids.map((x: any) => Number(x)))
     items = items.filter((i: any) => set.has(i.product_id))
   }
@@ -128,19 +152,23 @@ app.post('/mrp/create-po', async (c) => {
   const randomStr = Math.floor(Math.random() * 1000).toString().padStart(3, '0')
   const code = `PO-${dateStr}-${randomStr}`
   const totalAmount = items.reduce((sum: number, item: any) => sum + item.quantity * item.unit_price, 0)
+  const defaultNote = poStatus === 'DRAFT'
+    ? 'MES 자재소요(MRP) 기반 발주 초안'
+    : 'MES 자재소요(MRP) 기반 자동 발주'
 
   try {
     const poRes = await DB.prepare(`
       INSERT INTO purchase_orders (tenant_id, supplier_id, code, status, total_amount, expected_at, created_by, notes)
-      VALUES (?, ?, ?, 'ORDERED', ?, ?, ?, ?)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
     `).bind(
       tenantId,
       body.supplier_id,
       code,
+      poStatus,
       totalAmount,
       body.expected_at || null,
       userId,
-      body.notes || 'MES 자재소요(MRP) 기반 자동 발주'
+      body.notes || defaultNote
     ).run()
 
     const poId = poRes.meta.last_row_id
@@ -153,8 +181,17 @@ app.post('/mrp/create-po', async (c) => {
 
     return c.json({
       success: true,
-      message: `부족 자재 ${items.length}품목 발주가 생성되었습니다.`,
-      data: { id: poId, code, item_count: items.length, total_amount: totalAmount }
+      message: poStatus === 'DRAFT'
+        ? `부족 자재 ${items.length}품목 발주 초안이 생성되었습니다.`
+        : `부족 자재 ${items.length}품목 발주가 생성되었습니다.`,
+      data: {
+        id: poId,
+        code,
+        status: poStatus,
+        item_count: items.length,
+        total_amount: totalAmount,
+        items
+      }
     })
   } catch (e: any) {
     console.error(e)
