@@ -1,4 +1,5 @@
 ﻿import { Hono } from 'hono'
+import { linkOutboundItemLot } from '../utils/mes-distribution'
 import type { Bindings, Variables, OutboundOrder, CreateOutboundRequest, PickingRequest, PackingRequest } from '../types'
 
 const app = new Hono<{ Bindings: Bindings; Variables: Variables }>()
@@ -203,8 +204,22 @@ app.post('/direct', async (c) => {
         let totalSaleAmount = 0;
         const salesItems: any[] = [];
 
+        // Lot/QR가 있으면 라인별 처리, 없으면 기존처럼 상품별 합산
+        const hasLotLines = body.items.some((it: any) => it.qr_code || it.lot_number || it.qrCode || it.lotNumber);
+        const lineItems: Array<{ productId: number; quantity: number; qr_code?: string; lot_number?: string }> = hasLotLines
+            ? body.items.map((it: any) => ({
+                productId: Number(it.productId),
+                quantity: Number(it.quantity),
+                qr_code: it.qr_code || it.qrCode || null,
+                lot_number: it.lot_number || it.lotNumber || null
+            }))
+            : Array.from(mergedItems.entries()).map(([productId, quantity]) => ({ productId, quantity }));
+
         // 2. outbound_items 등록 및 재고 차감, 판매 데이터 준비
-        for (const [productId, quantity] of mergedItems.entries()) {
+        for (const line of lineItems) {
+            const productId = line.productId;
+            const quantity = line.quantity;
+
             // 재고 및 가격 확인 (Global Stock)
             const product = await DB.prepare('SELECT current_stock, selling_price, name FROM products WHERE id = ? AND tenant_id = ?')
                 .bind(productId, tenantId)
@@ -228,11 +243,12 @@ app.post('/direct', async (c) => {
             }
 
             // 아이템 등록
-            await DB.prepare(`
+            const itemResult = await DB.prepare(`
         INSERT INTO outbound_items (
             outbound_order_id, product_id, quantity_ordered, quantity_picked, quantity_packed, status
         ) VALUES (?, ?, ?, ?, ?, 'SHIPPED')
          `).bind(orderId, productId, quantity, quantity, quantity).run();
+            const outboundItemId = Number(itemResult.meta.last_row_id);
 
             // 1) Global 재고 차감
             await DB.prepare('UPDATE products SET current_stock = current_stock - ? WHERE id = ?')
@@ -254,11 +270,32 @@ app.post('/direct', async (c) => {
                 '간편출고', `Order: ${orderNumber}`, userId
             ).run();
 
+            // 4) Lot/QR 연결 (제조→유통)
+            if (line.qr_code || line.lot_number) {
+                await linkOutboundItemLot(DB, tenantId, userId, {
+                    outbound_item_id: outboundItemId,
+                    outbound_order_id: Number(orderId),
+                    product_id: productId,
+                    quantity,
+                    warehouse_id: warehouseId,
+                    qr_code: line.qr_code,
+                    lot_number: line.lot_number
+                });
+            }
+
             // 판매 데이터 수집
             const unitPrice = product.selling_price || 0;
             const subtotal = unitPrice * quantity;
             totalSaleAmount += subtotal;
-            salesItems.push({ productId, quantity, unitPrice, subtotal });
+            salesItems.push({
+                productId,
+                quantity,
+                unitPrice,
+                subtotal,
+                qr_code: line.qr_code,
+                lot_number: line.lot_number,
+                outboundItemId
+            });
         }
 
         // 3. outbound_packages 등록 (운송장 번호가 있는 경우)
@@ -332,10 +369,46 @@ app.post('/direct', async (c) => {
             const saleId = saleResult.meta.last_row_id;
 
             for (const item of salesItems) {
-                await DB.prepare(`
+                const si = await DB.prepare(`
                    INSERT INTO sale_items (sale_id, product_id, quantity, unit_price, subtotal)
                    VALUES (?, ?, ?, ?, ?)
                `).bind(saleId, item.productId, item.quantity, item.unitPrice, item.subtotal).run();
+
+                // 출고에서 이미 Lot 잔량 차감했으므로 sale_item_lots만 기록(잔량 재차감 방지)
+                if (item.qr_code || item.lot_number) {
+                    try {
+                        const { resolveTraceUnit, insertDistributionEvent } = await import('../utils/mes-distribution');
+                        const unit = await resolveTraceUnit(DB, tenantId, {
+                            qr_code: item.qr_code,
+                            lot_number: item.lot_number,
+                            product_id: item.productId
+                        });
+                        await DB.prepare(`
+                            INSERT INTO sale_item_lots (
+                              tenant_id, sale_item_id, sale_id, product_id,
+                              mes_lot_id, qr_code_id, lot_number, quantity, created_by
+                            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                        `).bind(
+                            tenantId, si.meta.last_row_id, saleId, item.productId,
+                            unit.mes_lot_id, unit.qr_code_id, unit.lot_number, item.quantity, userId
+                        ).run();
+                        await insertDistributionEvent(DB, tenantId, userId, {
+                            event_type: 'sale',
+                            product_id: item.productId,
+                            lot_number: unit.lot_number,
+                            quantity: item.quantity,
+                            qr_code_id: unit.qr_code_id,
+                            qr_code: unit.qr_code,
+                            work_order_id: unit.work_order_id,
+                            warehouse_id: warehouseId,
+                            reference_type: 'sale',
+                            reference_id: Number(saleId),
+                            notes: '간편출고 연계 판매 Lot/QR'
+                        });
+                    } catch (linkErr) {
+                        console.error('sale lot link from outbound:', linkErr);
+                    }
+                }
             }
         }
 

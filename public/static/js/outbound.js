@@ -464,7 +464,7 @@ function addToOutboundCart(productId) {
   if (outboundInputMode === 'manual') {
     // 수동 모드: 없으면 추가하고 포커스, 있으면 포커스만
     if (!existing) {
-      window.outboundCart.push({ product, quantity: 1 });
+      window.outboundCart.push({ product, quantity: 1, qr_code: '', lot_number: '' });
       renderOutboundCart();
     }
     // 포커스 이동 (렌더링 후 실행)
@@ -484,7 +484,7 @@ function addToOutboundCart(productId) {
       }
       existing.quantity++;
     } else {
-      window.outboundCart.push({ product, quantity: 1 });
+      window.outboundCart.push({ product, quantity: 1, qr_code: '', lot_number: '' });
     }
     renderOutboundCart();
   }
@@ -503,33 +503,45 @@ function renderOutboundCart() {
   let totalQty = 0;
   container.innerHTML = window.outboundCart.map(item => {
     totalQty += item.quantity;
+    if (item.qr_code == null) item.qr_code = '';
+    if (item.lot_number == null) item.lot_number = '';
     return `
-      <div class="flex justify-between items-center bg-slate-50 p-3 rounded-lg border border-slate-100 hover:border-teal-200 transition-colors">
-        <div class="flex-1 min-w-0 mr-4">
-          <div class="font-medium text-slate-800 text-sm truncate">${item.product.name}</div>
-          <div class="text-xs text-slate-500 font-mono">${item.product.sku}</div>
-        </div>
-        <div class="flex items-center gap-3">
-          <div class="flex items-center bg-white rounded border border-slate-200 overflow-hidden focus-within:ring-2 focus-within:ring-teal-500 focus-within:border-teal-500">
-            <button onclick="updateOutboundQty(${item.product.id}, -1)" tabindex="-1" class="w-8 h-8 flex items-center justify-center hover:bg-slate-100 text-slate-500 border-r border-slate-100 active:bg-slate-200 transition-colors">
-              <i class="fas fa-minus text-xs"></i>
-            </button>
-            <input type="number" 
-                   value="${item.quantity}" 
-                   min="1" 
-                   max="${item.product.current_stock}"
-                   data-qty-id="${item.product.id}"
-                   onchange="updateOutboundQtyFromInput(${item.product.id}, this.value)"
-                   class="w-16 h-8 text-center text-sm font-bold border-none focus:ring-0 p-0 appearance-none mx-0"
-                   onclick="this.select()"
-            >
-            <button onclick="updateOutboundQty(${item.product.id}, 1)" tabindex="-1" class="w-8 h-8 flex items-center justify-center hover:bg-slate-100 text-slate-500 border-l border-slate-100 active:bg-slate-200 transition-colors">
-              <i class="fas fa-plus text-xs"></i>
+      <div class="bg-slate-50 p-3 rounded-lg border border-slate-100 hover:border-teal-200 transition-colors space-y-2">
+        <div class="flex justify-between items-center gap-2">
+          <div class="flex-1 min-w-0">
+            <div class="font-medium text-slate-800 text-sm truncate">${item.product.name}</div>
+            <div class="text-xs text-slate-500 font-mono">${item.product.sku}</div>
+          </div>
+          <div class="flex items-center gap-2">
+            <div class="flex items-center bg-white rounded border border-slate-200 overflow-hidden focus-within:ring-2 focus-within:ring-teal-500 focus-within:border-teal-500">
+              <button onclick="updateOutboundQty(${item.product.id}, -1)" tabindex="-1" class="w-8 h-8 flex items-center justify-center hover:bg-slate-100 text-slate-500 border-r border-slate-100 active:bg-slate-200 transition-colors">
+                <i class="fas fa-minus text-xs"></i>
+              </button>
+              <input type="number" 
+                     value="${item.quantity}" 
+                     min="1" 
+                     max="${item.product.current_stock}"
+                     data-qty-id="${item.product.id}"
+                     onchange="updateOutboundQtyFromInput(${item.product.id}, this.value)"
+                     class="w-16 h-8 text-center text-sm font-bold border-none focus:ring-0 p-0 appearance-none mx-0"
+                     onclick="this.select()"
+              >
+              <button onclick="updateOutboundQty(${item.product.id}, 1)" tabindex="-1" class="w-8 h-8 flex items-center justify-center hover:bg-slate-100 text-slate-500 border-l border-slate-100 active:bg-slate-200 transition-colors">
+                <i class="fas fa-plus text-xs"></i>
+              </button>
+            </div>
+            <button onclick="removeOutboundItem(${item.product.id})" tabindex="-1" class="text-slate-400 hover:text-red-500 w-8 h-8 flex items-center justify-center rounded-full hover:bg-red-50 transition-colors">
+              <i class="fas fa-times"></i>
             </button>
           </div>
-          <button onclick="removeOutboundItem(${item.product.id})" tabindex="-1" class="text-slate-400 hover:text-red-500 w-8 h-8 flex items-center justify-center rounded-full hover:bg-red-50 transition-colors">
-            <i class="fas fa-times"></i>
-          </button>
+        </div>
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+          <input type="text" value="${item.qr_code || ''}" placeholder="제조 QR (선택)"
+            onchange="setOutboundTrace(${item.product.id}, 'qr_code', this.value)"
+            class="w-full border border-slate-200 rounded-lg px-2 py-1.5 text-xs font-mono bg-white">
+          <input type="text" value="${item.lot_number || ''}" placeholder="Lot 번호 (선택)"
+            onchange="setOutboundTrace(${item.product.id}, 'lot_number', this.value)"
+            class="w-full border border-slate-200 rounded-lg px-2 py-1.5 text-xs font-mono bg-white">
         </div>
       </div>
     `;
@@ -537,6 +549,12 @@ function renderOutboundCart() {
 
   totalEl.textContent = totalQty + '개';
 }
+
+window.setOutboundTrace = function (productId, field, value) {
+  const item = window.outboundCart.find(i => i.product.id === productId);
+  if (!item) return;
+  item[field] = (value || '').trim();
+};
 
 function updateOutboundQty(productId, delta) {
   const item = window.outboundCart.find(i => i.product.id === productId);
@@ -580,7 +598,12 @@ async function submitDirectOutbound() {
   }
 
   const payload = {
-    items: window.outboundCart.map(i => ({ productId: i.product.id, quantity: i.quantity })),
+    items: window.outboundCart.map(i => ({
+      productId: i.product.id,
+      quantity: i.quantity,
+      qr_code: i.qr_code || undefined,
+      lot_number: i.lot_number || undefined
+    })),
     recipient: document.getElementById('outDestName').value,
     phone: document.getElementById('outDestPhone').value,
     address: document.getElementById('outDestAddress').value,

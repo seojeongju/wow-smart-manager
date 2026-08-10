@@ -728,7 +728,11 @@ const MES_EVENT_LABEL = {
   material_issue: '자재 투입',
   process_complete: '공정 완료',
   fg_pack: '완제품 포장',
-  lookup: '조회'
+  lookup: '조회',
+  outbound_ship: '출고',
+  sale: '판매',
+  claim: '클레임',
+  claim_return: '반품입고'
 };
 
 async function loadMesTrace() {
@@ -747,9 +751,9 @@ async function loadMesTrace() {
       <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
         <div class="bg-white border border-slate-200 rounded-xl p-5">
           <h3 class="font-bold text-slate-800 mb-3"><i class="fas fa-search mr-2 text-orange-600"></i>역추적 조회</h3>
-          <p class="text-xs text-slate-500 mb-3">완제품/자재 QR을 입력하면 작업지시·투입 자재·이력을 조회합니다.</p>
+          <p class="text-xs text-slate-500 mb-3">QR 또는 Lot으로 제조→출고→판매→클레임 전 구간을 조회합니다.</p>
           <div class="flex gap-2">
-            <input id="mes-trace-lookup" class="flex-1 border rounded-lg px-3 py-2 text-sm" placeholder="QR 코드 입력 (예: QR-...)">
+            <input id="mes-trace-lookup" class="flex-1 border rounded-lg px-3 py-2 text-sm" placeholder="QR 또는 Lot 번호">
             <button onclick="lookupMesTrace()" class="bg-orange-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-orange-700">조회</button>
           </div>
           <div id="mes-trace-lookup-result" class="mt-4"></div>
@@ -858,16 +862,40 @@ window.lookupMesTrace = async function () {
   const code = document.getElementById('mes-trace-lookup')?.value?.trim();
   const box = document.getElementById('mes-trace-lookup-result');
   if (!code) {
-    alert('QR 코드를 입력해주세요.');
+    alert('QR 또는 Lot 번호를 입력해주세요.');
     return;
   }
   box.innerHTML = '<div class="text-slate-400 text-sm">조회 중...</div>';
   try {
+    // journey 우선 (Lot만 있어도 조회), 실패 시 lookup
+    let d;
+    try {
+      const journeyRes = await axios.get(`${API_BASE}/production/trace/journey/${encodeURIComponent(code)}`);
+      d = journeyRes.data.data;
+      if (d.mode === 'lot') {
+        const dist = d.distribution || {};
+        box.innerHTML = `
+          <div class="border rounded-lg p-3 bg-slate-50 text-sm space-y-2">
+            <div><span class="text-slate-500">Lot</span> <span class="font-mono font-medium">${d.lot.lot_number}</span></div>
+            <div><span class="text-slate-500">상품</span> ${d.lot.product_name || '-'} (${d.lot.product_sku || ''})</div>
+            <div><span class="text-slate-500">잔량</span> ${d.lot.remaining_quantity} / ${d.lot.quantity}</div>
+            ${renderDistributionBlock(dist)}
+            <div class="pt-2"><div class="font-semibold mb-1">이벤트</div>
+              ${(d.events || []).slice(-10).map((e) => `<div class="text-xs text-slate-600">${(e.created_at || '').replace('T', ' ').slice(0, 19)} · ${MES_EVENT_LABEL[e.event_type] || e.event_type}</div>`).join('') || '<div class="text-xs text-slate-400">없음</div>'}
+            </div>
+          </div>`;
+        return;
+      }
+    } catch (_) {
+      /* fallback lookup */
+    }
+
     const res = await axios.get(`${API_BASE}/production/trace/lookup/${encodeURIComponent(code)}`);
-    const d = res.data.data;
+    d = res.data.data;
     const mats = d.materials || [];
     const used = d.used_in || [];
     const events = d.events || [];
+    const dist = d.distribution || {};
     box.innerHTML = `
       <div class="border rounded-lg p-3 bg-slate-50 text-sm space-y-2">
         <div><span class="text-slate-500">QR</span> <span class="font-mono font-medium">${d.qr.code}</span></div>
@@ -876,8 +904,9 @@ window.lookupMesTrace = async function () {
         <div><span class="text-slate-500">작업지시</span> ${d.work_order ? `${d.work_order.wo_number} (${MES_STATUS_LABEL[d.work_order.status] || d.work_order.status})` : '-'}</div>
         ${mats.length ? `<div class="pt-2"><div class="font-semibold mb-1">투입 자재</div>${mats.map((m) => `<div class="text-xs">• ${m.material_name} ${m.quantity}${m.material_qr_code ? ` <span class="text-slate-400">[${m.material_qr_code}]</span>` : ''} Lot:${m.lot_number || '-'}</div>`).join('')}</div>` : ''}
         ${used.length ? `<div class="pt-2"><div class="font-semibold mb-1">사용된 완제품</div>${used.map((u) => `<div class="text-xs">• ${u.finished_name || '-'} <span class="font-mono">${u.finished_qr_code || '(미연결)'}</span></div>`).join('')}</div>` : ''}
+        ${renderDistributionBlock(dist)}
         <div class="pt-2"><div class="font-semibold mb-1">최근 이벤트</div>
-          ${events.length ? events.slice(0, 8).map((e) => `<div class="text-xs text-slate-600">${(e.created_at || '').replace('T', ' ').slice(0, 19)} · ${MES_EVENT_LABEL[e.event_type] || e.event_type}${e.process_name ? ` (${e.process_name})` : ''}</div>`).join('') : '<div class="text-xs text-slate-400">없음</div>'}
+          ${events.length ? events.slice(0, 10).map((e) => `<div class="text-xs text-slate-600">${(e.created_at || '').replace('T', ' ').slice(0, 19)} · ${MES_EVENT_LABEL[e.event_type] || e.event_type}${e.process_name ? ` (${e.process_name})` : ''}</div>`).join('') : '<div class="text-xs text-slate-400">없음</div>'}
         </div>
       </div>
     `;
@@ -885,6 +914,22 @@ window.lookupMesTrace = async function () {
     box.innerHTML = `<div class="text-rose-600 text-sm">${e.response?.data?.error || e.message}</div>`;
   }
 };
+
+function renderDistributionBlock(dist) {
+  const outs = dist.outbounds || [];
+  const sales = dist.sales || [];
+  const claims = dist.claims || [];
+  if (!outs.length && !sales.length && !claims.length) {
+    return `<div class="pt-2 border-t border-slate-200"><div class="font-semibold mb-1 text-orange-700">유통 구간</div><div class="text-xs text-slate-400">출고·판매·클레임 연결 없음</div></div>`;
+  }
+  return `
+    <div class="pt-2 border-t border-slate-200 space-y-2">
+      <div class="font-semibold text-orange-700">유통 구간 (제조→물류)</div>
+      ${outs.length ? `<div><div class="text-xs font-medium text-slate-600 mb-0.5">출고</div>${outs.map((o) => `<div class="text-xs">• ${o.order_number} → ${o.destination_name || '-'} · qty ${o.quantity} · ${(o.order_date || '').slice(0, 10)}</div>`).join('')}</div>` : ''}
+      ${sales.length ? `<div><div class="text-xs font-medium text-slate-600 mb-0.5">판매</div>${sales.map((s) => `<div class="text-xs">• #${s.sale_id} ${s.customer_name || ''} · ${s.final_amount != null ? s.final_amount + '원' : ''} · ${(s.sale_date || '').slice(0, 10)}</div>`).join('')}</div>` : ''}
+      ${claims.length ? `<div><div class="text-xs font-medium text-slate-600 mb-0.5">클레임</div>${claims.map((c) => `<div class="text-xs">• #${c.claim_id} ${c.claim_type === 'return' ? '반품' : '교환'} (${c.claim_status}) · qty ${c.quantity}</div>`).join('')}</div>` : ''}
+    </div>`;
+}
 
 window.mesTraceGenerate = async function (kind) {
   const work_order_id = mesTraceSelectedWo();

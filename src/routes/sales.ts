@@ -1,5 +1,6 @@
 import { Hono } from 'hono'
 import type { Bindings, Variables, Sale, CreateSaleRequest } from '../types'
+import { linkSaleItemLot } from '../utils/mes-distribution'
 
 const app = new Hono<{ Bindings: Bindings; Variables: Variables }>()
 
@@ -378,6 +379,36 @@ app.post('/', async (c) => {
 
   for (const p of stockPlan) {
     await syncMasterStockIfVariant(DB, tenantId, p.productId)
+  }
+
+  // Phase 8: 판매 라인 ↔ Lot/QR 연결
+  try {
+    const { results: saleItems } = await DB.prepare(
+      'SELECT id, product_id, quantity FROM sale_items WHERE sale_id = ? ORDER BY id ASC'
+    ).bind(saleId).all<{ id: number; product_id: number; quantity: number }>()
+
+    const usedSaleItemIds = new Set<number>()
+    for (const item of body.items) {
+      if (!item.qr_code && !item.lot_number) continue
+      const match = (saleItems || []).find(
+        (si) => Number(si.product_id) === Number(item.product_id)
+          && !usedSaleItemIds.has(Number(si.id))
+      )
+      if (!match) continue
+      usedSaleItemIds.add(Number(match.id))
+      await linkSaleItemLot(DB, tenantId, userId, {
+        sale_item_id: Number(match.id),
+        sale_id: saleId,
+        product_id: Number(item.product_id),
+        quantity: Number(item.quantity),
+        warehouse_id: preferredWarehouseId,
+        qr_code: item.qr_code,
+        lot_number: item.lot_number
+      })
+    }
+  } catch (linkErr: any) {
+    console.error('sale lot link error:', linkErr)
+    // 판매 자체는 유지, Lot 연결 실패만 메시지에 포함 가능
   }
 
   // 고객 구매 금액 및 횟수 업데이트

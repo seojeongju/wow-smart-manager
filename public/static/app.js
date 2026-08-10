@@ -3390,6 +3390,13 @@ function injectClaimModal() {
               <input type="number" id="claimQuantity" min="1" value="1" class="w-full border border-slate-300 rounded-lg px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-indigo-500 transition-shadow">
             </div>
             <div>
+              <label class="block text-sm font-semibold text-slate-700 mb-2">제조 QR / Lot <span class="text-xs font-normal text-slate-400">(선택·역추적용)</span></label>
+              <div class="grid grid-cols-1 gap-2">
+                <input type="text" id="claimQrCode" placeholder="QR 코드" class="w-full border border-slate-300 rounded-lg px-4 py-2.5 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-teal-500">
+                <input type="text" id="claimLotNumber" placeholder="Lot 번호" class="w-full border border-slate-300 rounded-lg px-4 py-2.5 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-teal-500">
+              </div>
+            </div>
+            <div>
               <label class="block text-sm font-semibold text-slate-700 mb-2">사유</label>
               <textarea id="claimReason" rows="3" class="w-full border border-slate-300 rounded-lg px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-indigo-500 transition-shadow resize-none"></textarea>
             </div>
@@ -3430,6 +3437,8 @@ async function submitClaim(e) {
   const productId = document.getElementById('claimProduct').value;
   const quantity = document.getElementById('claimQuantity').value;
 
+  const qrCode = document.getElementById('claimQrCode')?.value?.trim();
+  const lotNumber = document.getElementById('claimLotNumber')?.value?.trim();
   const payload = {
     sale_id: parseInt(saleId),
     type: document.getElementById('claimType').value,
@@ -3437,7 +3446,9 @@ async function submitClaim(e) {
     items: [{
       product_id: parseInt(productId),
       quantity: parseInt(quantity),
-      condition: 'good'
+      condition: 'good',
+      ...(qrCode ? { qr_code: qrCode } : {}),
+      ...(lotNumber ? { lot_number: lotNumber } : {})
     }]
   };
 

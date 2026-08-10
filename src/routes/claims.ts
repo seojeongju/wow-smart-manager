@@ -1,5 +1,6 @@
 import { Hono } from 'hono'
 import type { Bindings, Variables, Claim, CreateClaimRequest, UpdateClaimStatusRequest } from '../types'
+import { linkClaimItemLot, restoreMesLot, insertDistributionEvent } from '../utils/mes-distribution'
 
 const app = new Hono<{ Bindings: Bindings; Variables: Variables }>()
 
@@ -58,12 +59,46 @@ app.post('/', async (c) => {
 
   const claimId = claimResult.meta.last_row_id
 
-  // 클레임 아이템 생성
+  const tenantId = c.get('tenantId')
+  const userId = c.get('userId')
+
+  // 클레임 아이템 생성 (+ Lot/QR)
   for (const item of body.items) {
+    let mesLotId: number | null = null
+    let qrCodeId: number | null = null
+    let lotNumber: string | null = null
+
+    if (item.qr_code || item.lot_number) {
+      try {
+        const unit = await linkClaimItemLot(DB, tenantId, userId, {
+          claim_id: Number(claimId),
+          product_id: item.product_id,
+          quantity: item.quantity,
+          qr_code: item.qr_code,
+          lot_number: item.lot_number
+        })
+        if (unit) {
+          mesLotId = unit.mes_lot_id
+          qrCodeId = unit.qr_code_id
+          lotNumber = unit.lot_number
+        }
+      } catch (e: any) {
+        return c.json({ success: false, error: e.message || 'Lot/QR 연결 실패' }, 400)
+      }
+    }
+
     await DB.prepare(`
-      INSERT INTO claim_items (claim_id, product_id, quantity, condition)
-      VALUES (?, ?, ?, ?)
-    `).bind(claimId, item.product_id, item.quantity, item.condition || 'good').run()
+      INSERT INTO claim_items (claim_id, product_id, quantity, condition, mes_lot_id, qr_code_id, lot_number)
+      VALUES (?, ?, ?, ?, ?, ?, ?)
+    `).bind(
+      claimId,
+      item.product_id,
+      item.quantity,
+      item.condition || 'good',
+      mesLotId,
+      qrCodeId,
+      lotNumber
+    ).run()
   }
 
   return c.json({ success: true, message: '반품/교환 요청이 등록되었습니다.' })
@@ -126,6 +161,23 @@ app.put('/:id/status', async (c) => {
         INSERT INTO stock_movements (product_id, warehouse_id, movement_type, quantity, reason, reference_id, created_by)
         VALUES (?, ?, '입고', ?, '반품 입고', ?, ?)
       `).bind(item.product_id, warehouseId, item.quantity, claim.sale_id, c.get('userId')).run()
+
+      // Lot 잔량 복원 + 이벤트
+      if (item.mes_lot_id) {
+        const tenantId = c.get('tenantId')
+        await restoreMesLot(DB, tenantId, item.mes_lot_id, Number(item.quantity))
+        await insertDistributionEvent(DB, tenantId, c.get('userId'), {
+          event_type: 'claim_return',
+          product_id: item.product_id,
+          lot_number: item.lot_number,
+          quantity: item.quantity,
+          qr_code_id: item.qr_code_id,
+          warehouse_id: warehouseId,
+          reference_type: 'claim',
+          reference_id: Number(id),
+          notes: '반품 승인 — Lot 잔량 복원'
+        })
+      }
     }
   }
 

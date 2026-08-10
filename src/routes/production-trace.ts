@@ -1,5 +1,6 @@
 import { Hono } from 'hono'
 import type { Bindings, Variables } from '../types'
+import { fetchDistributionJourney } from '../utils/mes-distribution'
 
 const app = new Hono<{ Bindings: Bindings; Variables: Variables }>()
 
@@ -573,6 +574,12 @@ app.get('/lookup/:code', async (c) => {
     woEvents = results || []
   }
 
+  const distribution = await fetchDistributionJourney(DB, tenantId, {
+    qr_code_id: qr.id,
+    lot_number: qr.lot_number || qr.batch_number || null,
+    product_id: qr.product_id
+  })
+
   return c.json({
     success: true,
     data: {
@@ -593,7 +600,94 @@ app.get('/lookup/:code', async (c) => {
       materials: materials || [],
       used_in: usedIn || [],
       events: events || [],
-      work_order_timeline: woEvents
+      work_order_timeline: woEvents,
+      distribution
+    }
+  })
+})
+
+// 통합 여정 조회 (제조→출고→판매→클레임)
+app.get('/journey/:code', async (c) => {
+  const { DB } = c.env
+  const tenantId = c.get('tenantId')
+  const code = c.req.param('code')
+
+  const qr = await resolveQr(DB, tenantId, code)
+  if (!qr) {
+    // Lot 번호로도 조회 허용
+    const lot = await DB.prepare(`
+      SELECT l.*, p.name as product_name, p.sku as product_sku
+      FROM mes_lots l
+      JOIN products p ON l.product_id = p.id
+      WHERE l.tenant_id = ? AND l.lot_number = ?
+      LIMIT 1
+    `).bind(tenantId, code).first<any>()
+
+    if (!lot) {
+      return c.json({ success: false, error: 'QR 또는 Lot을 찾을 수 없습니다.' }, 404)
+    }
+
+    const distribution = await fetchDistributionJourney(DB, tenantId, {
+      lot_number: lot.lot_number,
+      product_id: lot.product_id
+    })
+
+    const { results: events } = await DB.prepare(`
+      SELECT e.*, u.name as created_by_name
+      FROM mes_trace_events e
+      LEFT JOIN users u ON e.created_by = u.id
+      WHERE e.tenant_id = ? AND e.lot_number = ?
+      ORDER BY e.created_at ASC
+      LIMIT 200
+    `).bind(tenantId, lot.lot_number).all()
+
+    return c.json({
+      success: true,
+      data: {
+        mode: 'lot',
+        lot,
+        distribution,
+        events: events || []
+      }
+    })
+  }
+
+  const distribution = await fetchDistributionJourney(DB, tenantId, {
+    qr_code_id: qr.id,
+    lot_number: qr.lot_number || null,
+    product_id: qr.product_id
+  })
+
+  const { results: events } = await DB.prepare(`
+    SELECT e.*, u.name as created_by_name
+    FROM mes_trace_events e
+    LEFT JOIN users u ON e.created_by = u.id
+    WHERE e.tenant_id = ? AND (e.qr_code_id = ? OR e.qr_code = ? OR e.lot_number = ?)
+    ORDER BY e.created_at ASC
+    LIMIT 200
+  `).bind(tenantId, qr.id, qr.code, qr.lot_number || '').all()
+
+  let workOrder = null
+  if (qr.work_order_id) {
+    workOrder = await getWorkOrder(DB, tenantId, qr.work_order_id)
+  }
+
+  return c.json({
+    success: true,
+    data: {
+      mode: 'qr',
+      qr: {
+        id: qr.id,
+        code: qr.code,
+        lot_number: qr.lot_number,
+        product_id: qr.product_id,
+        product_name: qr.product_name,
+        product_sku: qr.product_sku,
+        work_order_id: qr.work_order_id
+      },
+      work_order: workOrder,
+      distribution,
+      events: events || []
     }
   })
 })

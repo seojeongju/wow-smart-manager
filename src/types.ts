@@ -236,6 +236,8 @@ export interface CreateSaleRequest {
   items: {
     product_id: number;
     quantity: number;
+    qr_code?: string;
+    lot_number?: string;
   }[];
   discount_amount?: number;
   payment_method: string;
@@ -265,6 +267,8 @@ export interface CreateClaimRequest {
     product_id: number;
     quantity: number;
     condition?: string;
+    qr_code?: string;
+    lot_number?: string;
   }[];
 }
 
