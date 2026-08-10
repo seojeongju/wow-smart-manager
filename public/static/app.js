@@ -571,16 +571,23 @@ const ERP_STUB_META = {
     icon: 'fa-sitemap',
     module: '인사 · 급여',
     phase: 'Phase 5',
-    summary: '조직도·사원 마스터·발령 정보를 관리합니다.',
-    related: [{ label: '설정', page: 'settings' }]
+    summary: '구현됨 — 사이드바 ERP → 인사 · 급여 → 조직 · 사원 메뉴를 이용하세요.',
+    related: [
+      { label: '조직 · 사원 열기', page: 'hr-org' },
+      { label: '근태', page: 'hr-attendance' },
+      { label: '설정', page: 'settings' }
+    ]
   },
   'hr-attendance': {
     title: '근태',
     icon: 'fa-user-clock',
     module: '인사 · 급여',
     phase: 'Phase 5',
-    summary: '출퇴근·휴가·연장근로를 기록하고 정산에 반영합니다.',
-    related: [{ label: '조직 · 사원', page: 'erp-stub', tab: 'hr-org' }]
+    summary: '구현됨 — 사이드바 ERP → 인사 · 급여 → 근태 메뉴를 이용하세요.',
+    related: [
+      { label: '근태 열기', page: 'hr-attendance' },
+      { label: '조직 · 사원', page: 'hr-org' }
+    ]
   },
   'hr-payroll': {
     title: '급여',
@@ -588,7 +595,7 @@ const ERP_STUB_META = {
     module: '인사 · 급여',
     phase: 'Phase 5',
     summary: '급여 계산·공제·이체 명세를 처리합니다.',
-    related: [{ label: '근태', page: 'erp-stub', tab: 'hr-attendance' }]
+    related: [{ label: '근태', page: 'hr-attendance' }]
   },
   'hr-talent': {
     title: '채용 · 평가 · 교육',
@@ -596,7 +603,7 @@ const ERP_STUB_META = {
     module: '인사 · 급여',
     phase: 'Phase 5',
     summary: '채용 프로세스, 성과평가, 교육 이력을 관리합니다.',
-    related: [{ label: '조직 · 사원', page: 'erp-stub', tab: 'hr-org' }]
+    related: [{ label: '조직 · 사원', page: 'hr-org' }]
   }
 };
 
@@ -869,6 +876,16 @@ async function loadPage(page, subPage = null, opts = {}) {
       updatePageTitle('전표', '매출·매입·입금·지급 자동 전표');
       if (window.loadFinanceVouchersPage) await window.loadFinanceVouchersPage();
       else content.innerHTML = '<div class="text-center py-10">재무 모듈 로딩 중...</div>';
+      break;
+    case 'hr-org':
+      updatePageTitle('조직 · 사원', '부서 · 사원 마스터');
+      if (window.loadHrOrgPage) await window.loadHrOrgPage();
+      else content.innerHTML = '<div class="text-center py-10">인사 모듈 로딩 중...</div>';
+      break;
+    case 'hr-attendance':
+      updatePageTitle('근태', '출퇴근 · 휴가 · 연장근로');
+      if (window.loadHrAttendancePage) await window.loadHrAttendancePage();
+      else content.innerHTML = '<div class="text-center py-10">인사 모듈 로딩 중...</div>';
       break;
     case 'proc-receive':
       updatePageTitle('입고 · 검수', '발주 대기 건 창고별 입고');

@@ -33,6 +33,7 @@ import quotationsRouter from './routes/quotations'
 import transactionStatementsRouter from './routes/transaction-statements'
 import financeRouter from './routes/finance'
 import opportunitiesRouter from './routes/opportunities'
+import hrRouter from './routes/hr'
 
 const app = new Hono<{ Bindings: Bindings; Variables: Variables }>()
 
@@ -72,6 +73,7 @@ app.route('/api/quotations', quotationsRouter)
 app.route('/api/transaction-statements', transactionStatementsRouter)
 app.route('/api/finance', financeRouter)
 app.route('/api/opportunities', opportunitiesRouter)
+app.route('/api/hr', hrRouter)
 
 // 슈퍼 관리자 페이지
 app.get('/admin', (c: Context) => {
@@ -1172,15 +1174,13 @@ app.get('/', (c: Context) => {
                                                                         <i class="fas fa-chevron-down text-[10px] submenu-arrow"></i>
                                                                     </button>
                                                                     <div id="erp-hr-submenu" class="nav-submenu ml-4 space-y-1">
-                                                                        <a href="#" data-page="erp-stub" data-tab="hr-org" class="nav-link flex items-center px-4 py-2 rounded-lg group text-sm opacity-80" onclick="closeSidebarOnMobile()">
+                                                                        <a href="#" data-page="hr-org" class="nav-link flex items-center px-4 py-2 rounded-lg group text-sm" onclick="closeSidebarOnMobile()">
                                                                             <i class="fas fa-sitemap w-5 text-center mr-3 text-xs opacity-70"></i>
                                                                             <span class="flex-1">조직 · 사원</span>
-                                                                            <span class="text-[9px] font-bold px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300">준비중</span>
                                                                         </a>
-                                                                        <a href="#" data-page="erp-stub" data-tab="hr-attendance" class="nav-link flex items-center px-4 py-2 rounded-lg group text-sm opacity-80" onclick="closeSidebarOnMobile()">
+                                                                        <a href="#" data-page="hr-attendance" class="nav-link flex items-center px-4 py-2 rounded-lg group text-sm" onclick="closeSidebarOnMobile()">
                                                                             <i class="fas fa-clock w-5 text-center mr-3 text-xs opacity-70"></i>
                                                                             <span class="flex-1">근태</span>
-                                                                            <span class="text-[9px] font-bold px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300">준비중</span>
                                                                         </a>
                                                                         <a href="#" data-page="erp-stub" data-tab="hr-payroll" class="nav-link flex items-center px-4 py-2 rounded-lg group text-sm opacity-80" onclick="closeSidebarOnMobile()">
                                                                             <i class="fas fa-money-check-alt w-5 text-center mr-3 text-xs opacity-70"></i>
@@ -1608,7 +1608,7 @@ app.get('/', (c: Context) => {
                                             <script src="/static/js/utils.js?v=2"></script>
                                             <script src="/static/js/utils_address.js?v=1"></script>
                                             <script src="/static/js/auth.js?v=2"></script>
-                                            <script src="/static/app.js?v=56"></script>
+                                            <script src="/static/app.js?v=57"></script>
                                             <script src="/static/js/outbound.js?v=13"></script>
                                             <script src="/static/js/purchases.js?v=5"></script>
                                             <script src="/static/js/options.js?v=1"></script>
@@ -1619,6 +1619,7 @@ app.get('/', (c: Context) => {
                                             <script src="/static/js/transaction-statement.js?v=3"></script>
                                             <script src="/static/js/quotations.js?v=2"></script>
                                             <script src="/static/js/crm-pipeline.js?v=1"></script>
+                                            <script src="/static/js/hr.js?v=1"></script>
                                             <script src="/static/js/finance.js?v=2"></script>
                                             <script src="/static/js/erp-procurement.js?v=2"></script>
                                             <script src="/static/js/mes-oee.js?v=2"></script>
@@ -1628,7 +1629,7 @@ app.get('/', (c: Context) => {
                                             <script src="/static/js/shopfloor.js?v=2"></script>
                                             <script src="/static/js/mes-schedule.js?v=1"></script>
                                             <script src="/static/js/barcode-manager.js?v=3"></script>
-                                            <script src="/static/js/help-guides.js?v=13"></script>
+                                            <script src="/static/js/help-guides.js?v=14"></script>
                                         </body>
                                     </html>
                                     `)

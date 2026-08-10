@@ -551,33 +551,62 @@ const HELP_GUIDES = {
     tips: [],
     related: []
   },
+  'hr-org': {
+    title: '조직 · 사원',
+    summary: '부서·사원 마스터와 로그인 계정 연결을 관리합니다.',
+    steps: [
+      '부서를 먼저 등록합니다.',
+      '사원명·부서·직위·입사일을 입력해 사원을 등록합니다.',
+      '필요 시 로그인 계정을 연결합니다.',
+      '근태 메뉴에서 출퇴근·휴가를 기록합니다.'
+    ],
+    tips: ['사번은 자동 채번(EMP-…)됩니다.', '근태 이력이 있는 사원 삭제는 퇴직 처리됩니다.'],
+    related: [
+      { label: '근태', page: 'hr-attendance' },
+      { label: '설정(사용자)', page: 'settings' }
+    ]
+  },
+  'hr-attendance': {
+    title: '근태',
+    summary: '사원별 출퇴근·휴가·연장근로를 기록합니다.',
+    steps: [
+      '사원과 근무일을 선택합니다.',
+      '상태(출근/지각/결근/휴가 등)·출퇴근 시각을 입력합니다.',
+      '동일 사원·날짜 재저장 시 기존 기록이 갱신됩니다.',
+      '기간·부서로 조회해 연장 합계를 확인합니다.'
+    ],
+    tips: ['급여 정산(다음 단계)에 사용할 기초 데이터입니다.'],
+    related: [
+      { label: '조직 · 사원', page: 'hr-org' }
+    ]
+  },
   'erp-stub:hr-org': {
-    title: '조직 · 사원 (준비중)',
-    summary: '조직·사원 마스터. Phase 5 예정.',
+    title: '조직 · 사원',
+    summary: '구현됨 — 조직 · 사원 메뉴를 이용하세요.',
     steps: [],
     tips: [],
-    related: []
+    related: [{ label: '조직 · 사원 열기', page: 'hr-org' }]
   },
   'erp-stub:hr-attendance': {
-    title: '근태 (준비중)',
-    summary: '출퇴근·휴가. Phase 5 예정.',
+    title: '근태',
+    summary: '구현됨 — 근태 메뉴를 이용하세요.',
     steps: [],
     tips: [],
-    related: []
+    related: [{ label: '근태 열기', page: 'hr-attendance' }]
   },
   'erp-stub:hr-payroll': {
     title: '급여 (준비중)',
-    summary: '급여 계산. Phase 5 예정.',
+    summary: '급여 계산. Phase 5 2차 예정.',
     steps: [],
     tips: [],
-    related: []
+    related: [{ label: '근태', page: 'hr-attendance' }]
   },
   'erp-stub:hr-talent': {
     title: '채용 · 평가 · 교육 (준비중)',
-    summary: '채용·평가·교육. Phase 5 예정.',
+    summary: '채용·평가·교육. Phase 5 추후.',
     steps: [],
     tips: [],
-    related: []
+    related: [{ label: '조직 · 사원', page: 'hr-org' }]
   },
 
   settings: {
@@ -924,6 +953,8 @@ const HELP_HUB_SECTIONS = [
     title: 'ERP',
     items: [
       { key: 'crm-pipeline', label: '영업 기회' },
+      { key: 'hr-org', label: '조직 · 사원' },
+      { key: 'hr-attendance', label: '근태' },
       { key: 'dashboard', label: '대시보드' },
       { key: 'sales:pos', label: '판매(POS)' },
       { key: 'quotations', label: '견적' },
