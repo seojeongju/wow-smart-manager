@@ -28,7 +28,7 @@ export interface User {
   tenant_id: number;
   email: string;
   name: string;
-  role: 'OWNER' | 'ADMIN' | 'USER';
+  role: 'OWNER' | 'ADMIN' | 'USER' | 'MANAGEMENT' | 'PRODUCTION' | 'FLOOR' | 'SALES' | 'SUPER_ADMIN';
   password_hash?: string;
   created_at: string;
   updated_at: string;

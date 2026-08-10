@@ -27,6 +27,7 @@ import pricesRouter from './routes/prices'
 import qrRouter from './routes/qr'
 import dashboardKpiRouter from './routes/dashboard-kpi'
 import productionRouter from './routes/production'
+import opsAdminRouter from './routes/ops-admin'
 
 const app = new Hono<{ Bindings: Bindings; Variables: Variables }>()
 
@@ -60,6 +61,7 @@ app.route('/api/prices', pricesRouter)
 app.route('/api/qr', qrRouter)
 app.route('/api/dashboard-kpi', dashboardKpiRouter)
 app.route('/api/production', productionRouter)
+app.route('/api/ops-admin', opsAdminRouter)
 
 // 슈퍼 관리자 페이지
 app.get('/admin', (c: Context) => {
@@ -964,7 +966,7 @@ app.get('/', (c: Context) => {
                                                         </div>
 
                                                         <!-- Business Group -->
-                                                        <div>
+                                                        <div id="nav-sales-group" data-module="sales">
                                                             <p class="px-4 text-[11px] font-bold text-slate-500 uppercase tracking-widest mb-3 flex items-center gap-2">
                                                                 <span class="w-1.5 h-1.5 rounded-full bg-blue-500/50"></span>
                                                                 영업 및 물류
@@ -1098,7 +1100,7 @@ app.get('/', (c: Context) => {
                                                         </div>
 
                                                         <!-- MES Group — 업무 프로세스 순서 -->
-                                                        <div>
+                                                        <div id="nav-mes-group" data-module="mes">
                                                             <p class="px-4 text-[11px] font-bold text-slate-500 uppercase tracking-widest mb-3 flex items-center gap-2">
                                                                 <span class="w-1.5 h-1.5 rounded-full bg-orange-500/50"></span>
                                                                 MES (제조실행)
@@ -1321,13 +1323,13 @@ app.get('/', (c: Context) => {
                                             <script src="/static/js/utils.js?v=2"></script>
                                             <script src="/static/js/utils_address.js?v=1"></script>
                                             <script src="/static/js/auth.js?v=1"></script>
-                                            <script src="/static/app.js?v=33"></script>
+                                            <script src="/static/app.js?v=34"></script>
                                             <script src="/static/js/outbound.js?v=9"></script>
                                             <script src="/static/js/purchases.js?v=1"></script>
                                             <script src="/static/js/options.js?v=1"></script>
                                             <script src="/static/js/products.js?v=7"></script>
                                             <script src="/static/js/prices.js?v=1"></script>
-                                            <script src="/static/js/system-settings.js?v=1"></script>
+                                            <script src="/static/js/system-settings.js?v=2"></script>
                                             <script src="/static/js/tracking.js?v=1"></script>
                                             <script src="/static/js/transaction-statement.js?v=1"></script>
                                             <script src="/static/js/qr-mes.js?v=2"></script>

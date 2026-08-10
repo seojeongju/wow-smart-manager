@@ -1,7 +1,9 @@
 import { Hono } from 'hono'
-import type { Bindings, Variables, User } from '../types'
+import type { Bindings, Variables } from '../types'
 import { checkPlanLimit } from '../utils/subscription'
 import { hashPassword } from '../utils/auth'
+import { denyIfNoPermission, normalizeRole, ROLE_LABELS } from '../utils/rbac'
+import { writeAuditLog } from '../utils/audit'
 
 const app = new Hono<{ Bindings: Bindings; Variables: Variables }>()
 
@@ -30,6 +32,9 @@ app.get('/me', async (c) => {
 
 // 사용자 목록 조회 (같은 테넌트)
 app.get('/', async (c) => {
+    const denied = denyIfNoPermission(c, 'admin.settings')
+    if (denied) return denied
+
     const { DB } = c.env
     const tenantId = c.get('tenantId')
 
@@ -40,51 +45,43 @@ app.get('/', async (c) => {
         ORDER BY created_at DESC
     `).bind(tenantId).all()
 
-    return c.json({ success: true, data: results })
+    return c.json({
+        success: true,
+        data: results,
+        role_labels: ROLE_LABELS
+    })
 })
 
 // 사용자 추가 (초대)
 app.post('/', async (c) => {
+    const denied = denyIfNoPermission(c, 'admin.settings')
+    if (denied) return denied
+
     const { DB } = c.env
     const tenantId = c.get('tenantId')
-    const userId = c.get('userId')
-    let userRole = c.get('userRole') // 미들웨어에서 설정 필요 (현재는 토큰에서 가져옴)
-
-    console.log('[DEBUG] POST /users - userId:', userId, 'userRole from token:', userRole)
-
-    // role이 토큰에 없는 경우 DB에서 조회
-    if (!userRole) {
-        const user = await DB.prepare('SELECT role FROM users WHERE id = ?').bind(userId).first<{ role: string }>()
-        userRole = user?.role
-        console.log('[DEBUG] POST /users - userRole from DB:', userRole)
-    }
-
-    console.log('[DEBUG] POST /users - Final userRole:', userRole)
-
-    // 권한 체크 (OWNER or ADMIN) - 임시로 비활성화
-    // if (userRole !== 'OWNER' && userRole !== 'ADMIN') {
-    //     console.log('[DEBUG] POST /users - Access denied. userRole:', userRole)
-    //     return c.json({ success: false, error: '권한이 없습니다.' }, 403)
-    // }
+    const actorId = c.get('userId')
 
     const body = await c.req.json<{
         email: string;
         name: string;
         password: string;
-        role?: 'ADMIN' | 'USER';
+        role?: string;
     }>()
 
     if (!body.email || !body.name || !body.password) {
         return c.json({ success: false, error: '필수 항목을 입력해주세요.' }, 400)
     }
 
-    // 플랜 한도 체크
+    const role = normalizeRole(body.role || 'USER')
+    if (!['ADMIN', 'MANAGEMENT', 'PRODUCTION', 'FLOOR', 'SALES', 'USER'].includes(role)) {
+        return c.json({ success: false, error: '부여할 수 없는 역할입니다.' }, 400)
+    }
+
     const limitCheck = await checkPlanLimit(DB, tenantId, 'users')
     if (!limitCheck.allowed) {
         return c.json({ success: false, error: limitCheck.error }, 403)
     }
 
-    // 이메일 중복 체크
     const existing = await DB.prepare('SELECT id FROM users WHERE email = ?').bind(body.email).first()
     if (existing) {
         return c.json({ success: false, error: '이미 존재하는 이메일입니다.' }, 400)
@@ -93,7 +90,7 @@ app.post('/', async (c) => {
     try {
         const passwordHash = await hashPassword(body.password)
 
-        await DB.prepare(`
+        const result = await DB.prepare(`
             INSERT INTO users (tenant_id, email, name, password_hash, role)
             VALUES (?, ?, ?, ?, ?)
         `).bind(
@@ -101,8 +98,18 @@ app.post('/', async (c) => {
             body.email,
             body.name,
             passwordHash,
-            body.role || 'USER'
+            role
         ).run()
+
+        await writeAuditLog(DB, {
+            tenantId,
+            userId: actorId,
+            action: 'user.create',
+            entityType: 'user',
+            entityId: result.meta.last_row_id,
+            meta: { email: body.email, role },
+            ip: c.req.header('cf-connecting-ip') || null
+        })
 
         return c.json({ success: true, message: '사용자가 추가되었습니다.' })
     } catch (e) {
@@ -113,41 +120,45 @@ app.post('/', async (c) => {
 
 // 사용자 정보 수정
 app.put('/:id', async (c) => {
+    const denied = denyIfNoPermission(c, 'admin.settings')
+    if (denied) return denied
+
     const { DB } = c.env
     const tenantId = c.get('tenantId')
     const myId = c.get('userId')
     let myRole = c.get('userRole')
     const targetId = c.req.param('id')
 
-    // Role 조회
     if (!myRole) {
         const user = await DB.prepare('SELECT role FROM users WHERE id = ?').bind(myId).first<{ role: string }>()
         myRole = user?.role
     }
 
-    // 권한 체크 (OWNER 또는 ADMIN) - 본인의 정보 수정은 별도 API(/me)에서 처리 권장하지만 여기서는 팀원 관리 목적
-    if (myRole !== 'OWNER' && myRole !== 'ADMIN') {
-        return c.json({ success: false, error: '권한이 없습니다.' }, 403)
-    }
-
     const body = await c.req.json<{
         name?: string;
-        role?: 'ADMIN' | 'USER' | 'OWNER'; // 타입 확장
+        role?: string;
         password?: string;
     }>()
 
-    // 대상 사용자 확인
-    const targetUser = await DB.prepare('SELECT role FROM users WHERE id = ? AND tenant_id = ?').bind(targetId, tenantId).first<{ role: string }>()
+    const targetUser = await DB.prepare('SELECT role FROM users WHERE id = ? AND tenant_id = ?')
+        .bind(targetId, tenantId).first<{ role: string }>()
     if (!targetUser) {
         return c.json({ success: false, error: '사용자를 찾을 수 없습니다.' }, 404)
     }
 
-    // OWNER의 등급은 변경 불가
-    if (targetUser.role === 'OWNER' && body.role && body.role !== 'OWNER') {
+    if (targetUser.role === 'OWNER' && body.role && normalizeRole(body.role) !== 'OWNER') {
         return c.json({ success: false, error: '소유자(OWNER)의 등급은 변경할 수 없습니다.' }, 403)
     }
 
-    // OWNER가 아닌 관리자가 다른 관리자의 등급을 바꾸거나 할 때의 제약사항은 일단 생략 (요구사항에 맞게 유연하게)
+    if (body.role) {
+        const newRole = normalizeRole(body.role)
+        if (newRole === 'SUPER_ADMIN' && normalizeRole(myRole) !== 'SUPER_ADMIN') {
+            return c.json({ success: false, error: 'SUPER_ADMIN은 부여할 수 없습니다.' }, 403)
+        }
+        if (newRole !== 'OWNER' && !['ADMIN', 'MANAGEMENT', 'PRODUCTION', 'FLOOR', 'SALES', 'USER'].includes(newRole)) {
+            return c.json({ success: false, error: '유효하지 않은 역할입니다.' }, 400)
+        }
+    }
 
     const updates = []
     const params = []
@@ -159,7 +170,7 @@ app.put('/:id', async (c) => {
 
     if (body.role) {
         updates.push('role = ?')
-        params.push(body.role)
+        params.push(normalizeRole(body.role))
     }
 
     if (body.password) {
@@ -172,14 +183,29 @@ app.put('/:id', async (c) => {
         return c.json({ success: false, error: '변경할 내용이 없습니다.' }, 400)
     }
 
-    updates.push('updated_at = CURRENT_TIMESTAMP')
+    updates.push("updated_at = datetime('now')")
 
-    // 쿼리 실행
     const query = `UPDATE users SET ${updates.join(', ')} WHERE id = ? AND tenant_id = ?`
     params.push(targetId, tenantId)
 
     try {
         await DB.prepare(query).bind(...params).run()
+
+        await writeAuditLog(DB, {
+            tenantId,
+            userId: myId,
+            action: 'user.update',
+            entityType: 'user',
+            entityId: targetId,
+            meta: {
+                name: body.name,
+                role: body.role ? normalizeRole(body.role) : undefined,
+                password_changed: !!body.password,
+                previous_role: targetUser.role
+            },
+            ip: c.req.header('cf-connecting-ip') || null
+        })
+
         return c.json({ success: true, message: '사용자 정보가 수정되었습니다.' })
     } catch (e) {
         console.error(e)
@@ -195,23 +221,41 @@ app.delete('/:id', async (c) => {
     let myRole = c.get('userRole')
     const targetId = c.req.param('id')
 
-    // role이 토큰에 없는 경우 DB에서 조회
     if (!myRole) {
         const user = await DB.prepare('SELECT role FROM users WHERE id = ?').bind(myId).first<{ role: string }>()
         myRole = user?.role
     }
 
-    if (myRole !== 'OWNER') {
-        return c.json({ success: false, error: '권한이 없습니다.' }, 403)
+    if (normalizeRole(myRole) !== 'OWNER' && normalizeRole(myRole) !== 'SUPER_ADMIN') {
+        return c.json({ success: false, error: '권한이 없습니다. (OWNER만 삭제 가능)' }, 403)
     }
 
     if (String(myId) === targetId) {
         return c.json({ success: false, error: '자기 자신은 삭제할 수 없습니다.' }, 400)
     }
 
+    const targetUser = await DB.prepare('SELECT role, email FROM users WHERE id = ? AND tenant_id = ?')
+        .bind(targetId, tenantId).first<{ role: string; email: string }>()
+    if (!targetUser) {
+        return c.json({ success: false, error: '사용자를 찾을 수 없습니다.' }, 404)
+    }
+    if (targetUser.role === 'OWNER') {
+        return c.json({ success: false, error: '소유자는 삭제할 수 없습니다.' }, 403)
+    }
+
     await DB.prepare('DELETE FROM users WHERE id = ? AND tenant_id = ?')
         .bind(targetId, tenantId)
         .run()
+
+    await writeAuditLog(DB, {
+        tenantId,
+        userId: myId,
+        action: 'user.delete',
+        entityType: 'user',
+        entityId: targetId,
+        meta: { email: targetUser.email, role: targetUser.role },
+        ip: c.req.header('cf-connecting-ip') || null
+    })
 
     return c.json({ success: true, message: '사용자가 삭제되었습니다.' })
 })

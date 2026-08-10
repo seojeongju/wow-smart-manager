@@ -25,6 +25,12 @@ async function loadSystemSettings(content) {
         <button id="tab-warehouse" class="px-6 py-4 font-medium text-slate-500 hover:text-slate-700 transition-colors border-b-2 border-transparent flex items-center whitespace-nowrap" onclick="switchSettingsTab('warehouse')">
           <i class="fas fa-warehouse mr-2"></i>창고 관리
         </button>
+        <button id="tab-audit" class="px-6 py-4 font-medium text-slate-500 hover:text-slate-700 transition-colors border-b-2 border-transparent flex items-center whitespace-nowrap" onclick="switchSettingsTab('audit')">
+          <i class="fas fa-clipboard-list mr-2"></i>감사 로그
+        </button>
+        <button id="tab-demo" class="px-6 py-4 font-medium text-slate-500 hover:text-slate-700 transition-colors border-b-2 border-transparent flex items-center whitespace-nowrap" onclick="switchSettingsTab('demo')">
+          <i class="fas fa-flask mr-2"></i>데모/파일럿
+        </button>
       </div>
 
       <!-- 탭 컨텐츠 -->
@@ -67,7 +73,36 @@ function switchSettingsTab(tabName) {
     case 'warehouse':
       renderWarehouseSettings(container);
       break;
+    case 'audit':
+      renderAuditSettings(container);
+      break;
+    case 'demo':
+      renderDemoSettings(container);
+      break;
   }
+}
+
+const ROLE_LABEL_KO = {
+  SUPER_ADMIN: '플랫폼 관리자',
+  OWNER: '소유자',
+  ADMIN: '관리자',
+  MANAGEMENT: '경영',
+  PRODUCTION: '생산관리',
+  FLOOR: '현장',
+  SALES: '영업',
+  USER: '일반(영업)',
+  staff: '일반(레거시)'
+};
+
+function roleBadgeClass(role) {
+  const r = String(role || '').toUpperCase();
+  if (r === 'OWNER' || r === 'SUPER_ADMIN') return 'bg-purple-100 text-purple-700';
+  if (r === 'ADMIN') return 'bg-indigo-100 text-indigo-700';
+  if (r === 'PRODUCTION') return 'bg-orange-100 text-orange-800';
+  if (r === 'FLOOR') return 'bg-amber-100 text-amber-900';
+  if (r === 'MANAGEMENT') return 'bg-sky-100 text-sky-800';
+  if (r === 'SALES') return 'bg-emerald-100 text-emerald-800';
+  return 'bg-slate-100 text-slate-700';
 }
 
 // 회사 정보 설정
@@ -736,8 +771,8 @@ async function loadTeamMembers() {
               <td class="px-6 py-4 text-sm font-medium text-slate-900">${u.name}</td>
               <td class="px-6 py-4 text-sm text-slate-600">${u.email}</td>
               <td class="px-6 py-4 text-sm">
-                <span class="px-2 py-1 rounded ${u.role === 'admin' ? 'bg-purple-100 text-purple-700' : 'bg-slate-100 text-slate-700'} text-xs font-bold">
-                  ${u.role === 'admin' ? '관리자' : '멤버'}
+                <span class="px-2 py-1 rounded ${roleBadgeClass(u.role)} text-xs font-bold">
+                  ${ROLE_LABEL_KO[u.role] || ROLE_LABEL_KO[String(u.role || '').toUpperCase()] || u.role}
                 </span>
               </td>
               <td class="px-6 py-4 text-sm text-slate-500">${formatDateTimeKST(u.created_at)}</td>
@@ -760,9 +795,77 @@ async function loadTeamMembers() {
   }
 }
 
-// 팀원 초대 모달 (추후 구현)
+function roleSelectOptions(selected) {
+  const role = String(selected || 'USER').toUpperCase();
+  const options = [
+    ['FLOOR', '현장 (FLOOR)'],
+    ['PRODUCTION', '생산관리 (PRODUCTION)'],
+    ['SALES', '영업 (SALES)'],
+    ['MANAGEMENT', '경영 (MANAGEMENT)'],
+    ['USER', '일반/영업 (USER)'],
+    ['ADMIN', '관리자 (ADMIN)'],
+    ['OWNER', '소유자 (OWNER)']
+  ];
+  return options.map(([v, label]) =>
+    `<option value="${v}" ${role === v ? 'selected' : ''}>${label}</option>`
+  ).join('');
+}
+
+// 팀원 초대 모달
 function openInviteMemberModal() {
-  showToast('팀원 초대 기능은 추후 업데이트 예정입니다.', 'info');
+  const modalHtml = `
+    <div id="inviteMemberModal" class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm flex items-center justify-center z-50">
+      <div class="bg-white rounded-2xl shadow-2xl w-full max-w-md mx-4 border border-slate-100">
+        <div class="flex justify-between items-center p-6 border-b border-slate-100">
+          <h3 class="text-xl font-bold text-slate-800">팀원 초대</h3>
+          <button onclick="document.getElementById('inviteMemberModal').remove()" class="text-slate-400 hover:text-slate-600">
+            <i class="fas fa-times"></i>
+          </button>
+        </div>
+        <form onsubmit="handleInviteMember(event)" class="p-6 space-y-4">
+          <div>
+            <label class="block text-sm font-bold text-slate-700 mb-2">이름</label>
+            <input id="inviteName" required class="w-full border border-slate-300 rounded-lg px-4 py-2.5">
+          </div>
+          <div>
+            <label class="block text-sm font-bold text-slate-700 mb-2">이메일</label>
+            <input id="inviteEmail" type="email" required class="w-full border border-slate-300 rounded-lg px-4 py-2.5">
+          </div>
+          <div>
+            <label class="block text-sm font-bold text-slate-700 mb-2">임시 비밀번호</label>
+            <input id="invitePassword" type="password" required minlength="4" class="w-full border border-slate-300 rounded-lg px-4 py-2.5">
+          </div>
+          <div>
+            <label class="block text-sm font-bold text-slate-700 mb-2">역할</label>
+            <select id="inviteRole" class="w-full border border-slate-300 rounded-lg px-4 py-2.5">
+              ${roleSelectOptions('FLOOR')}
+            </select>
+          </div>
+          <div class="flex gap-2 pt-2">
+            <button type="button" onclick="document.getElementById('inviteMemberModal').remove()" class="flex-1 px-4 py-2.5 border rounded-lg">취소</button>
+            <button type="submit" class="flex-1 px-4 py-2.5 bg-teal-600 text-white rounded-lg font-bold">초대</button>
+          </div>
+        </form>
+      </div>
+    </div>`;
+  document.body.insertAdjacentHTML('beforeend', modalHtml);
+}
+
+async function handleInviteMember(e) {
+  e.preventDefault();
+  try {
+    await axios.post(`${API_BASE}/users`, {
+      name: document.getElementById('inviteName').value.trim(),
+      email: document.getElementById('inviteEmail').value.trim(),
+      password: document.getElementById('invitePassword').value,
+      role: document.getElementById('inviteRole').value
+    });
+    showToast('팀원이 추가되었습니다');
+    document.getElementById('inviteMemberModal')?.remove();
+    loadTeamMembers();
+  } catch (err) {
+    showToast(err.response?.data?.error || err.message, 'error');
+  }
 }
 
 // 팀원 수정 모달 열기
@@ -787,13 +890,11 @@ function openEditMemberModal(userId, userName, currentRole) {
           </div>
 
           <div class="mb-4">
-            <label class="block text-sm font-bold text-slate-700 mb-2">등급 (권한)</label>
+            <label class="block text-sm font-bold text-slate-700 mb-2">역할 (권한)</label>
             <select id="editMemberRole" class="w-full border border-slate-300 rounded-lg px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-teal-500">
-              <option value="USER" ${role === 'USER' ? 'selected' : ''}>일반 멤버 (USER)</option>
-              <option value="ADMIN" ${role === 'ADMIN' ? 'selected' : ''}>관리자 (ADMIN)</option>
-              <option value="OWNER" ${role === 'OWNER' ? 'selected' : ''}>소유자 (OWNER)</option>
+              ${roleSelectOptions(role)}
             </select>
-            <p class="text-xs text-slate-500 mt-1">소유자는 모든 권한을 가집니다.</p>
+            <p class="text-xs text-slate-500 mt-1">현장=스캔/실적, 생산관리=MES 기준정보, 경영=KPI·감사조회</p>
           </div>
 
           <div class="mb-6">
@@ -1147,10 +1248,152 @@ function autoFormatPhoneNumber(value) {
   }
 }
 
+async function renderAuditSettings(container) {
+  container.innerHTML = `
+    <div class="bg-white rounded-xl shadow-sm border border-slate-100 p-6">
+      <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-3 mb-4">
+        <div>
+          <h3 class="text-lg font-bold text-slate-800">감사 로그</h3>
+          <p class="text-sm text-slate-500">역할 변경·데모 시드 등 주요 관리 행위 기록</p>
+        </div>
+        <div class="flex gap-2">
+          <input id="auditActionFilter" placeholder="액션 검색 (user.update 등)" class="border border-slate-300 rounded-lg px-3 py-2 text-sm w-56">
+          <button onclick="loadAuditLogs()" class="px-4 py-2 bg-teal-600 text-white rounded-lg text-sm font-medium">조회</button>
+        </div>
+      </div>
+      <div id="auditLogsTable" class="overflow-x-auto">
+        <div class="text-center py-10 text-slate-400"><i class="fas fa-spinner fa-spin"></i></div>
+      </div>
+    </div>`;
+  await loadAuditLogs();
+}
+
+async function loadAuditLogs() {
+  const el = document.getElementById('auditLogsTable');
+  if (!el) return;
+  try {
+    const action = document.getElementById('auditActionFilter')?.value?.trim() || '';
+    const res = await axios.get(`${API_BASE}/ops-admin/audit-logs`, {
+      params: { limit: 100, action }
+    });
+    const rows = res.data.data || [];
+    if (!rows.length) {
+      el.innerHTML = '<div class="text-center py-10 text-slate-400 text-sm">기록이 없습니다.</div>';
+      return;
+    }
+    el.innerHTML = `
+      <table class="min-w-full text-sm">
+        <thead class="bg-slate-50 text-xs uppercase text-slate-500">
+          <tr>
+            <th class="px-3 py-2 text-left">시각</th>
+            <th class="px-3 py-2 text-left">사용자</th>
+            <th class="px-3 py-2 text-left">액션</th>
+            <th class="px-3 py-2 text-left">대상</th>
+            <th class="px-3 py-2 text-left">상세</th>
+          </tr>
+        </thead>
+        <tbody class="divide-y">
+          ${rows.map((r) => `
+            <tr class="hover:bg-slate-50">
+              <td class="px-3 py-2 whitespace-nowrap text-slate-500">${(r.created_at || '').replace('T', ' ').slice(0, 19)}</td>
+              <td class="px-3 py-2">${r.user_name || '-'}<div class="text-xs text-slate-400">${r.user_email || ''}</div></td>
+              <td class="px-3 py-2 font-mono text-xs">${r.action}</td>
+              <td class="px-3 py-2 text-xs">${r.entity_type || ''} ${r.entity_id || ''}</td>
+              <td class="px-3 py-2 text-xs text-slate-500 max-w-xs truncate" title='${(r.meta_json || '').replace(/'/g, '')}'>${r.meta_json || ''}</td>
+            </tr>`).join('')}
+        </tbody>
+      </table>`;
+  } catch (e) {
+    el.innerHTML = `<div class="text-center py-10 text-rose-600 text-sm">${e.response?.data?.error || e.message}</div>`;
+  }
+}
+
+async function renderDemoSettings(container) {
+  container.innerHTML = `
+    <div class="space-y-4">
+      <div class="bg-white rounded-xl shadow-sm border border-slate-100 p-6">
+        <h3 class="text-lg font-bold text-slate-800 mb-1">데모 / 파일럿</h3>
+        <p class="text-sm text-slate-500 mb-4">지원사업·현장 시연용 DEMO 접두 데이터를 생성·정리합니다. 기존 실데이터는 삭제하지 않습니다.</p>
+        <div class="flex flex-wrap gap-2 mb-4">
+          <button onclick="runDemoSeed()" class="px-4 py-2.5 bg-orange-600 text-white rounded-lg text-sm font-bold">
+            <i class="fas fa-magic mr-2"></i>데모 데이터 생성
+          </button>
+          <button onclick="runDemoReset()" class="px-4 py-2.5 bg-rose-600 text-white rounded-lg text-sm font-bold">
+            <i class="fas fa-trash-alt mr-2"></i>DEMO 데이터 정리
+          </button>
+        </div>
+        <div id="demoActionResult" class="hidden text-sm rounded-lg px-3 py-2 mb-2"></div>
+      </div>
+      <div class="bg-white rounded-xl shadow-sm border border-slate-100 p-6">
+        <h3 class="text-lg font-bold text-slate-800 mb-3">시나리오 가이드</h3>
+        <ol id="demoScenarioSteps" class="space-y-2 text-sm text-slate-700 list-decimal list-inside mb-4">
+          <li class="text-slate-400">불러오는 중...</li>
+        </ol>
+        <div id="demoUsersBox" class="bg-slate-50 rounded-lg p-3 text-xs font-mono text-slate-600"></div>
+      </div>
+    </div>`;
+
+  try {
+    const res = await axios.get(`${API_BASE}/ops-admin/demo/scenario`);
+    const d = res.data.data;
+    document.getElementById('demoScenarioSteps').innerHTML =
+      (d.steps || []).map((s) => `<li><span class="font-semibold">${s.title}</span> — ${s.desc}</li>`).join('');
+    document.getElementById('demoUsersBox').innerHTML =
+      '<div class="font-bold mb-1 text-slate-700">데모 계정 (시드 후)</div>' +
+      (d.demo_users || []).map((u) => `${u.email} / ${u.password} (${u.role})`).join('<br>');
+  } catch (e) {
+    document.getElementById('demoScenarioSteps').innerHTML =
+      `<li class="text-rose-600 list-none">${e.response?.data?.error || e.message}</li>`;
+  }
+}
+
+async function runDemoSeed() {
+  if (!confirm('데모 상품·BOM·작업지시·역할별 계정을 생성할까요?')) return;
+  const box = document.getElementById('demoActionResult');
+  try {
+    const res = await axios.post(`${API_BASE}/ops-admin/demo/seed`);
+    if (box) {
+      box.classList.remove('hidden', 'bg-rose-50', 'text-rose-700');
+      box.classList.add('bg-emerald-50', 'text-emerald-800');
+      const d = res.data.data || {};
+      box.innerHTML = `${res.data.message}<br>WO: ${d.wo_number || ''}<br>${(d.demo_users || []).join('<br>')}`;
+    }
+    showToast('데모 데이터 준비 완료');
+  } catch (e) {
+    if (box) {
+      box.classList.remove('hidden', 'bg-emerald-50', 'text-emerald-800');
+      box.classList.add('bg-rose-50', 'text-rose-700');
+      box.textContent = e.response?.data?.error || e.message;
+    }
+    showToast(e.response?.data?.error || e.message, 'error');
+  }
+}
+
+async function runDemoReset() {
+  if (!confirm('DEMO 접두 데이터와 @demo.local 계정을 삭제합니다. 계속할까요?')) return;
+  try {
+    const res = await axios.post(`${API_BASE}/ops-admin/demo/reset`);
+    showToast(res.data.message || '정리 완료');
+    const box = document.getElementById('demoActionResult');
+    if (box) {
+      box.classList.remove('hidden', 'bg-rose-50', 'text-rose-700');
+      box.classList.add('bg-emerald-50', 'text-emerald-800');
+      box.textContent = res.data.message;
+    }
+  } catch (e) {
+    showToast(e.response?.data?.error || e.message, 'error');
+  }
+}
+
 window.autoFormatBizNo = autoFormatBizNo;
 window.autoFormatPhoneNumber = autoFormatPhoneNumber;
 window.openEditMemberModal = openEditMemberModal;
 window.handleUpdateMember = handleUpdateMember;
+window.openInviteMemberModal = openInviteMemberModal;
+window.handleInviteMember = handleInviteMember;
+window.loadAuditLogs = loadAuditLogs;
+window.runDemoSeed = runDemoSeed;
+window.runDemoReset = runDemoReset;
 
 
 

@@ -160,37 +160,54 @@ function updateUserUI(user) {
     }
   }
 
-  // Role-based Menu Visibility Control
+  // Role-based Menu Visibility Control (Phase 7 RBAC)
+  const role = String(user.role || '').toUpperCase();
+  window.currentUserRole = role;
+
+  const mesRoles = ['SUPER_ADMIN', 'OWNER', 'ADMIN', 'MANAGEMENT', 'PRODUCTION', 'FLOOR'];
+  const salesRoles = ['SUPER_ADMIN', 'OWNER', 'ADMIN', 'MANAGEMENT', 'SALES', 'USER', 'STAFF'];
+  const settingsRoles = ['SUPER_ADMIN', 'OWNER', 'ADMIN', 'MANAGEMENT'];
+
   const superAdminNav = document.getElementById('nav-super-admin');
   const settingsNav = document.getElementById('nav-settings');
-  const systemGroup = superAdminNav?.closest('div')?.parentElement; // div containing the group
+  const mesGroup = document.getElementById('nav-mes-group');
+  const salesGroup = document.getElementById('nav-sales-group');
+  const systemGroup = superAdminNav?.closest('div')?.parentElement;
 
   if (superAdminNav) {
-    if (user.role === 'SUPER_ADMIN') {
-      superAdminNav.classList.remove('hidden');
-    } else {
-      superAdminNav.classList.add('hidden');
-    }
+    if (role === 'SUPER_ADMIN') superAdminNav.classList.remove('hidden');
+    else superAdminNav.classList.add('hidden');
   }
 
   if (settingsNav) {
-    // Only Admin, Owner, and Super Admin can see settings
-    if (['SUPER_ADMIN', 'ADMIN', 'OWNER'].includes(user.role)) {
-      settingsNav.classList.remove('hidden');
-    } else {
-      settingsNav.classList.add('hidden');
-    }
+    if (settingsRoles.includes(role)) settingsNav.classList.remove('hidden');
+    else settingsNav.classList.add('hidden');
   }
 
-  // Show/Hide System Group container
+  if (mesGroup) {
+    if (mesRoles.includes(role)) mesGroup.classList.remove('hidden');
+    else mesGroup.classList.add('hidden');
+  }
+
+  if (salesGroup) {
+    // 현장·생산은 MES 집중 — 영업/물류 메뉴 숨김
+    if (role === 'FLOOR' || role === 'PRODUCTION') salesGroup.classList.add('hidden');
+    else if (salesRoles.includes(role)) salesGroup.classList.remove('hidden');
+    else salesGroup.classList.add('hidden');
+  }
+
   if (systemGroup) {
     const hasVisibleItems = Array.from(systemGroup.querySelectorAll('.nav-link:not(.hidden)')).length > 0;
-    if (hasVisibleItems) {
-      systemGroup.classList.remove('hidden');
-    } else {
-      systemGroup.classList.add('hidden');
-    }
+    if (hasVisibleItems) systemGroup.classList.remove('hidden');
+    else systemGroup.classList.add('hidden');
   }
+
+  // 권한 캐시 (설정 탭 등에서 사용)
+  axios.get(`${API_BASE}/ops-admin/rbac/me`).then((res) => {
+    if (res.data?.success) window.currentPermissions = res.data.data.permissions || {};
+  }).catch(() => {
+    window.currentPermissions = {};
+  });
 }
 
 // 네비게이션 설정

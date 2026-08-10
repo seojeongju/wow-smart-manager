@@ -4,8 +4,41 @@ import productionTraceRouter from './production-trace'
 import productionKpiRouter from './production-kpi'
 import productionQualityRouter from './production-quality'
 import productionOpsRouter from './production-ops'
+import { denyIfNoPermission } from '../utils/rbac'
 
 const app = new Hono<{ Bindings: Bindings; Variables: Variables }>()
+
+// Phase 7: MES RBAC 가드
+app.use('*', async (c, next) => {
+  const method = c.req.method.toUpperCase()
+  const path = c.req.path || ''
+
+  if (method === 'OPTIONS' || method === 'HEAD') {
+    return next()
+  }
+
+  if (method === 'GET') {
+    const denied = denyIfNoPermission(c, 'mes.read')
+    if (denied) return denied
+    return next()
+  }
+
+  // 쓰기 권한 분기
+  if (path.includes('/trace') || /\/work-orders\/\d+\/records/.test(path) || path.includes('/records')) {
+    const denied = denyIfNoPermission(c, 'floor.write')
+    if (denied) return denied
+  } else if (path.includes('/quality')) {
+    const denied = denyIfNoPermission(c, 'quality.write')
+    if (denied) return denied
+  } else if (path.includes('/kpi')) {
+    return c.json({ success: false, error: '권한이 없습니다.' }, 403)
+  } else {
+    const denied = denyIfNoPermission(c, 'mes.write')
+    if (denied) return denied
+  }
+
+  return next()
+})
 
 app.route('/trace', productionTraceRouter)
 app.route('/kpi', productionKpiRouter)
