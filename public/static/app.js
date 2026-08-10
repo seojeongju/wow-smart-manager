@@ -288,11 +288,22 @@ async function loadPage(page, subPage = null) {
       if (window.renderTransactionStatementPage) await window.renderTransactionStatementPage(content);
       else content.innerHTML = '<div class="text-center py-10">모듈 로딩 중...</div>';
       break;
-    case 'production':
-      updatePageTitle('생산 MES', '작업지시 · BOM · 공정 · 생산실적');
-      if (window.loadProductionPage) await window.loadProductionPage(subPage || 'work-orders');
+    case 'production': {
+      const mesTitles = {
+        kpi: ['제조 현황', '계획달성·수율·불량·납기 KPI'],
+        masters: ['기준정보', 'BOM · 공정 · 설비 마스터'],
+        'work-orders': ['작업지시', '생산계획 · 실적 · 재고연동'],
+        materials: ['자재·외주', '자재소요 · 외주공정 · 설비'],
+        trace: ['현장추적', 'Lot/QR · 투입 · 역추적'],
+        quality: ['품질검사', '검사 · 불량유형 · NCR']
+      };
+      const tab = subPage || 'kpi';
+      const [title, desc] = mesTitles[tab] || mesTitles.kpi;
+      updatePageTitle(title, desc);
+      if (window.loadProductionPage) await window.loadProductionPage(tab);
       else content.innerHTML = '<div class="text-center py-10">모듈 로딩 중...</div>';
       break;
+    }
     case 'qr-dashboard':
       updatePageTitle('QR 대시보드', 'QR 작업 현황 및 실시간 통계');
       await renderQRDashboardPage(content);

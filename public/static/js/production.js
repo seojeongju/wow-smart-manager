@@ -16,26 +16,30 @@ const MES_STATUS_CLASS = {
   cancelled: 'bg-rose-100 text-rose-700'
 };
 
-window.loadProductionPage = async function (initialTab = 'work-orders') {
+window.loadProductionPage = async function (initialTab = 'kpi') {
+  // 구 탭명 호환
+  const alias = { boms: 'masters', processes: 'masters', equipment: 'masters' };
+  const tab = alias[initialTab] || initialTab;
+
   const content = document.getElementById('content');
   content.innerHTML = `
-    <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-6">
+    <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-4">
       <div>
         <h1 class="text-2xl font-bold text-slate-800">
-          <i class="fas fa-industry mr-2 text-orange-600"></i>생산 MES
+          <i class="fas fa-industry mr-2 text-orange-600"></i>제조실행 MES
         </h1>
-        <p class="text-sm text-slate-500 mt-1">작업지시 · BOM · 공정 · 실적 · 추적 · KPI · 품질</p>
+        <p class="text-sm text-slate-500 mt-1">현황 → 기준정보 → 작업지시 → 자재/외주 → 추적 → 품질</p>
       </div>
       <div id="mes-stats" class="grid grid-cols-2 md:grid-cols-4 gap-2 text-sm"></div>
     </div>
 
     <div class="flex mb-6 border-b border-slate-200 overflow-x-auto">
-      <button onclick="switchMesTab('work-orders')" id="mes-tab-work-orders" class="px-5 py-3 text-sm font-medium border-b-2 whitespace-nowrap">작업지시</button>
-      <button onclick="switchMesTab('boms')" id="mes-tab-boms" class="px-5 py-3 text-sm font-medium border-b-2 whitespace-nowrap">BOM</button>
-      <button onclick="switchMesTab('processes')" id="mes-tab-processes" class="px-5 py-3 text-sm font-medium border-b-2 whitespace-nowrap">공정</button>
-      <button onclick="switchMesTab('trace')" id="mes-tab-trace" class="px-5 py-3 text-sm font-medium border-b-2 whitespace-nowrap">생산 추적</button>
-      <button onclick="switchMesTab('kpi')" id="mes-tab-kpi" class="px-5 py-3 text-sm font-medium border-b-2 whitespace-nowrap">KPI/리포트</button>
-      <button onclick="switchMesTab('quality')" id="mes-tab-quality" class="px-5 py-3 text-sm font-medium border-b-2 whitespace-nowrap">품질</button>
+      <button onclick="switchMesTab('kpi')" id="mes-tab-kpi" class="px-4 py-3 text-sm font-medium border-b-2 whitespace-nowrap">1.현황</button>
+      <button onclick="switchMesTab('masters')" id="mes-tab-masters" class="px-4 py-3 text-sm font-medium border-b-2 whitespace-nowrap">2.기준정보</button>
+      <button onclick="switchMesTab('work-orders')" id="mes-tab-work-orders" class="px-4 py-3 text-sm font-medium border-b-2 whitespace-nowrap">3.작업지시</button>
+      <button onclick="switchMesTab('materials')" id="mes-tab-materials" class="px-4 py-3 text-sm font-medium border-b-2 whitespace-nowrap">4.자재·외주</button>
+      <button onclick="switchMesTab('trace')" id="mes-tab-trace" class="px-4 py-3 text-sm font-medium border-b-2 whitespace-nowrap">5.현장추적</button>
+      <button onclick="switchMesTab('quality')" id="mes-tab-quality" class="px-4 py-3 text-sm font-medium border-b-2 whitespace-nowrap">6.품질</button>
     </div>
 
     <div id="mes-tab-content"></div>
@@ -43,7 +47,7 @@ window.loadProductionPage = async function (initialTab = 'work-orders') {
   `;
 
   await refreshMesStats();
-  switchMesTab(initialTab);
+  switchMesTab(tab);
 };
 
 async function refreshMesStats() {
@@ -64,10 +68,13 @@ async function refreshMesStats() {
 }
 
 window.switchMesTab = function (tabName) {
-  ['work-orders', 'boms', 'processes', 'trace', 'kpi', 'quality'].forEach((t) => {
+  const alias = { boms: 'masters', processes: 'masters', equipment: 'masters' };
+  const resolved = alias[tabName] || tabName;
+
+  ['kpi', 'masters', 'work-orders', 'materials', 'trace', 'quality'].forEach((t) => {
     const btn = document.getElementById(`mes-tab-${t}`);
     if (!btn) return;
-    if (t === tabName) {
+    if (t === resolved) {
       btn.classList.add('border-orange-600', 'text-orange-600');
       btn.classList.remove('border-transparent', 'text-slate-500');
     } else {
@@ -76,11 +83,11 @@ window.switchMesTab = function (tabName) {
     }
   });
 
-  if (tabName === 'work-orders') loadMesWorkOrders();
-  else if (tabName === 'boms') loadMesBoms();
-  else if (tabName === 'processes') loadMesProcesses();
-  else if (tabName === 'trace') loadMesTrace();
-  else if (tabName === 'kpi') loadMesKpi();
+  if (resolved === 'kpi') loadMesKpi();
+  else if (resolved === 'masters') loadMesMasters(tabName === 'processes' ? 'processes' : tabName === 'equipment' ? 'equipment' : 'boms');
+  else if (resolved === 'work-orders') loadMesWorkOrders();
+  else if (resolved === 'materials') loadMesMaterials();
+  else if (resolved === 'trace') loadMesTrace();
   else loadMesQuality();
 };
 
@@ -1712,4 +1719,328 @@ window.deactivateMesDefectType = async function (id) {
     alert(e.response?.data?.error || e.message);
   }
 };
+
+// ---------- 기준정보 (BOM / 공정 / 설비) ----------
+async function loadMesMasters(sub = 'boms') {
+  if (sub === 'boms') await loadMesBoms();
+  else if (sub === 'processes') await loadMesProcesses();
+  else await loadMesEquipment();
+
+  const container = document.getElementById('mes-tab-content');
+  if (!container) return;
+  const inner = container.innerHTML;
+  container.innerHTML = `
+    <div class="flex gap-2 mb-4">
+      <button onclick="loadMesMasters('boms')" class="px-3 py-1.5 rounded-lg text-sm ${sub === 'boms' ? 'bg-orange-600 text-white' : 'border'}">BOM</button>
+      <button onclick="loadMesMasters('processes')" class="px-3 py-1.5 rounded-lg text-sm ${sub === 'processes' ? 'bg-orange-600 text-white' : 'border'}">공정</button>
+      <button onclick="loadMesMasters('equipment')" class="px-3 py-1.5 rounded-lg text-sm ${sub === 'equipment' ? 'bg-orange-600 text-white' : 'border'}">설비</button>
+    </div>
+    ${inner}
+  `;
+}
+
+async function loadMesEquipment() {
+  const container = document.getElementById('mes-tab-content');
+  container.innerHTML = '<div class="text-center py-10"><i class="fas fa-spinner fa-spin text-3xl text-orange-500"></i></div>';
+  try {
+    const res = await axios.get(`${API_BASE}/production/ops/equipment`);
+    const rows = res.data.data || [];
+    const statusLabel = { idle: '대기', running: '가동', breakdown: '고장', maintenance: '정비' };
+    const statusClass = {
+      idle: 'bg-slate-100 text-slate-700',
+      running: 'bg-emerald-100 text-emerald-700',
+      breakdown: 'bg-rose-100 text-rose-700',
+      maintenance: 'bg-amber-100 text-amber-800'
+    };
+    container.innerHTML = `
+      <div class="flex justify-end mb-4">
+        <button onclick="showMesEquipmentModal()" class="bg-orange-600 text-white px-4 py-2 rounded-lg text-sm"><i class="fas fa-plus mr-1"></i>설비 등록</button>
+      </div>
+      <div class="bg-white border rounded-xl overflow-hidden">
+        <table class="w-full text-sm">
+          <thead class="text-xs uppercase bg-slate-50 border-b"><tr>
+            <th class="px-4 py-3 text-left">코드</th><th class="px-4 py-3 text-left">설비명</th>
+            <th class="px-4 py-3 text-left">공정</th><th class="px-4 py-3 text-left">상태</th><th class="px-4 py-3 text-right">관리</th>
+          </tr></thead>
+          <tbody class="divide-y">
+            ${rows.length ? rows.map((e) => `
+              <tr>
+                <td class="px-4 py-3">${e.code || '-'}</td>
+                <td class="px-4 py-3 font-medium">${e.name}<div class="text-xs text-slate-400">${e.location || ''}</div></td>
+                <td class="px-4 py-3">${e.process_name || '-'}</td>
+                <td class="px-4 py-3"><span class="px-2 py-0.5 rounded-full text-xs ${statusClass[e.status] || ''}">${statusLabel[e.status] || e.status}</span></td>
+                <td class="px-4 py-3 text-right space-x-2">
+                  <button onclick="mesEquipmentEvent(${e.id},'run')" class="text-emerald-600 text-xs hover:underline">가동</button>
+                  <button onclick="mesEquipmentEvent(${e.id},'stop')" class="text-slate-600 text-xs hover:underline">정지</button>
+                  <button onclick="mesEquipmentEvent(${e.id},'breakdown')" class="text-rose-600 text-xs hover:underline">고장</button>
+                  <button onclick="showMesEquipmentLogs(${e.id})" class="text-orange-600 text-xs hover:underline">이력</button>
+                </td>
+              </tr>`).join('') : '<tr><td colspan="5" class="px-4 py-10 text-center text-slate-400">등록된 설비가 없습니다.</td></tr>'}
+          </tbody>
+        </table>
+      </div>
+    `;
+  } catch (e) {
+    container.innerHTML = `<div class="text-center py-10 text-rose-600">${e.response?.data?.error || e.message}</div>`;
+  }
+}
+
+window.showMesEquipmentModal = async function () {
+  const procRes = await axios.get(`${API_BASE}/production/processes`, { params: { active: 1 } });
+  const processes = procRes.data.data || [];
+  document.getElementById('mes-modals').innerHTML = `
+    <div class="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4" onclick="if(event.target===this)closeMesModal()">
+      <div class="bg-white rounded-xl w-full max-w-md p-6">
+        <h3 class="text-lg font-bold mb-4">설비 등록</h3>
+        <div class="space-y-3 text-sm">
+          <div><label>설비명 *</label><input id="mes-eq-name" class="w-full border rounded-lg px-3 py-2 mt-1"></div>
+          <div class="grid grid-cols-2 gap-2">
+            <div><label>코드</label><input id="mes-eq-code" class="w-full border rounded-lg px-3 py-2 mt-1"></div>
+            <div><label>위치</label><input id="mes-eq-loc" class="w-full border rounded-lg px-3 py-2 mt-1"></div>
+          </div>
+          <div>
+            <label>연결 공정</label>
+            <select id="mes-eq-process" class="w-full border rounded-lg px-3 py-2 mt-1">
+              <option value="">선택 안 함</option>
+              ${processes.map((p) => `<option value="${p.id}">${p.name}</option>`).join('')}
+            </select>
+          </div>
+        </div>
+        <div class="flex justify-end gap-2 mt-6">
+          <button onclick="closeMesModal()" class="px-4 py-2 rounded-lg border">취소</button>
+          <button onclick="submitMesEquipment()" class="px-4 py-2 rounded-lg bg-orange-600 text-white">등록</button>
+        </div>
+      </div>
+    </div>
+  `;
+};
+
+window.submitMesEquipment = async function () {
+  const payload = {
+    name: document.getElementById('mes-eq-name').value.trim(),
+    code: document.getElementById('mes-eq-code').value.trim() || null,
+    location: document.getElementById('mes-eq-loc').value.trim() || null,
+    process_id: document.getElementById('mes-eq-process').value || null
+  };
+  if (!payload.name) { alert('설비명을 입력해주세요.'); return; }
+  try {
+    await axios.post(`${API_BASE}/production/ops/equipment`, payload);
+    closeMesModal();
+    loadMesMasters('equipment');
+  } catch (e) {
+    alert(e.response?.data?.error || e.message);
+  }
+};
+
+window.mesEquipmentEvent = async function (id, event_type) {
+  const notes = event_type === 'breakdown' ? (prompt('고장/비가동 메모 (선택)') || null) : null;
+  try {
+    await axios.post(`${API_BASE}/production/ops/equipment/${id}/events`, { event_type, notes });
+    loadMesMasters('equipment');
+  } catch (e) {
+    alert(e.response?.data?.error || e.message);
+  }
+};
+
+window.showMesEquipmentLogs = async function (id) {
+  try {
+    const res = await axios.get(`${API_BASE}/production/ops/equipment/${id}/logs`);
+    const logs = res.data.data || [];
+    alert(logs.length
+      ? logs.slice(0, 15).map((l) => `${(l.started_at || '').slice(0, 16)} · ${l.event_type}${l.duration_minutes != null ? ` (${Math.round(l.duration_minutes)}분)` : ''}`).join('\n')
+      : '이력이 없습니다.');
+  } catch (e) {
+    alert(e.response?.data?.error || e.message);
+  }
+};
+
+// ---------- 자재·외주 (Phase 5) ----------
+async function loadMesMaterials() {
+  const container = document.getElementById('mes-tab-content');
+  container.innerHTML = '<div class="text-center py-10"><i class="fas fa-spinner fa-spin text-3xl text-orange-500"></i></div>';
+  try {
+    const [mrpRes, osRes, eqStatsRes] = await Promise.all([
+      axios.get(`${API_BASE}/production/ops/mrp`),
+      axios.get(`${API_BASE}/production/ops/outsourcing`),
+      axios.get(`${API_BASE}/production/ops/stats`)
+    ]);
+    const mrp = mrpRes.data.data || {};
+    const items = mrp.items || [];
+    const osList = osRes.data.data || [];
+    const eq = eqStatsRes.data.data || {};
+
+    container.innerHTML = `
+      <div class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
+        <div class="bg-white border rounded-xl p-4"><div class="text-xs text-slate-500">자재 품목</div><div class="text-2xl font-bold">${mrp.total_materials || 0}</div></div>
+        <div class="bg-white border rounded-xl p-4"><div class="text-xs text-slate-500">부족 자재</div><div class="text-2xl font-bold text-rose-600">${mrp.shortage_count || 0}</div></div>
+        <div class="bg-white border rounded-xl p-4"><div class="text-xs text-slate-500">진행 외주</div><div class="text-2xl font-bold text-amber-700">${eq.open_os || 0}</div></div>
+        <div class="bg-white border rounded-xl p-4"><div class="text-xs text-slate-500">가동 설비</div><div class="text-2xl font-bold text-emerald-700">${eq.running_count || 0}/${eq.equipment_count || 0}</div></div>
+      </div>
+
+      <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <div class="bg-white border rounded-xl overflow-hidden">
+          <div class="px-4 py-3 border-b bg-slate-50 font-bold text-sm flex justify-between items-center">
+            <span>자재 소요 (미완료 WO × BOM)</span>
+            <button onclick="loadMesMaterials()" class="text-xs text-orange-600 hover:underline">새로고침</button>
+          </div>
+          <div class="overflow-x-auto max-h-96">
+            <table class="w-full text-sm">
+              <thead class="text-xs border-b sticky top-0 bg-white"><tr>
+                <th class="px-3 py-2 text-left">자재</th><th class="px-3 py-2 text-right">소요</th>
+                <th class="px-3 py-2 text-right">재고</th><th class="px-3 py-2 text-right">부족</th>
+              </tr></thead>
+              <tbody>
+                ${items.length ? items.map((i) => `
+                  <tr class="border-t ${i.shortage_qty > 0 ? 'bg-rose-50/40' : ''}">
+                    <td class="px-3 py-2">${i.product_name}<div class="text-xs text-slate-400">${i.product_sku || ''}</div></td>
+                    <td class="px-3 py-2 text-right">${Math.round(i.required_qty * 1000) / 1000}</td>
+                    <td class="px-3 py-2 text-right">${i.current_stock}</td>
+                    <td class="px-3 py-2 text-right font-medium ${i.shortage_qty > 0 ? 'text-rose-600' : 'text-emerald-600'}">${Math.round(i.shortage_qty * 1000) / 1000}</td>
+                  </tr>`).join('') : '<tr><td colspan="4" class="px-3 py-8 text-center text-slate-400">미완료 작업지시·BOM이 있으면 표시됩니다.</td></tr>'}
+              </tbody>
+            </table>
+          </div>
+          <div class="px-4 py-3 border-t text-xs text-slate-500">부족 자재는 입고/발주 메뉴에서 발주하세요.</div>
+        </div>
+
+        <div class="bg-white border rounded-xl overflow-hidden">
+          <div class="px-4 py-3 border-b bg-slate-50 font-bold text-sm flex justify-between items-center">
+            <span>외주 공정</span>
+            <button onclick="showMesOutsourcingModal()" class="text-xs bg-orange-600 text-white px-3 py-1.5 rounded-lg">외주 등록</button>
+          </div>
+          <div class="overflow-x-auto max-h-96">
+            <table class="w-full text-sm">
+              <thead class="text-xs border-b sticky top-0 bg-white"><tr>
+                <th class="px-3 py-2 text-left">외주번호</th><th class="px-3 py-2 text-left">대상</th>
+                <th class="px-3 py-2 text-left">상태</th><th class="px-3 py-2 text-right">처리</th>
+              </tr></thead>
+              <tbody>
+                ${osList.length ? osList.map((o) => `
+                  <tr class="border-t">
+                    <td class="px-3 py-2 font-mono text-xs">${o.os_number}<div class="text-slate-400">${o.supplier_name || ''}</div></td>
+                    <td class="px-3 py-2">${o.product_name || '-'}<div class="text-xs text-slate-400">${o.wo_number || ''} · ${o.quantity}</div></td>
+                    <td class="px-3 py-2 text-xs">${o.status}</td>
+                    <td class="px-3 py-2 text-right space-x-1">
+                      ${o.status === 'ordered' ? `<button onclick="mesOsStatus(${o.id},'in_progress')" class="text-amber-600 text-xs hover:underline">진행</button>` : ''}
+                      ${['ordered', 'in_progress'].includes(o.status) ? `<button onclick="mesOsReceive(${o.id})" class="text-emerald-600 text-xs hover:underline">입고</button>` : ''}
+                      ${o.status !== 'cancelled' && o.status !== 'received' ? `<button onclick="mesOsStatus(${o.id},'cancelled')" class="text-rose-500 text-xs hover:underline">취소</button>` : ''}
+                    </td>
+                  </tr>`).join('') : '<tr><td colspan="4" class="px-3 py-8 text-center text-slate-400">외주 주문 없음</td></tr>'}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    `;
+  } catch (e) {
+    container.innerHTML = `<div class="text-center py-10 text-rose-600">${e.response?.data?.error || e.message}</div>`;
+  }
+}
+
+window.showMesOutsourcingModal = async function () {
+  const [woRes, suppliersRes, procRes] = await Promise.all([
+    axios.get(`${API_BASE}/production/work-orders`),
+    axios.get(`${API_BASE}/suppliers`).catch(() => ({ data: { data: [] } })),
+    axios.get(`${API_BASE}/production/processes`, { params: { active: 1 } })
+  ]);
+  const wos = woRes.data.data || [];
+  const suppliers = suppliersRes.data.data || [];
+  const processes = procRes.data.data || [];
+
+  document.getElementById('mes-modals').innerHTML = `
+    <div class="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4" onclick="if(event.target===this)closeMesModal()">
+      <div class="bg-white rounded-xl w-full max-w-lg p-6 max-h-[90vh] overflow-y-auto">
+        <h3 class="text-lg font-bold mb-4">외주 등록</h3>
+        <div class="space-y-3 text-sm">
+          <div>
+            <label>작업지시</label>
+            <select id="mes-os-wo" class="w-full border rounded-lg px-3 py-2 mt-1">
+              <option value="">선택 안 함</option>
+              ${wos.map((w) => `<option value="${w.id}">${w.wo_number} — ${w.product_name}</option>`).join('')}
+            </select>
+          </div>
+          <div>
+            <label>공급사</label>
+            <select id="mes-os-supplier" class="w-full border rounded-lg px-3 py-2 mt-1">
+              <option value="">선택 안 함</option>
+              ${suppliers.map((s) => `<option value="${s.id}">${s.name}</option>`).join('')}
+            </select>
+          </div>
+          <div>
+            <label>외주 공정</label>
+            <select id="mes-os-process" class="w-full border rounded-lg px-3 py-2 mt-1">
+              <option value="">선택 안 함</option>
+              ${processes.map((p) => `<option value="${p.id}">${p.name}</option>`).join('')}
+            </select>
+          </div>
+          <div class="grid grid-cols-2 gap-3">
+            <div><label>수량 *</label><input id="mes-os-qty" type="number" min="0.01" value="1" class="w-full border rounded-lg px-3 py-2 mt-1"></div>
+            <div><label>납기</label><input id="mes-os-due" type="date" class="w-full border rounded-lg px-3 py-2 mt-1"></div>
+          </div>
+          <div><label>단가</label><input id="mes-os-cost" type="number" min="0" value="0" class="w-full border rounded-lg px-3 py-2 mt-1"></div>
+          <div><label>메모</label><textarea id="mes-os-notes" class="w-full border rounded-lg px-3 py-2 mt-1" rows="2"></textarea></div>
+        </div>
+        <div class="flex justify-end gap-2 mt-6">
+          <button onclick="closeMesModal()" class="px-4 py-2 rounded-lg border">취소</button>
+          <button onclick="submitMesOutsourcing()" class="px-4 py-2 rounded-lg bg-orange-600 text-white">등록</button>
+        </div>
+      </div>
+    </div>
+  `;
+};
+
+window.submitMesOutsourcing = async function () {
+  const payload = {
+    work_order_id: document.getElementById('mes-os-wo').value || null,
+    supplier_id: document.getElementById('mes-os-supplier').value || null,
+    process_id: document.getElementById('mes-os-process').value || null,
+    quantity: Number(document.getElementById('mes-os-qty').value),
+    due_date: document.getElementById('mes-os-due').value || null,
+    unit_cost: Number(document.getElementById('mes-os-cost').value) || 0,
+    notes: document.getElementById('mes-os-notes').value || null
+  };
+  if (!(payload.quantity > 0)) { alert('수량을 입력해주세요.'); return; }
+  try {
+    const res = await axios.post(`${API_BASE}/production/ops/outsourcing`, payload);
+    alert(`외주 등록: ${res.data.data.os_number}`);
+    closeMesModal();
+    loadMesMaterials();
+  } catch (e) {
+    alert(e.response?.data?.error || e.message);
+  }
+};
+
+window.mesOsStatus = async function (id, status) {
+  try {
+    await axios.put(`${API_BASE}/production/ops/outsourcing/${id}/status`, { status });
+    loadMesMaterials();
+  } catch (e) {
+    alert(e.response?.data?.error || e.message);
+  }
+};
+
+window.mesOsReceive = async function (id) {
+  const apply = confirm('외주 입고 처리합니다. 재고에도 반영할까요?');
+  let warehouse_id = null;
+  if (apply) {
+    const whRes = await axios.get(`${API_BASE}/warehouses`);
+    const whs = whRes.data.data || whRes.data || [];
+    if (!whs.length) { alert('창고가 없습니다.'); return; }
+    const pick = prompt(`창고 번호 선택:\n${whs.map((w, i) => `${i + 1}. ${w.name}`).join('\n')}`, '1');
+    const wh = whs[Number(pick) - 1];
+    if (!wh) return;
+    warehouse_id = wh.id;
+  }
+  try {
+    await axios.put(`${API_BASE}/production/ops/outsourcing/${id}/status`, {
+      status: 'received',
+      apply_stock: !!warehouse_id,
+      warehouse_id
+    });
+    loadMesMaterials();
+  } catch (e) {
+    alert(e.response?.data?.error || e.message);
+  }
+};
+
 

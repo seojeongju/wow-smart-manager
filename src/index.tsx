@@ -1097,49 +1097,79 @@ app.get('/', (c: Context) => {
                                                             </div>
                                                         </div>
 
-                                                        <!-- MES Group -->
+                                                        <!-- MES Group — 업무 프로세스 순서 -->
                                                         <div>
                                                             <p class="px-4 text-[11px] font-bold text-slate-500 uppercase tracking-widest mb-3 flex items-center gap-2">
                                                                 <span class="w-1.5 h-1.5 rounded-full bg-orange-500/50"></span>
-                                                                MES (제조실행시스템)
+                                                                MES (제조실행)
                                                             </p>
                                                             <div class="space-y-1">
-                                                                <a href="#" data-page="production" data-tab="work-orders" class="nav-link flex items-center px-4 py-3 rounded-lg group" onclick="closeSidebarOnMobile()">
-                                                                    <i class="fas fa-industry w-6 text-center text-lg mr-3"></i>
-                                                                    <span class="font-medium">생산 MES</span>
-                                                                </a>
-                                                                <a href="#" data-page="production" data-tab="trace" class="nav-link flex items-center px-4 py-3 rounded-lg group" onclick="closeSidebarOnMobile()">
-                                                                    <i class="fas fa-route w-6 text-center text-lg mr-3"></i>
-                                                                    <span class="font-medium">생산 추적</span>
-                                                                </a>
-                                                                <a href="#" data-page="production" data-tab="kpi" class="nav-link flex items-center px-4 py-3 rounded-lg group" onclick="closeSidebarOnMobile()">
-                                                                    <i class="fas fa-chart-pie w-6 text-center text-lg mr-3"></i>
-                                                                    <span class="font-medium">제조 KPI</span>
-                                                                </a>
-                                                                <a href="#" data-page="production" data-tab="quality" class="nav-link flex items-center px-4 py-3 rounded-lg group" onclick="closeSidebarOnMobile()">
-                                                                    <i class="fas fa-clipboard-check w-6 text-center text-lg mr-3"></i>
-                                                                    <span class="font-medium">품질관리</span>
-                                                                </a>
-                                                                <a href="#" data-page="qr-dashboard" class="nav-link flex items-center px-4 py-3 rounded-lg group" onclick="closeSidebarOnMobile()">
-                                                                    <i class="fas fa-chart-line w-6 text-center text-lg mr-3"></i>
-                                                                    <span class="font-medium">QR 대시보드</span>
-                                                                </a>
-                                                                <a href="#" data-page="qr-inbound" class="nav-link flex items-center px-4 py-3 rounded-lg group" onclick="closeSidebarOnMobile()">
-                                                                    <i class="fas fa-qrcode w-6 text-center text-lg mr-3"></i>
-                                                                    <span class="font-medium">QR 입고</span>
-                                                                </a>
-                                                                <a href="#" data-page="qr-outbound" class="nav-link flex items-center px-4 py-3 rounded-lg group" onclick="closeSidebarOnMobile()">
-                                                                    <i class="fas fa-dolly w-6 text-center text-lg mr-3"></i>
-                                                                    <span class="font-medium">QR 출고</span>
-                                                                </a>
-                                                                <a href="#" data-page="qr-sale" class="nav-link flex items-center px-4 py-3 rounded-lg group" onclick="closeSidebarOnMobile()">
-                                                                    <i class="fas fa-cash-register w-6 text-center text-lg mr-3"></i>
-                                                                    <span class="font-medium">QR 판매</span>
-                                                                </a>
-                                                                <a href="#" data-page="qr-management" class="nav-link flex items-center px-4 py-3 rounded-lg group" onclick="closeSidebarOnMobile()">
-                                                                    <i class="fas fa-cogs w-6 text-center text-lg mr-3"></i>
-                                                                    <span class="font-medium">QR 관리</span>
-                                                                </a>
+                                                                <div class="nav-item-group">
+                                                                    <button onclick="toggleSubMenu(this, 'mes-exec-submenu')" class="flex items-center justify-between w-full px-4 py-3 rounded-lg group hover:bg-white/5 transition-all text-slate-400 hover:text-white">
+                                                                        <div class="flex items-center">
+                                                                            <i class="fas fa-industry w-6 text-center text-lg mr-3"></i>
+                                                                            <span class="font-medium">제조실행</span>
+                                                                        </div>
+                                                                        <i class="fas fa-chevron-down text-[10px] submenu-arrow"></i>
+                                                                    </button>
+                                                                    <div id="mes-exec-submenu" class="nav-submenu ml-4 space-y-1 open">
+                                                                        <a href="#" data-page="production" data-tab="kpi" class="nav-link flex items-center px-4 py-2 rounded-lg group text-sm" onclick="closeSidebarOnMobile()">
+                                                                            <i class="fas fa-chart-pie w-5 text-center mr-3 text-xs opacity-70"></i>
+                                                                            <span>1. 제조 현황</span>
+                                                                        </a>
+                                                                        <a href="#" data-page="production" data-tab="masters" class="nav-link flex items-center px-4 py-2 rounded-lg group text-sm" onclick="closeSidebarOnMobile()">
+                                                                            <i class="fas fa-sitemap w-5 text-center mr-3 text-xs opacity-70"></i>
+                                                                            <span>2. 기준정보</span>
+                                                                        </a>
+                                                                        <a href="#" data-page="production" data-tab="work-orders" class="nav-link flex items-center px-4 py-2 rounded-lg group text-sm" onclick="closeSidebarOnMobile()">
+                                                                            <i class="fas fa-clipboard-list w-5 text-center mr-3 text-xs opacity-70"></i>
+                                                                            <span>3. 작업지시</span>
+                                                                        </a>
+                                                                        <a href="#" data-page="production" data-tab="materials" class="nav-link flex items-center px-4 py-2 rounded-lg group text-sm" onclick="closeSidebarOnMobile()">
+                                                                            <i class="fas fa-boxes w-5 text-center mr-3 text-xs opacity-70"></i>
+                                                                            <span>4. 자재·외주</span>
+                                                                        </a>
+                                                                        <a href="#" data-page="production" data-tab="trace" class="nav-link flex items-center px-4 py-2 rounded-lg group text-sm" onclick="closeSidebarOnMobile()">
+                                                                            <i class="fas fa-route w-5 text-center mr-3 text-xs opacity-70"></i>
+                                                                            <span>5. 현장추적</span>
+                                                                        </a>
+                                                                        <a href="#" data-page="production" data-tab="quality" class="nav-link flex items-center px-4 py-2 rounded-lg group text-sm" onclick="closeSidebarOnMobile()">
+                                                                            <i class="fas fa-clipboard-check w-5 text-center mr-3 text-xs opacity-70"></i>
+                                                                            <span>6. 품질검사</span>
+                                                                        </a>
+                                                                    </div>
+                                                                </div>
+                                                                <div class="nav-item-group">
+                                                                    <button onclick="toggleSubMenu(this, 'mes-qr-submenu')" class="flex items-center justify-between w-full px-4 py-3 rounded-lg group hover:bg-white/5 transition-all text-slate-400 hover:text-white">
+                                                                        <div class="flex items-center">
+                                                                            <i class="fas fa-qrcode w-6 text-center text-lg mr-3"></i>
+                                                                            <span class="font-medium">QR 현장</span>
+                                                                        </div>
+                                                                        <i class="fas fa-chevron-down text-[10px] submenu-arrow"></i>
+                                                                    </button>
+                                                                    <div id="mes-qr-submenu" class="nav-submenu ml-4 space-y-1">
+                                                                        <a href="#" data-page="qr-dashboard" class="nav-link flex items-center px-4 py-2 rounded-lg group text-sm" onclick="closeSidebarOnMobile()">
+                                                                            <i class="fas fa-chart-line w-5 text-center mr-3 text-xs opacity-70"></i>
+                                                                            <span>QR 현황</span>
+                                                                        </a>
+                                                                        <a href="#" data-page="qr-inbound" class="nav-link flex items-center px-4 py-2 rounded-lg group text-sm" onclick="closeSidebarOnMobile()">
+                                                                            <i class="fas fa-sign-in-alt w-5 text-center mr-3 text-xs opacity-70"></i>
+                                                                            <span>QR 입고</span>
+                                                                        </a>
+                                                                        <a href="#" data-page="qr-outbound" class="nav-link flex items-center px-4 py-2 rounded-lg group text-sm" onclick="closeSidebarOnMobile()">
+                                                                            <i class="fas fa-dolly w-5 text-center mr-3 text-xs opacity-70"></i>
+                                                                            <span>QR 출고</span>
+                                                                        </a>
+                                                                        <a href="#" data-page="qr-sale" class="nav-link flex items-center px-4 py-2 rounded-lg group text-sm" onclick="closeSidebarOnMobile()">
+                                                                            <i class="fas fa-cash-register w-5 text-center mr-3 text-xs opacity-70"></i>
+                                                                            <span>QR 판매</span>
+                                                                        </a>
+                                                                        <a href="#" data-page="qr-management" class="nav-link flex items-center px-4 py-2 rounded-lg group text-sm" onclick="closeSidebarOnMobile()">
+                                                                            <i class="fas fa-tags w-5 text-center mr-3 text-xs opacity-70"></i>
+                                                                            <span>QR 라벨관리</span>
+                                                                        </a>
+                                                                    </div>
+                                                                </div>
                                                             </div>
                                                         </div>
 
@@ -1287,7 +1317,7 @@ app.get('/', (c: Context) => {
                                             <script src="/static/js/utils.js?v=2"></script>
                                             <script src="/static/js/utils_address.js?v=1"></script>
                                             <script src="/static/js/auth.js?v=1"></script>
-                                            <script src="/static/app.js?v=30"></script>
+                                            <script src="/static/app.js?v=31"></script>
                                             <script src="/static/js/outbound.js?v=9"></script>
                                             <script src="/static/js/purchases.js?v=1"></script>
                                             <script src="/static/js/options.js?v=1"></script>
@@ -1297,7 +1327,7 @@ app.get('/', (c: Context) => {
                                             <script src="/static/js/tracking.js?v=1"></script>
                                             <script src="/static/js/transaction-statement.js?v=1"></script>
                                             <script src="/static/js/qr-mes.js?v=1"></script>
-                                            <script src="/static/js/production.js?v=4"></script>
+                                            <script src="/static/js/production.js?v=5"></script>
                                         </body>
                                     </html>
                                     `)
