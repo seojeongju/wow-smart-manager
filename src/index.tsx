@@ -1607,7 +1607,8 @@ app.get('/', (c: Context) => {
                                             <script src="/static/js/utils.js?v=2"></script>
                                             <script src="/static/js/utils_address.js?v=1"></script>
                                             <script src="/static/js/auth.js?v=2"></script>
-                                            <script src="/static/app.js?v=58"></script>
+                                            <script src="/static/app.js?v=59"></script>
+                                            <script src="/static/js/dashboard-tabs.js?v=1"></script>
                                             <script src="/static/js/outbound.js?v=13"></script>
                                             <script src="/static/js/purchases.js?v=5"></script>
                                             <script src="/static/js/options.js?v=1"></script>
@@ -1628,7 +1629,7 @@ app.get('/', (c: Context) => {
                                             <script src="/static/js/shopfloor.js?v=2"></script>
                                             <script src="/static/js/mes-schedule.js?v=1"></script>
                                             <script src="/static/js/barcode-manager.js?v=3"></script>
-                                            <script src="/static/js/help-guides.js?v=15"></script>
+                                            <script src="/static/js/help-guides.js?v=16"></script>
                                         </body>
                                     </html>
                                     `)

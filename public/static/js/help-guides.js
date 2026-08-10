@@ -21,14 +21,33 @@ const HELP_GUIDES = {
 
   // ---------- 공통 ----------
   dashboard: {
-    title: '대시보드',
-    summary: '매출·재고·주요 지표를 한눈에 보는 시작 화면입니다.',
+    title: '대시보드 · ERP',
+    summary: '매출·재고·오늘의 업무를 한눈에 보는 ERP 시작 화면입니다.',
     steps: [
-      '상단·카드에서 오늘 현황을 확인합니다.',
+      '상단 탭에서 ERP / MES 성과지표를 전환합니다.',
+      'ERP 탭에서 오늘 매출·주문·재고 경고를 확인합니다.',
       '빠른 업무가 필요하면 카드/메뉴로 해당 화면으로 이동합니다.'
     ],
-    tips: ['자세한 제조 KPI는 제조실행 → 현황을 이용하세요.'],
-    related: [{ label: '제조 현황', page: 'production', tab: 'kpi' }]
+    tips: ['제조 지표는 MES 성과지표 탭을 이용하세요.'],
+    related: [
+      { label: 'MES 성과지표', page: 'dashboard', tab: 'mes' },
+      { label: '제조 KPI', page: 'production', tab: 'kpi' }
+    ]
+  },
+  'dashboard:mes': {
+    title: '대시보드 · MES',
+    summary: '제조 성과·OEE·작업지시 현황을 한눈에 봅니다.',
+    steps: [
+      '양품·계획달성·수율·납기·OEE 카드를 확인합니다.',
+      '일별 생산·설비 OEE·제품별 실적을 점검합니다.',
+      '상세가 필요하면 OEE·현장 실행·제조 KPI로 이동합니다.'
+    ],
+    tips: ['기간 기본값은 최근 30일, OEE는 7일 기준입니다.'],
+    related: [
+      { label: 'ERP 대시보드', page: 'dashboard', tab: 'erp' },
+      { label: 'OEE', page: 'mes-oee' },
+      { label: '현장 실행', page: 'shopfloor' }
+    ]
   },
   products: {
     title: '상품 관리',
