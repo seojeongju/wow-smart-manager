@@ -584,7 +584,7 @@ async function loadPage(page, subPage = null) {
       };
       navTab = subPage || bcAlias[page] || 'dashboard';
     } else if (page === 'production') {
-      navTab = subPage || 'kpi';
+      navTab = subPage || 'shopfloor';
     }
     window.syncSidebarNav(navPage, navTab);
   }
@@ -614,7 +614,7 @@ async function loadPage(page, subPage = null) {
       };
       helpTab = subPage || bcAlias[page] || 'dashboard';
     } else if (page === 'production') {
-      helpTab = subPage || 'kpi';
+      helpTab = subPage || 'shopfloor';
     } else if (page === 'help') {
       helpPage = 'help';
       helpTab = null;
@@ -761,17 +761,17 @@ async function loadPage(page, subPage = null) {
       break;
     case 'production': {
       const mesTitles = {
-        shopfloor: ['현장 실행', '작업지시 · QR 스캔 · 투입/공정/실적'],
-        kpi: ['제조 현황', 'KPI · 원가 · 월간 성과'],
-        schedule: ['생산 일정', '주간 일정판 · 드래그 배치'],
         masters: ['기준정보', 'BOM · 공정 · 설비 마스터'],
+        schedule: ['생산 일정', '주간 일정판 · 드래그 배치'],
         'work-orders': ['작업지시', '생산계획 · 실적 · 재고연동'],
+        shopfloor: ['현장 실행', '작업지시 · QR 스캔 · 투입/공정/실적'],
+        quality: ['품질검사', '검사 · 불량유형 · NCR'],
         materials: ['자재·외주', '자재소요 · 외주공정 · 설비'],
-        trace: ['현장추적', 'Lot/QR · 투입 · 역추적'],
-        quality: ['품질검사', '검사 · 불량유형 · NCR']
+        trace: ['Lot · 역추적', 'Lot/QR · 투입 · 역추적'],
+        kpi: ['제조 KPI · 원가', 'KPI · 원가 · 월간 성과']
       };
-      const tab = subPage || 'kpi';
-      const [title, desc] = mesTitles[tab] || mesTitles.kpi;
+      const tab = subPage || 'shopfloor';
+      const [title, desc] = mesTitles[tab] || mesTitles.shopfloor;
       updatePageTitle(title, desc);
       if (window.loadProductionPage) await window.loadProductionPage(tab);
       else content.innerHTML = '<div class="text-center py-10">모듈 로딩 중...</div>';

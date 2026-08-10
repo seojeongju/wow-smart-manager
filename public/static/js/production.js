@@ -16,7 +16,7 @@ const MES_STATUS_CLASS = {
   cancelled: 'bg-rose-100 text-rose-700'
 };
 
-window.loadProductionPage = async function (initialTab = 'kpi') {
+window.loadProductionPage = async function (initialTab = 'shopfloor') {
   // 구 탭명 호환
   const alias = { boms: 'masters', processes: 'masters', equipment: 'masters' };
   const tab = alias[initialTab] || initialTab;
@@ -28,20 +28,20 @@ window.loadProductionPage = async function (initialTab = 'kpi') {
         <h1 class="text-2xl font-bold text-slate-800">
           <i class="fas fa-industry mr-2 text-orange-600"></i>제조실행 MES
         </h1>
-        <p class="text-sm text-slate-500 mt-1">현장실행 → 현황 → 생산일정 → 기준정보 → 작업지시 → 자재/외주 → 추적 → 품질</p>
+        <p class="text-sm text-slate-500 mt-1">사이드바 MES 순서와 동일 · 기준정보 → 일정 → 작업지시 → 현장 → 품질 → 자재 → 추적 → KPI</p>
       </div>
       <div id="mes-stats" class="grid grid-cols-2 md:grid-cols-4 gap-2 text-sm"></div>
     </div>
 
     <div class="flex mb-6 border-b border-slate-200 overflow-x-auto">
-      <button onclick="switchMesTab('shopfloor')" id="mes-tab-shopfloor" class="px-4 py-3 text-sm font-medium border-b-2 whitespace-nowrap">1.현장실행</button>
-      <button onclick="switchMesTab('kpi')" id="mes-tab-kpi" class="px-4 py-3 text-sm font-medium border-b-2 whitespace-nowrap">2.현황</button>
-      <button onclick="switchMesTab('schedule')" id="mes-tab-schedule" class="px-4 py-3 text-sm font-medium border-b-2 whitespace-nowrap">3.생산일정</button>
-      <button onclick="switchMesTab('masters')" id="mes-tab-masters" class="px-4 py-3 text-sm font-medium border-b-2 whitespace-nowrap">4.기준정보</button>
-      <button onclick="switchMesTab('work-orders')" id="mes-tab-work-orders" class="px-4 py-3 text-sm font-medium border-b-2 whitespace-nowrap">5.작업지시</button>
-      <button onclick="switchMesTab('materials')" id="mes-tab-materials" class="px-4 py-3 text-sm font-medium border-b-2 whitespace-nowrap">6.자재·외주</button>
-      <button onclick="switchMesTab('trace')" id="mes-tab-trace" class="px-4 py-3 text-sm font-medium border-b-2 whitespace-nowrap">7.현장추적</button>
-      <button onclick="switchMesTab('quality')" id="mes-tab-quality" class="px-4 py-3 text-sm font-medium border-b-2 whitespace-nowrap">8.품질</button>
+      <button onclick="switchMesTab('masters')" id="mes-tab-masters" class="px-4 py-3 text-sm font-medium border-b-2 whitespace-nowrap">기준정보</button>
+      <button onclick="switchMesTab('schedule')" id="mes-tab-schedule" class="px-4 py-3 text-sm font-medium border-b-2 whitespace-nowrap">생산일정</button>
+      <button onclick="switchMesTab('work-orders')" id="mes-tab-work-orders" class="px-4 py-3 text-sm font-medium border-b-2 whitespace-nowrap">작업지시</button>
+      <button onclick="switchMesTab('shopfloor')" id="mes-tab-shopfloor" class="px-4 py-3 text-sm font-medium border-b-2 whitespace-nowrap">현장실행</button>
+      <button onclick="switchMesTab('quality')" id="mes-tab-quality" class="px-4 py-3 text-sm font-medium border-b-2 whitespace-nowrap">품질</button>
+      <button onclick="switchMesTab('materials')" id="mes-tab-materials" class="px-4 py-3 text-sm font-medium border-b-2 whitespace-nowrap">자재·외주</button>
+      <button onclick="switchMesTab('trace')" id="mes-tab-trace" class="px-4 py-3 text-sm font-medium border-b-2 whitespace-nowrap">Lot·추적</button>
+      <button onclick="switchMesTab('kpi')" id="mes-tab-kpi" class="px-4 py-3 text-sm font-medium border-b-2 whitespace-nowrap">KPI·원가</button>
     </div>
 
     <div id="mes-tab-content"></div>
@@ -73,7 +73,7 @@ window.switchMesTab = function (tabName) {
   const alias = { boms: 'masters', processes: 'masters', equipment: 'masters' };
   const resolved = alias[tabName] || tabName;
 
-  ['shopfloor', 'kpi', 'schedule', 'masters', 'work-orders', 'materials', 'trace', 'quality'].forEach((t) => {
+  ['masters', 'schedule', 'work-orders', 'shopfloor', 'quality', 'materials', 'trace', 'kpi'].forEach((t) => {
     const btn = document.getElementById(`mes-tab-${t}`);
     if (!btn) return;
     if (t === resolved) {
@@ -86,17 +86,17 @@ window.switchMesTab = function (tabName) {
   });
 
   const mesTitles = {
-    shopfloor: ['현장 실행', '작업지시 · QR 스캔 · 투입/공정/실적'],
-    kpi: ['제조 현황', 'KPI · 원가 · 월간 성과'],
-    schedule: ['생산 일정', '주간 일정판 · 드래그 배치'],
     masters: ['기준정보', 'BOM · 공정 · 설비 마스터'],
+    schedule: ['생산 일정', '주간 일정판 · 드래그 배치'],
     'work-orders': ['작업지시', '생산계획 · 실적 · 재고연동'],
+    shopfloor: ['현장 실행', '작업지시 · QR 스캔 · 투입/공정/실적'],
+    quality: ['품질검사', '검사 · 불량유형 · NCR'],
     materials: ['자재·외주', '자재소요 · 외주공정 · 설비'],
-    trace: ['현장추적', 'Lot/QR · 투입 · 역추적'],
-    quality: ['품질검사', '검사 · 불량유형 · NCR']
+    trace: ['Lot · 역추적', 'Lot/QR · 투입 · 역추적'],
+    kpi: ['제조 KPI · 원가', 'KPI · 원가 · 월간 성과']
   };
   if (typeof updatePageTitle === 'function') {
-    const [title, desc] = mesTitles[resolved] || mesTitles.kpi;
+    const [title, desc] = mesTitles[resolved] || mesTitles.shopfloor;
     updatePageTitle(title, desc);
   }
   if (typeof window.syncSidebarNav === 'function') {
