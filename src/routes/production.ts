@@ -450,12 +450,14 @@ app.get('/work-orders', async (c) => {
       b.name as bom_name, b.version as bom_version,
       pr.name as process_name,
       w.name as warehouse_name,
+      eq.name as equipment_name,
       u.name as created_by_name
     FROM mes_work_orders wo
     JOIN products p ON wo.product_id = p.id
     LEFT JOIN mes_boms b ON wo.bom_id = b.id
     LEFT JOIN mes_processes pr ON wo.process_id = pr.id
     LEFT JOIN warehouses w ON wo.warehouse_id = w.id
+    LEFT JOIN mes_equipment eq ON wo.equipment_id = eq.id
     LEFT JOIN users u ON wo.created_by = u.id
     WHERE wo.tenant_id = ?
   `
@@ -486,12 +488,14 @@ app.get('/work-orders/:id', async (c) => {
       b.name as bom_name, b.version as bom_version,
       pr.name as process_name,
       w.name as warehouse_name,
+      eq.name as equipment_name,
       u.name as created_by_name
     FROM mes_work_orders wo
     JOIN products p ON wo.product_id = p.id
     LEFT JOIN mes_boms b ON wo.bom_id = b.id
     LEFT JOIN mes_processes pr ON wo.process_id = pr.id
     LEFT JOIN warehouses w ON wo.warehouse_id = w.id
+    LEFT JOIN mes_equipment eq ON wo.equipment_id = eq.id
     LEFT JOIN users u ON wo.created_by = u.id
     WHERE wo.id = ? AND wo.tenant_id = ?
   `).bind(id, tenantId).first()
@@ -566,8 +570,8 @@ app.post('/work-orders', async (c) => {
       INSERT INTO mes_work_orders (
         tenant_id, wo_number, product_id, bom_id, process_id, planned_qty,
         status, warehouse_id, planned_start_date, planned_end_date,
-        assignee_user_id, notes, created_by
-      ) VALUES (?, ?, ?, ?, ?, ?, 'planned', ?, ?, ?, ?, ?, ?)
+        assignee_user_id, equipment_id, notes, created_by
+      ) VALUES (?, ?, ?, ?, ?, ?, 'planned', ?, ?, ?, ?, ?, ?, ?)
     `).bind(
       tenantId,
       woNumber,
@@ -579,6 +583,7 @@ app.post('/work-orders', async (c) => {
       body.planned_start_date || null,
       body.planned_end_date || null,
       body.assignee_user_id || null,
+      body.equipment_id || null,
       body.notes || null,
       userId
     ).run()
@@ -614,7 +619,7 @@ app.put('/work-orders/:id', async (c) => {
     UPDATE mes_work_orders
     SET bom_id = ?, process_id = ?, planned_qty = ?, warehouse_id = ?,
         planned_start_date = ?, planned_end_date = ?, assignee_user_id = ?,
-        notes = ?, updated_at = datetime('now')
+        equipment_id = ?, notes = ?, updated_at = datetime('now')
     WHERE id = ? AND tenant_id = ?
   `).bind(
     body.bom_id ?? wo.bom_id,
@@ -624,6 +629,7 @@ app.put('/work-orders/:id', async (c) => {
     body.planned_start_date ?? wo.planned_start_date,
     body.planned_end_date ?? wo.planned_end_date,
     body.assignee_user_id ?? wo.assignee_user_id,
+    body.equipment_id !== undefined ? (body.equipment_id || null) : wo.equipment_id,
     body.notes ?? wo.notes,
     id,
     tenantId

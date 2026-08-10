@@ -61,6 +61,218 @@ app.get('/mrp', async (c) => {
   })
 })
 
+// 부족 자재 → 발주서 생성
+app.post('/mrp/create-po', async (c) => {
+  const { DB } = c.env
+  const tenantId = c.get('tenantId')
+  const userId = c.get('userId')
+  const body = await c.req.json<any>()
+
+  if (!body.supplier_id) {
+    return c.json({ success: false, error: '공급사를 선택해주세요.' }, 400)
+  }
+
+  const supplier = await DB.prepare(
+    'SELECT id FROM suppliers WHERE id = ? AND tenant_id = ?'
+  ).bind(body.supplier_id, tenantId).first()
+  if (!supplier) {
+    return c.json({ success: false, error: '공급사를 찾을 수 없습니다.' }, 404)
+  }
+
+  // 동일 MRP 계산
+  const { results } = await DB.prepare(`
+    SELECT
+      bi.component_product_id as product_id,
+      p.name as product_name,
+      p.sku as product_sku,
+      p.current_stock,
+      COALESCE(p.purchase_price, 0) as purchase_price,
+      COALESCE(SUM(
+        bi.quantity * CASE
+          WHEN (wo.planned_qty - wo.completed_qty) > 0 THEN (wo.planned_qty - wo.completed_qty)
+          ELSE 0
+        END
+      ), 0) as required_qty
+    FROM mes_work_orders wo
+    JOIN mes_bom_items bi ON bi.bom_id = wo.bom_id AND bi.tenant_id = wo.tenant_id
+    JOIN products p ON bi.component_product_id = p.id
+    WHERE wo.tenant_id = ?
+      AND wo.status IN ('planned', 'released', 'in_progress')
+      AND wo.bom_id IS NOT NULL
+      AND (wo.planned_qty - wo.completed_qty) > 0
+    GROUP BY bi.component_product_id, p.name, p.sku, p.current_stock, p.purchase_price
+  `).bind(tenantId).all<any>()
+
+  let items = (results || []).map((r: any) => {
+    const required = Number(r.required_qty) || 0
+    const stock = Number(r.current_stock) || 0
+    const shortage = Math.max(required - stock, 0)
+    return {
+      product_id: Number(r.product_id),
+      quantity: shortage,
+      unit_price: Number(r.purchase_price) || 0,
+      product_name: r.product_name
+    }
+  }).filter((i: any) => i.quantity > 0)
+
+  if (Array.isArray(body.product_ids) && body.product_ids.length) {
+    const set = new Set(body.product_ids.map((x: any) => Number(x)))
+    items = items.filter((i: any) => set.has(i.product_id))
+  }
+
+  if (!items.length) {
+    return c.json({ success: false, error: '발주할 부족 자재가 없습니다.' }, 400)
+  }
+
+  const dateStr = new Date().toISOString().slice(0, 10).replace(/-/g, '')
+  const randomStr = Math.floor(Math.random() * 1000).toString().padStart(3, '0')
+  const code = `PO-${dateStr}-${randomStr}`
+  const totalAmount = items.reduce((sum: number, item: any) => sum + item.quantity * item.unit_price, 0)
+
+  try {
+    const poRes = await DB.prepare(`
+      INSERT INTO purchase_orders (tenant_id, supplier_id, code, status, total_amount, expected_at, created_by, notes)
+      VALUES (?, ?, ?, 'ORDERED', ?, ?, ?, ?)
+    `).bind(
+      tenantId,
+      body.supplier_id,
+      code,
+      totalAmount,
+      body.expected_at || null,
+      userId,
+      body.notes || 'MES 자재소요(MRP) 기반 자동 발주'
+    ).run()
+
+    const poId = poRes.meta.last_row_id
+    for (const item of items) {
+      await DB.prepare(`
+        INSERT INTO purchase_items (purchase_order_id, product_id, quantity, unit_price)
+        VALUES (?, ?, ?, ?)
+      `).bind(poId, item.product_id, item.quantity, item.unit_price).run()
+    }
+
+    return c.json({
+      success: true,
+      message: `부족 자재 ${items.length}품목 발주가 생성되었습니다.`,
+      data: { id: poId, code, item_count: items.length, total_amount: totalAmount }
+    })
+  } catch (e: any) {
+    console.error(e)
+    return c.json({ success: false, error: e.message || '발주 생성 실패' }, 500)
+  }
+})
+
+// 작업지시 자재 불출 (재고 차감)
+app.post('/material-issue', async (c) => {
+  const { DB } = c.env
+  const tenantId = c.get('tenantId')
+  const userId = c.get('userId')
+  const body = await c.req.json<any>()
+
+  const workOrderId = Number(body.work_order_id)
+  const productId = Number(body.product_id)
+  const warehouseId = Number(body.warehouse_id)
+  const quantity = Number(body.quantity)
+
+  if (!workOrderId || !productId || !warehouseId || !(quantity > 0)) {
+    return c.json({ success: false, error: '작업지시, 자재, 창고, 수량은 필수입니다.' }, 400)
+  }
+
+  const wo = await DB.prepare(
+    'SELECT * FROM mes_work_orders WHERE id = ? AND tenant_id = ?'
+  ).bind(workOrderId, tenantId).first<any>()
+  if (!wo) return c.json({ success: false, error: '작업지시를 찾을 수 없습니다.' }, 404)
+  if (!['released', 'in_progress'].includes(wo.status)) {
+    return c.json({ success: false, error: '확정/진행중 작업지시에서만 불출할 수 있습니다.' }, 400)
+  }
+
+  if (wo.bom_id) {
+    const inBom = await DB.prepare(`
+      SELECT id FROM mes_bom_items
+      WHERE bom_id = ? AND tenant_id = ? AND component_product_id = ?
+    `).bind(wo.bom_id, tenantId, productId).first()
+    if (!inBom) {
+      return c.json({ success: false, error: 'BOM에 없는 자재입니다.' }, 400)
+    }
+  }
+
+  const whStock = await DB.prepare(`
+    SELECT quantity FROM product_warehouse_stocks
+    WHERE product_id = ? AND warehouse_id = ? AND tenant_id = ?
+  `).bind(productId, warehouseId, tenantId).first<{ quantity: number }>()
+
+  if ((whStock?.quantity || 0) < quantity) {
+    return c.json({
+      success: false,
+      error: `창고 재고 부족 (현재: ${whStock?.quantity || 0})`
+    }, 400)
+  }
+
+  try {
+    await DB.prepare(`
+      UPDATE products SET current_stock = current_stock - ?, updated_at = CURRENT_TIMESTAMP
+      WHERE id = ? AND tenant_id = ?
+    `).bind(quantity, productId, tenantId).run()
+
+    await DB.prepare(`
+      UPDATE product_warehouse_stocks
+      SET quantity = quantity - ?, updated_at = CURRENT_TIMESTAMP
+      WHERE product_id = ? AND warehouse_id = ? AND tenant_id = ?
+    `).bind(quantity, productId, warehouseId, tenantId).run()
+
+    await DB.prepare(`
+      INSERT INTO stock_movements (tenant_id, product_id, warehouse_id, movement_type, quantity, reason, notes, created_by)
+      VALUES (?, ?, ?, '출고', ?, '생산불출', ?, ?)
+    `).bind(tenantId, productId, warehouseId, -quantity, `WO ${wo.wo_number}`, userId).run()
+
+    await DB.prepare(`
+      INSERT INTO mes_material_issues (
+        tenant_id, work_order_id, product_id, warehouse_id, quantity, notes, created_by
+      ) VALUES (?, ?, ?, ?, ?, ?, ?)
+    `).bind(tenantId, workOrderId, productId, warehouseId, quantity, body.notes || null, userId).run()
+
+    if (wo.status === 'released') {
+      await DB.prepare(`
+        UPDATE mes_work_orders
+        SET status = 'in_progress',
+            actual_start_at = COALESCE(actual_start_at, datetime('now')),
+            updated_at = datetime('now')
+        WHERE id = ? AND tenant_id = ?
+      `).bind(workOrderId, tenantId).run()
+    }
+
+    return c.json({ success: true, message: '자재 불출이 완료되었습니다.' })
+  } catch (e: any) {
+    return c.json({ success: false, error: e.message || '불출 실패' }, 500)
+  }
+})
+
+app.get('/material-issues', async (c) => {
+  const { DB } = c.env
+  const tenantId = c.get('tenantId')
+  const workOrderId = c.req.query('work_order_id')
+
+  let query = `
+    SELECT mi.*, p.name as product_name, p.sku as product_sku,
+      wo.wo_number, w.name as warehouse_name, u.name as created_by_name
+    FROM mes_material_issues mi
+    JOIN products p ON mi.product_id = p.id
+    JOIN mes_work_orders wo ON mi.work_order_id = wo.id
+    LEFT JOIN warehouses w ON mi.warehouse_id = w.id
+    LEFT JOIN users u ON mi.created_by = u.id
+    WHERE mi.tenant_id = ?
+  `
+  const params: any[] = [tenantId]
+  if (workOrderId) {
+    query += ' AND mi.work_order_id = ?'
+    params.push(workOrderId)
+  }
+  query += ' ORDER BY mi.created_at DESC LIMIT 100'
+
+  const { results } = await DB.prepare(query).bind(...params).all()
+  return c.json({ success: true, data: results })
+})
+
 // ---------- 외주 ----------
 app.get('/outsourcing', async (c) => {
   const { DB } = c.env

@@ -1327,7 +1327,7 @@ app.get('/', (c: Context) => {
                                             <script src="/static/js/tracking.js?v=1"></script>
                                             <script src="/static/js/transaction-statement.js?v=1"></script>
                                             <script src="/static/js/qr-mes.js?v=1"></script>
-                                            <script src="/static/js/production.js?v=5"></script>
+                                            <script src="/static/js/production.js?v=6"></script>
                                         </body>
                                     </html>
                                     `)

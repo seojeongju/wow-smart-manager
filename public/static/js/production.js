@@ -195,17 +195,19 @@ window.changeMesWoStatus = async function (id, status) {
 };
 
 window.showMesWorkOrderModal = async function () {
-  const [productsRes, bomsRes, processesRes, whRes] = await Promise.all([
+  const [productsRes, bomsRes, processesRes, whRes, eqRes] = await Promise.all([
     axios.get(`${API_BASE}/products`, { params: { limit: 500 } }),
     axios.get(`${API_BASE}/production/boms`),
     axios.get(`${API_BASE}/production/processes`, { params: { active: 1 } }),
-    axios.get(`${API_BASE}/warehouses`)
+    axios.get(`${API_BASE}/warehouses`),
+    axios.get(`${API_BASE}/production/ops/equipment`).catch(() => ({ data: { data: [] } }))
   ]);
 
   const products = productsRes.data.data || productsRes.data || [];
   const boms = bomsRes.data.data || [];
   const processes = processesRes.data.data || [];
   const warehouses = whRes.data.data || whRes.data || [];
+  const equipment = (eqRes.data.data || []).filter((e) => e.is_active);
 
   document.getElementById('mes-modals').innerHTML = `
     <div class="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4" onclick="if(event.target===this)closeMesModal()">
@@ -239,12 +241,21 @@ window.showMesWorkOrderModal = async function () {
               </select>
             </div>
           </div>
-          <div>
-            <label class="text-sm text-slate-600">공정</label>
-            <select id="mes-wo-process" class="w-full border rounded-lg px-3 py-2 mt-1">
-              <option value="">선택 안 함</option>
-              ${processes.map((p) => `<option value="${p.id}">${p.name}</option>`).join('')}
-            </select>
+          <div class="grid grid-cols-2 gap-3">
+            <div>
+              <label class="text-sm text-slate-600">공정</label>
+              <select id="mes-wo-process" class="w-full border rounded-lg px-3 py-2 mt-1">
+                <option value="">선택 안 함</option>
+                ${processes.map((p) => `<option value="${p.id}">${p.name}</option>`).join('')}
+              </select>
+            </div>
+            <div>
+              <label class="text-sm text-slate-600">설비</label>
+              <select id="mes-wo-equipment" class="w-full border rounded-lg px-3 py-2 mt-1">
+                <option value="">선택 안 함</option>
+                ${equipment.map((e) => `<option value="${e.id}">${e.name}${e.code ? ` (${e.code})` : ''}</option>`).join('')}
+              </select>
+            </div>
           </div>
           <div class="grid grid-cols-2 gap-3">
             <div>
@@ -289,6 +300,7 @@ window.submitMesWorkOrder = async function () {
     planned_qty: Number(document.getElementById('mes-wo-qty').value),
     warehouse_id: document.getElementById('mes-wo-warehouse').value ? Number(document.getElementById('mes-wo-warehouse').value) : null,
     process_id: document.getElementById('mes-wo-process').value ? Number(document.getElementById('mes-wo-process').value) : null,
+    equipment_id: document.getElementById('mes-wo-equipment')?.value ? Number(document.getElementById('mes-wo-equipment').value) : null,
     planned_start_date: document.getElementById('mes-wo-start').value || null,
     planned_end_date: document.getElementById('mes-wo-end').value || null,
     notes: document.getElementById('mes-wo-notes').value || null
@@ -1879,9 +1891,12 @@ async function loadMesMaterials() {
 
       <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <div class="bg-white border rounded-xl overflow-hidden">
-          <div class="px-4 py-3 border-b bg-slate-50 font-bold text-sm flex justify-between items-center">
+          <div class="px-4 py-3 border-b bg-slate-50 font-bold text-sm flex flex-wrap justify-between items-center gap-2">
             <span>자재 소요 (미완료 WO × BOM)</span>
-            <button onclick="loadMesMaterials()" class="text-xs text-orange-600 hover:underline">새로고침</button>
+            <div class="flex gap-2">
+              <button onclick="showMesMaterialIssueModal()" class="text-xs border px-3 py-1.5 rounded-lg hover:bg-white">자재 불출</button>
+              <button onclick="showMesMrpCreatePoModal()" class="text-xs bg-orange-600 text-white px-3 py-1.5 rounded-lg ${mrp.shortage_count ? '' : 'opacity-50'}" ${mrp.shortage_count ? '' : 'disabled'}>부족분 발주</button>
+            </div>
           </div>
           <div class="overflow-x-auto max-h-96">
             <table class="w-full text-sm">
@@ -1900,7 +1915,7 @@ async function loadMesMaterials() {
               </tbody>
             </table>
           </div>
-          <div class="px-4 py-3 border-t text-xs text-slate-500">부족 자재는 입고/발주 메뉴에서 발주하세요.</div>
+          <div class="px-4 py-3 border-t text-xs text-slate-500">부족분이 있으면 [부족분 발주]로 발주서를 바로 생성할 수 있습니다.</div>
         </div>
 
         <div class="bg-white border rounded-xl overflow-hidden">
@@ -2043,4 +2058,129 @@ window.mesOsReceive = async function (id) {
   }
 };
 
+window.showMesMrpCreatePoModal = async function () {
+  const [mrpRes, suppliersRes] = await Promise.all([
+    axios.get(`${API_BASE}/production/ops/mrp`),
+    axios.get(`${API_BASE}/suppliers`)
+  ]);
+  const shortages = (mrpRes.data.data?.items || []).filter((i) => i.shortage_qty > 0);
+  const suppliers = suppliersRes.data.data || [];
+  if (!shortages.length) {
+    alert('부족 자재가 없습니다.');
+    return;
+  }
+  if (!suppliers.length) {
+    alert('공급사를 먼저 등록해주세요. (입고/발주 → 공급사)');
+    return;
+  }
+
+  document.getElementById('mes-modals').innerHTML = `
+    <div class="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4" onclick="if(event.target===this)closeMesModal()">
+      <div class="bg-white rounded-xl w-full max-w-lg p-6 max-h-[90vh] overflow-y-auto">
+        <h3 class="text-lg font-bold mb-2">부족 자재 발주 생성</h3>
+        <p class="text-xs text-slate-500 mb-4">부족 ${shortages.length}품목을 발주서로 생성합니다. 단가는 상품 매입가를 사용합니다.</p>
+        <div class="mb-3">
+          <label class="text-sm">공급사 *</label>
+          <select id="mes-mrp-supplier" class="w-full border rounded-lg px-3 py-2 mt-1">
+            ${suppliers.map((s) => `<option value="${s.id}">${s.name}</option>`).join('')}
+          </select>
+        </div>
+        <div class="mb-3">
+          <label class="text-sm">납기 예정일</label>
+          <input id="mes-mrp-expected" type="date" class="w-full border rounded-lg px-3 py-2 mt-1">
+        </div>
+        <div class="border rounded-lg max-h-48 overflow-y-auto text-sm mb-4">
+          ${shortages.map((i) => `<div class="px-3 py-2 border-b flex justify-between"><span>${i.product_name}</span><span class="text-rose-600 font-medium">${Math.round(i.shortage_qty * 1000) / 1000}</span></div>`).join('')}
+        </div>
+        <div class="flex justify-end gap-2">
+          <button onclick="closeMesModal()" class="px-4 py-2 rounded-lg border">취소</button>
+          <button onclick="submitMesMrpCreatePo()" class="px-4 py-2 rounded-lg bg-orange-600 text-white">발주 생성</button>
+        </div>
+      </div>
+    </div>
+  `;
+};
+
+window.submitMesMrpCreatePo = async function () {
+  try {
+    const res = await axios.post(`${API_BASE}/production/ops/mrp/create-po`, {
+      supplier_id: Number(document.getElementById('mes-mrp-supplier').value),
+      expected_at: document.getElementById('mes-mrp-expected').value || null
+    });
+    alert(`${res.data.message}\n발주번호: ${res.data.data.code}`);
+    closeMesModal();
+    loadMesMaterials();
+  } catch (e) {
+    alert(e.response?.data?.error || e.message);
+  }
+};
+
+window.showMesMaterialIssueModal = async function () {
+  const [woRes, mrpRes, whRes] = await Promise.all([
+    axios.get(`${API_BASE}/production/work-orders`),
+    axios.get(`${API_BASE}/production/ops/mrp`),
+    axios.get(`${API_BASE}/warehouses`)
+  ]);
+  const wos = (woRes.data.data || []).filter((w) => ['released', 'in_progress'].includes(w.status));
+  const materials = mrpRes.data.data?.items || [];
+  const warehouses = whRes.data.data || whRes.data || [];
+  if (!wos.length) {
+    alert('확정/진행중 작업지시가 없습니다.');
+    return;
+  }
+
+  document.getElementById('mes-modals').innerHTML = `
+    <div class="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4" onclick="if(event.target===this)closeMesModal()">
+      <div class="bg-white rounded-xl w-full max-w-md p-6">
+        <h3 class="text-lg font-bold mb-4">자재 불출</h3>
+        <div class="space-y-3 text-sm">
+          <div>
+            <label>작업지시 *</label>
+            <select id="mes-mi-wo" class="w-full border rounded-lg px-3 py-2 mt-1">
+              ${wos.map((w) => `<option value="${w.id}">${w.wo_number} — ${w.product_name}</option>`).join('')}
+            </select>
+          </div>
+          <div>
+            <label>자재 *</label>
+            <select id="mes-mi-product" class="w-full border rounded-lg px-3 py-2 mt-1">
+              ${materials.map((m) => `<option value="${m.product_id}">${m.product_name} (재고 ${m.current_stock})</option>`).join('') || '<option value="">자재 없음</option>'}
+            </select>
+          </div>
+          <div class="grid grid-cols-2 gap-2">
+            <div>
+              <label>창고 *</label>
+              <select id="mes-mi-wh" class="w-full border rounded-lg px-3 py-2 mt-1">
+                ${warehouses.map((w) => `<option value="${w.id}">${w.name}</option>`).join('')}
+              </select>
+            </div>
+            <div>
+              <label>수량 *</label>
+              <input id="mes-mi-qty" type="number" min="0.01" step="any" value="1" class="w-full border rounded-lg px-3 py-2 mt-1">
+            </div>
+          </div>
+        </div>
+        <div class="flex justify-end gap-2 mt-6">
+          <button onclick="closeMesModal()" class="px-4 py-2 rounded-lg border">취소</button>
+          <button onclick="submitMesMaterialIssue()" class="px-4 py-2 rounded-lg bg-orange-600 text-white">불출</button>
+        </div>
+      </div>
+    </div>
+  `;
+};
+
+window.submitMesMaterialIssue = async function () {
+  try {
+    await axios.post(`${API_BASE}/production/ops/material-issue`, {
+      work_order_id: Number(document.getElementById('mes-mi-wo').value),
+      product_id: Number(document.getElementById('mes-mi-product').value),
+      warehouse_id: Number(document.getElementById('mes-mi-wh').value),
+      quantity: Number(document.getElementById('mes-mi-qty').value)
+    });
+    alert('자재 불출이 완료되었습니다.');
+    closeMesModal();
+    loadMesMaterials();
+  } catch (e) {
+    alert(e.response?.data?.error || e.message);
+  }
+};
 
