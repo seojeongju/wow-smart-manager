@@ -174,7 +174,7 @@ function updateUserUI(user) {
   const superAdminNav = document.getElementById('nav-super-admin');
   const settingsNav = document.getElementById('nav-settings');
   const mesGroup = document.getElementById('nav-mes-group');
-  const salesGroup = document.getElementById('nav-sales-group');
+  const erpGroup = document.getElementById('nav-erp-group') || document.getElementById('nav-sales-group');
   const systemGroup = superAdminNav?.closest('div')?.parentElement;
 
   if (superAdminNav) {
@@ -192,11 +192,11 @@ function updateUserUI(user) {
     else mesGroup.classList.add('hidden');
   }
 
-  if (salesGroup) {
-    // 현장·생산은 MES 집중 — 영업/물류 메뉴 숨김
-    if (role === 'FLOOR' || role === 'PRODUCTION') salesGroup.classList.add('hidden');
-    else if (salesRoles.includes(role)) salesGroup.classList.remove('hidden');
-    else salesGroup.classList.add('hidden');
+  if (erpGroup) {
+    // 현장·생산은 MES 집중 — ERP 메뉴 숨김
+    if (role === 'FLOOR' || role === 'PRODUCTION') erpGroup.classList.add('hidden');
+    else if (salesRoles.includes(role)) erpGroup.classList.remove('hidden');
+    else erpGroup.classList.add('hidden');
   }
 
   if (systemGroup) {
@@ -259,10 +259,16 @@ window.syncSidebarNav = function syncSidebarNav(page, tab = null) {
   const parentSubmenu = target.closest('.nav-submenu');
   if (!parentSubmenu) return;
 
-  // 같은 MES 그룹 내에서는 해당 서브메뉴만 열기
+  // MES / ERP 그룹 내에서는 해당 서브메뉴만 열기
   const mesGroup = document.getElementById('nav-mes-group');
-  if (mesGroup && mesGroup.contains(parentSubmenu)) {
-    mesGroup.querySelectorAll('.nav-submenu').forEach((sm) => {
+  const erpGroup = document.getElementById('nav-erp-group') || document.getElementById('nav-sales-group');
+  const exclusiveRoot =
+    (mesGroup && mesGroup.contains(parentSubmenu) && mesGroup) ||
+    (erpGroup && erpGroup.contains(parentSubmenu) && erpGroup) ||
+    null;
+
+  if (exclusiveRoot) {
+    exclusiveRoot.querySelectorAll('.nav-submenu').forEach((sm) => {
       const group = sm.closest('.nav-item-group');
       const arrow = group?.querySelector('.submenu-arrow');
       if (sm === parentSubmenu) {
@@ -296,6 +302,173 @@ function updatePageTitle(title, subtitle) {
   if (subtitleElement) {
     subtitleElement.textContent = subtitle;
   }
+}
+
+// ERP 미구현 메뉴 스텁 메타 (Phase 0 골격)
+const ERP_STUB_META = {
+  'crm-pipeline': {
+    title: '영업 기회',
+    module: '영업 · CRM',
+    phase: 'Phase 3',
+    summary: '리드·기회·파이프라인 추적 및 수주 전환을 관리합니다.',
+    related: [
+      { label: '견적 관리', page: 'quotations' },
+      { label: '고객 관리', page: 'customers' },
+      { label: '주문/배송', page: 'sales', tab: 'orders' }
+    ]
+  },
+  'proc-receive': {
+    title: '입고 · 검수',
+    module: '구매',
+    phase: 'Phase 2',
+    summary: '발주 대비 입고·품질검수·부분입고를 전용 화면으로 처리합니다. (현재는 발주 관리에서 입고 가능)',
+    related: [
+      { label: '발주 관리', page: 'purchases', tab: 'purchases' },
+      { label: '공급사', page: 'purchases', tab: 'suppliers' }
+    ]
+  },
+  'proc-price': {
+    title: '단가 관리',
+    module: '구매',
+    phase: 'Phase 2',
+    summary: '공급사별·품목별 구매 단가 이력과 유효기간을 관리합니다.',
+    related: [{ label: '발주 관리', page: 'purchases', tab: 'purchases' }]
+  },
+  'proc-eval': {
+    title: '공급사 평가',
+    module: '구매',
+    phase: 'Phase 2',
+    summary: '납기·품질·가격 기준으로 공급사를 평가하고 등급을 부여합니다.',
+    related: [{ label: '공급사 관리', page: 'purchases', tab: 'suppliers' }]
+  },
+  'scm-reserve': {
+    title: '예약 재고',
+    module: '재고 · SCM',
+    phase: 'Phase 2',
+    summary: '견적·수주 기준 soft allocation 현황을 조회·조정합니다. (API는 견적/가용재고에 연동됨)',
+    related: [
+      { label: '견적 관리', page: 'quotations' },
+      { label: '창고별 재고', page: 'stock', tab: 'levels' }
+    ]
+  },
+  'scm-reorder': {
+    title: '적정재고 · 발주제안',
+    module: '재고 · SCM',
+    phase: 'Phase 2',
+    summary: '안전재고·소진 예측 기반 자동 발주 제안을 제공합니다.',
+    related: [
+      { label: '창고별 재고', page: 'stock', tab: 'levels' },
+      { label: '발주 관리', page: 'purchases', tab: 'purchases' }
+    ]
+  },
+  'fin-ar': {
+    title: '매출채권 (AR)',
+    module: '재무 · 회계',
+    phase: 'Phase 1',
+    summary: '구현됨 — 사이드바 ERP → 재무 · 회계 → 매출채권 메뉴를 이용하세요.',
+    related: [{ label: '매출채권 열기', page: 'finance-ar' }]
+  },
+  'fin-ap': {
+    title: '매입채무 (AP)',
+    module: '재무 · 회계',
+    phase: 'Phase 1',
+    summary: '구현됨 — 사이드바 ERP → 재무 · 회계 → 매입채무 메뉴를 이용하세요.',
+    related: [{ label: '매입채무 열기', page: 'finance-ap' }]
+  },
+  'fin-voucher': {
+    title: '전표',
+    module: '재무 · 회계',
+    phase: 'Phase 1',
+    summary: '구현됨 — 사이드바 ERP → 재무 · 회계 → 전표 메뉴를 이용하세요.',
+    related: [{ label: '전표 열기', page: 'finance-vouchers' }]
+  },
+  'fin-cash': {
+    title: '자금 관리',
+    module: '재무 · 회계',
+    phase: 'Phase 6',
+    summary: '계좌·현금흐름·자금계획을 관리합니다.',
+    related: [{ label: '대시보드', page: 'dashboard' }]
+  },
+  'fin-close': {
+    title: '결산 · 재무제표',
+    module: '재무 · 회계',
+    phase: 'Phase 6',
+    summary: '월/년 결산과 손익·재무상태표 등 재무제표를 작성합니다.',
+    related: [{ label: '전표', page: 'finance-vouchers' }]
+  },
+  'fin-tax': {
+    title: '세무',
+    module: '재무 · 회계',
+    phase: 'Phase 6',
+    summary: '부가세 등 신고 기초 자료와 세무 리포트를 지원합니다.',
+    related: [{ label: '결산 · 재무제표', page: 'erp-stub', tab: 'fin-close' }]
+  },
+  'hr-org': {
+    title: '조직 · 사원',
+    module: '인사 · 급여',
+    phase: 'Phase 5',
+    summary: '조직도·사원 마스터·발령 정보를 관리합니다.',
+    related: [{ label: '설정', page: 'settings' }]
+  },
+  'hr-attendance': {
+    title: '근태',
+    module: '인사 · 급여',
+    phase: 'Phase 5',
+    summary: '출퇴근·휴가·연장근로를 기록하고 정산에 반영합니다.',
+    related: [{ label: '조직 · 사원', page: 'erp-stub', tab: 'hr-org' }]
+  },
+  'hr-payroll': {
+    title: '급여',
+    module: '인사 · 급여',
+    phase: 'Phase 5',
+    summary: '급여 계산·공제·이체 명세를 처리합니다.',
+    related: [{ label: '근태', page: 'erp-stub', tab: 'hr-attendance' }]
+  },
+  'hr-talent': {
+    title: '채용 · 평가 · 교육',
+    module: '인사 · 급여',
+    phase: 'Phase 5',
+    summary: '채용 프로세스, 성과평가, 교육 이력을 관리합니다.',
+    related: [{ label: '조직 · 사원', page: 'erp-stub', tab: 'hr-org' }]
+  }
+};
+
+function renderErpStubPage(container, stubKey) {
+  const meta = ERP_STUB_META[stubKey] || {
+    title: '준비 중',
+    module: 'ERP',
+    phase: '추후',
+    summary: '해당 ERP 메뉴는 골격만 등록된 상태입니다.',
+    related: [{ label: '대시보드', page: 'dashboard' }]
+  };
+  const relatedHtml = (meta.related || []).map((r) => {
+    const tabArg = r.tab ? `, '${r.tab}'` : '';
+    return `<button type="button" onclick="loadPage('${r.page}'${tabArg})"
+      class="inline-flex items-center gap-2 px-3 py-2 rounded-lg border border-slate-200 bg-white hover:border-teal-300 hover:bg-teal-50 text-sm text-slate-700 transition-colors">
+      <i class="fas fa-arrow-right text-teal-600 text-xs"></i>${r.label}
+    </button>`;
+  }).join('');
+
+  container.innerHTML = `
+    <div class="max-w-3xl mx-auto">
+      <div class="rounded-2xl border border-slate-200 bg-gradient-to-br from-slate-50 to-white p-8 shadow-sm">
+        <div class="flex flex-wrap items-center gap-2 mb-4">
+          <span class="text-[11px] font-bold uppercase tracking-wider text-slate-500">${meta.module}</span>
+          <span class="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-100 text-amber-800">준비중</span>
+          <span class="text-[10px] font-bold px-2 py-0.5 rounded-full bg-indigo-100 text-indigo-700">${meta.phase}</span>
+        </div>
+        <h2 class="text-2xl font-bold text-slate-900 mb-2">${meta.title}</h2>
+        <p class="text-slate-600 leading-relaxed mb-6">${meta.summary}</p>
+        <div class="rounded-xl bg-slate-900 text-slate-200 px-4 py-3 text-sm mb-6">
+          ERP 메뉴 골격(Phase 0)에 등록된 항목입니다. 기능 구현은 로드맵 ${meta.phase}에서 진행됩니다.
+        </div>
+        ${relatedHtml ? `
+          <p class="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">관련 메뉴</p>
+          <div class="flex flex-wrap gap-2">${relatedHtml}</div>
+        ` : ''}
+      </div>
+    </div>
+  `;
 }
 
 // 페이지 로드
@@ -428,6 +601,28 @@ async function loadPage(page, subPage = null) {
       updatePageTitle('거래명세서 출력', '고객별 거래 내역 통합 및 출력');
       if (window.renderTransactionStatementPage) await window.renderTransactionStatementPage(content);
       else content.innerHTML = '<div class="text-center py-10">모듈 로딩 중...</div>';
+      break;
+    case 'erp-stub': {
+      const stubKey = subPage || 'crm-pipeline';
+      const stubMeta = ERP_STUB_META[stubKey];
+      updatePageTitle(stubMeta?.title || '준비 중', `${stubMeta?.module || 'ERP'} · ${stubMeta?.phase || '추후'} 예정`);
+      renderErpStubPage(content, stubKey);
+      break;
+    }
+    case 'finance-ar':
+      updatePageTitle('매출채권 (AR)', '미수 잔액 · 입금 · 연령분석');
+      if (window.loadFinanceArPage) await window.loadFinanceArPage();
+      else content.innerHTML = '<div class="text-center py-10">재무 모듈 로딩 중...</div>';
+      break;
+    case 'finance-ap':
+      updatePageTitle('매입채무 (AP)', '미지급 잔액 · 지급 · 연령분석');
+      if (window.loadFinanceApPage) await window.loadFinanceApPage();
+      else content.innerHTML = '<div class="text-center py-10">재무 모듈 로딩 중...</div>';
+      break;
+    case 'finance-vouchers':
+      updatePageTitle('전표', '매출·매입·입금·지급 자동 전표');
+      if (window.loadFinanceVouchersPage) await window.loadFinanceVouchersPage();
+      else content.innerHTML = '<div class="text-center py-10">재무 모듈 로딩 중...</div>';
       break;
     case 'shopfloor':
       updatePageTitle('현장 실행', '작업지시 · QR 스캔 · 투입/공정/실적');

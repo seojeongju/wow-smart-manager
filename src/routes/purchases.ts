@@ -1,5 +1,6 @@
 import { Hono } from 'hono'
 import type { Bindings, Variables } from '../types'
+import { insertVoucher } from '../utils/vouchers'
 
 const app = new Hono<{ Bindings: Bindings; Variables: Variables }>()
 
@@ -342,12 +343,131 @@ app.post('/:id/receive', async (c) => {
         ).bind(id).run()
     }
 
+    // 입고분 매입채무 인식 + AP 전표
+    let receiveAmount = 0
+    for (const item of items) {
+        const qty = Number(item.quantity) || 0
+        if (qty <= 0) continue
+        const pi = await DB.prepare(
+            'SELECT unit_price FROM purchase_items WHERE id = ?'
+        ).bind(item.id).first<{ unit_price: number }>()
+        receiveAmount += qty * (Number(pi?.unit_price) || 0)
+    }
+
+    try {
+        await DB.prepare(`
+          UPDATE purchase_orders
+          SET payment_status = CASE
+                WHEN COALESCE(payment_status, 'unpaid') = 'paid' THEN 'paid'
+                ELSE 'unpaid'
+              END,
+              paid_amount = COALESCE(paid_amount, 0),
+              updated_at = CURRENT_TIMESTAMP
+          WHERE id = ? AND tenant_id = ?
+        `).bind(id, tenantId).run()
+    } catch {
+      /* 0043 미적용 시 무시 */
+    }
+
+    if (receiveAmount > 0) {
+        const supplier = await DB.prepare(`
+          SELECT s.name FROM suppliers s
+          JOIN purchase_orders po ON po.supplier_id = s.id
+          WHERE po.id = ? AND po.tenant_id = ?
+        `).bind(id, tenantId).first<{ name: string }>()
+        await insertVoucher(DB, {
+            tenantId,
+            voucherType: 'AP_INVOICE',
+            sourceType: 'purchase_order',
+            sourceId: Number(id),
+            partnerName: supplier?.name || null,
+            description: `매입채무 PO#${(po as any).code || id} 입고`,
+            amount: receiveAmount,
+            createdBy: userId
+        })
+    }
+
     return c.json({
         success: true,
         message: Number(remainingRow?.cnt || 0) === 0
             ? '전량 입고 완료. 매입가가 반영되었습니다.'
             : '부분 입고 처리가 완료되었습니다. 매입가가 반영되었습니다.',
         data: { fully_received: Number(remainingRow?.cnt || 0) === 0 }
+    })
+})
+
+/** 매입 지급/채무 상태 */
+app.put('/:id/payment', async (c) => {
+    const { DB } = c.env
+    const tenantId = c.get('tenantId')
+    const userId = c.get('userId')
+    const id = c.req.param('id')
+    const body = await c.req.json<{
+        payment_status: 'paid' | 'unpaid' | 'partial'
+        paid_amount?: number
+    }>()
+
+    if (!['paid', 'unpaid', 'partial'].includes(body.payment_status)) {
+        return c.json({ success: false, error: 'payment_status는 paid/unpaid/partial 이어야 합니다.' }, 400)
+    }
+
+    const po = await DB.prepare(`
+      SELECT po.id, po.code, po.total_amount, po.paid_amount, po.payment_status, s.name as supplier_name
+      FROM purchase_orders po
+      LEFT JOIN suppliers s ON s.id = po.supplier_id
+      WHERE po.id = ? AND po.tenant_id = ?
+    `).bind(id, tenantId).first<{
+        id: number
+        code: string
+        total_amount: number
+        paid_amount: number | null
+        payment_status: string | null
+        supplier_name: string | null
+    }>()
+
+    if (!po) return c.json({ success: false, error: '발주를 찾을 수 없습니다.' }, 404)
+
+    const prevPaid = Number(po.paid_amount) || 0
+    let paidAmount = Number(body.paid_amount)
+    if (body.payment_status === 'paid') paidAmount = Number(po.total_amount) || 0
+    if (body.payment_status === 'unpaid') paidAmount = 0
+    if (body.payment_status === 'partial') {
+        if (!Number.isFinite(paidAmount) || paidAmount < 0) {
+            return c.json({ success: false, error: 'partial 일 때 paid_amount가 필요합니다.' }, 400)
+        }
+    }
+
+    try {
+        await DB.prepare(`
+          UPDATE purchase_orders
+          SET payment_status = ?, paid_amount = ?, updated_at = CURRENT_TIMESTAMP
+          WHERE id = ? AND tenant_id = ?
+        `).bind(body.payment_status, paidAmount, id, tenantId).run()
+    } catch (e: any) {
+        return c.json({
+            success: false,
+            error: '지급 컬럼이 없습니다. 마이그레이션 0043을 적용해 주세요. ' + e.message
+        }, 500)
+    }
+
+    const payAmt = Math.max(0, paidAmount - prevPaid)
+    if (payAmt > 0) {
+        await insertVoucher(DB, {
+            tenantId,
+            voucherType: 'AP_PAYMENT',
+            sourceType: 'purchase_order',
+            sourceId: Number(id),
+            partnerName: po.supplier_name,
+            description: `매입지급 ${po.code || '#' + id}`,
+            amount: payAmt,
+            createdBy: userId
+        })
+    }
+
+    return c.json({
+        success: true,
+        message: '지급 상태가 업데이트되었습니다.',
+        data: { payment_status: body.payment_status, paid_amount: paidAmount }
     })
 })
 

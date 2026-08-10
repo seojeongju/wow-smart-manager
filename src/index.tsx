@@ -31,6 +31,7 @@ import opsAdminRouter from './routes/ops-admin'
 import barcodeRouter from './routes/barcode'
 import quotationsRouter from './routes/quotations'
 import transactionStatementsRouter from './routes/transaction-statements'
+import financeRouter from './routes/finance'
 
 const app = new Hono<{ Bindings: Bindings; Variables: Variables }>()
 
@@ -68,6 +69,7 @@ app.route('/api/ops-admin', opsAdminRouter)
 app.route('/api/barcode', barcodeRouter)
 app.route('/api/quotations', quotationsRouter)
 app.route('/api/transaction-statements', transactionStatementsRouter)
+app.route('/api/finance', financeRouter)
 
 // 슈퍼 관리자 페이지
 app.get('/admin', (c: Context) => {
@@ -957,11 +959,11 @@ app.get('/', (c: Context) => {
 
                                                     <!-- Navigation -->
                                                     <nav class="flex-1 px-4 py-8 space-y-8 overflow-y-auto custom-scrollbar">
-                                                        <!-- Analysis Group -->
+                                                        <!-- Home -->
                                                         <div>
                                                             <p class="px-4 text-[11px] font-bold text-slate-500 uppercase tracking-widest mb-3 flex items-center gap-2">
                                                                 <span class="w-1.5 h-1.5 rounded-full bg-teal-500/50"></span>
-                                                                분석 및 현황
+                                                                홈
                                                             </p>
                                                             <div class="space-y-1">
                                                                 <a href="#" data-page="dashboard" class="nav-link flex items-center px-4 py-3 rounded-lg group" onclick="closeSidebarOnMobile()">
@@ -971,29 +973,30 @@ app.get('/', (c: Context) => {
                                                             </div>
                                                         </div>
 
-                                                        <!-- Business Group -->
-                                                        <div id="nav-sales-group" data-module="sales">
+                                                        <!-- ERP Group — 모듈 골격 (미구현은 준비중 스텁) -->
+                                                        <div id="nav-erp-group" data-module="sales">
                                                             <p class="px-4 text-[11px] font-bold text-slate-500 uppercase tracking-widest mb-3 flex items-center gap-2">
                                                                 <span class="w-1.5 h-1.5 rounded-full bg-blue-500/50"></span>
-                                                                영업 및 물류
+                                                                ERP
                                                             </p>
                                                             <div class="space-y-1">
+                                                                <!-- 영업 · CRM -->
                                                                 <div class="nav-item-group">
-                                                                    <button onclick="toggleSubMenu(this, 'sales-submenu')" class="flex items-center justify-between w-full px-4 py-3 rounded-lg group hover:bg-white/5 transition-all text-slate-400 hover:text-white">
+                                                                    <button onclick="toggleSubMenu(this, 'erp-sales-submenu')" class="flex items-center justify-between w-full px-4 py-3 rounded-lg group hover:bg-white/5 transition-all text-slate-400 hover:text-white">
                                                                         <div class="flex items-center">
-                                                                            <i class="fas fa-cash-register w-6 text-center text-lg mr-3"></i>
-                                                                            <span class="font-medium">판매 관리</span>
+                                                                            <i class="fas fa-handshake w-6 text-center text-lg mr-3"></i>
+                                                                            <span class="font-medium">영업 · CRM</span>
                                                                         </div>
                                                                         <i class="fas fa-chevron-down text-[10px] submenu-arrow"></i>
                                                                     </button>
-                                                                    <div id="sales-submenu" class="nav-submenu ml-4 space-y-1">
-                                                                        <a href="#" data-page="sales" data-tab="pos" class="nav-link flex items-center px-4 py-2 rounded-lg group text-sm" onclick="closeSidebarOnMobile()">
-                                                                            <i class="fas fa-calculator w-5 text-center mr-3 text-xs opacity-70"></i>
-                                                                            <span>POS (판매등록)</span>
-                                                                        </a>
+                                                                    <div id="erp-sales-submenu" class="nav-submenu ml-4 space-y-1">
                                                                         <a href="#" data-page="quotations" class="nav-link flex items-center px-4 py-2 rounded-lg group text-sm" onclick="closeSidebarOnMobile()">
                                                                             <i class="fas fa-file-signature w-5 text-center mr-3 text-xs opacity-70"></i>
                                                                             <span>견적 관리</span>
+                                                                        </a>
+                                                                        <a href="#" data-page="sales" data-tab="pos" class="nav-link flex items-center px-4 py-2 rounded-lg group text-sm" onclick="closeSidebarOnMobile()">
+                                                                            <i class="fas fa-calculator w-5 text-center mr-3 text-xs opacity-70"></i>
+                                                                            <span>POS (판매등록)</span>
                                                                         </a>
                                                                         <a href="#" data-page="sales" data-tab="orders" class="nav-link flex items-center px-4 py-2 rounded-lg group text-sm" onclick="closeSidebarOnMobile()">
                                                                             <i class="fas fa-truck w-5 text-center mr-3 text-xs opacity-70"></i>
@@ -1003,24 +1006,83 @@ app.get('/', (c: Context) => {
                                                                             <i class="fas fa-undo w-5 text-center mr-3 text-xs opacity-70"></i>
                                                                             <span>반품/교환 관리</span>
                                                                         </a>
+                                                                        <a href="#" data-page="transaction-statement" class="nav-link flex items-center px-4 py-2 rounded-lg group text-sm" onclick="closeSidebarOnMobile()">
+                                                                            <i class="fas fa-file-invoice w-5 text-center mr-3 text-xs opacity-70"></i>
+                                                                            <span>거래명세서</span>
+                                                                        </a>
+                                                                        <a href="#" data-page="customers" class="nav-link flex items-center px-4 py-2 rounded-lg group text-sm" onclick="closeSidebarOnMobile()">
+                                                                            <i class="fas fa-users w-5 text-center mr-3 text-xs opacity-70"></i>
+                                                                            <span>고객 관리</span>
+                                                                        </a>
+                                                                        <a href="#" data-page="erp-stub" data-tab="crm-pipeline" class="nav-link flex items-center px-4 py-2 rounded-lg group text-sm opacity-80" onclick="closeSidebarOnMobile()">
+                                                                            <i class="fas fa-filter w-5 text-center mr-3 text-xs opacity-70"></i>
+                                                                            <span class="flex-1">영업 기회</span>
+                                                                            <span class="text-[9px] font-bold px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300">준비중</span>
+                                                                        </a>
                                                                     </div>
                                                                 </div>
+
+                                                                <!-- 구매 -->
                                                                 <div class="nav-item-group">
-                                                                    <button onclick="toggleSubMenu(this, 'outbound-submenu')" class="flex items-center justify-between w-full px-4 py-3 rounded-lg group hover:bg-white/5 transition-all text-slate-400 hover:text-white">
+                                                                    <button onclick="toggleSubMenu(this, 'erp-purchases-submenu')" class="flex items-center justify-between w-full px-4 py-3 rounded-lg group hover:bg-white/5 transition-all text-slate-400 hover:text-white">
                                                                         <div class="flex items-center">
-                                                                            <i class="fas fa-truck-loading w-6 text-center text-lg mr-3"></i>
-                                                                            <span class="font-medium">출고 관리</span>
+                                                                            <i class="fas fa-shopping-cart w-6 text-center text-lg mr-3"></i>
+                                                                            <span class="font-medium">구매</span>
                                                                         </div>
                                                                         <i class="fas fa-chevron-down text-[10px] submenu-arrow"></i>
                                                                     </button>
-                                                                    <div id="outbound-submenu" class="nav-submenu ml-4 space-y-1">
+                                                                    <div id="erp-purchases-submenu" class="nav-submenu ml-4 space-y-1">
+                                                                        <a href="#" data-page="purchases" data-tab="purchases" class="nav-link flex items-center px-4 py-2 rounded-lg group text-sm" onclick="closeSidebarOnMobile()">
+                                                                            <i class="fas fa-file-invoice-dollar w-5 text-center mr-3 text-xs opacity-70"></i>
+                                                                            <span>발주 관리</span>
+                                                                        </a>
+                                                                        <a href="#" data-page="purchases" data-tab="suppliers" class="nav-link flex items-center px-4 py-2 rounded-lg group text-sm" onclick="closeSidebarOnMobile()">
+                                                                            <i class="fas fa-truck-loading w-5 text-center mr-3 text-xs opacity-70"></i>
+                                                                            <span>공급사 관리</span>
+                                                                        </a>
+                                                                        <a href="#" data-page="erp-stub" data-tab="proc-receive" class="nav-link flex items-center px-4 py-2 rounded-lg group text-sm opacity-80" onclick="closeSidebarOnMobile()">
+                                                                            <i class="fas fa-clipboard-check w-5 text-center mr-3 text-xs opacity-70"></i>
+                                                                            <span class="flex-1">입고 · 검수</span>
+                                                                            <span class="text-[9px] font-bold px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300">준비중</span>
+                                                                        </a>
+                                                                        <a href="#" data-page="erp-stub" data-tab="proc-price" class="nav-link flex items-center px-4 py-2 rounded-lg group text-sm opacity-80" onclick="closeSidebarOnMobile()">
+                                                                            <i class="fas fa-tags w-5 text-center mr-3 text-xs opacity-70"></i>
+                                                                            <span class="flex-1">단가 관리</span>
+                                                                            <span class="text-[9px] font-bold px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300">준비중</span>
+                                                                        </a>
+                                                                        <a href="#" data-page="erp-stub" data-tab="proc-eval" class="nav-link flex items-center px-4 py-2 rounded-lg group text-sm opacity-80" onclick="closeSidebarOnMobile()">
+                                                                            <i class="fas fa-star-half-alt w-5 text-center mr-3 text-xs opacity-70"></i>
+                                                                            <span class="flex-1">공급사 평가</span>
+                                                                            <span class="text-[9px] font-bold px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300">준비중</span>
+                                                                        </a>
+                                                                    </div>
+                                                                </div>
+
+                                                                <!-- 출고 · 물류 -->
+                                                                <div class="nav-item-group">
+                                                                    <button onclick="toggleSubMenu(this, 'erp-outbound-submenu')" class="flex items-center justify-between w-full px-4 py-3 rounded-lg group hover:bg-white/5 transition-all text-slate-400 hover:text-white">
+                                                                        <div class="flex items-center">
+                                                                            <i class="fas fa-dolly w-6 text-center text-lg mr-3"></i>
+                                                                            <span class="font-medium">출고 · 물류</span>
+                                                                        </div>
+                                                                        <i class="fas fa-chevron-down text-[10px] submenu-arrow"></i>
+                                                                    </button>
+                                                                    <div id="erp-outbound-submenu" class="nav-submenu ml-4 space-y-1">
                                                                         <a href="#" data-page="outbound" data-tab="reg" class="nav-link flex items-center px-4 py-2 rounded-lg group text-sm" onclick="closeSidebarOnMobile()">
                                                                             <i class="fas fa-edit w-5 text-center mr-3 text-xs opacity-70"></i>
                                                                             <span>간편 출고 등록</span>
                                                                         </a>
+                                                                        <a href="#" data-page="outbound" data-tab="picking" class="nav-link flex items-center px-4 py-2 rounded-lg group text-sm" onclick="closeSidebarOnMobile()">
+                                                                            <i class="fas fa-hand-paper w-5 text-center mr-3 text-xs opacity-70"></i>
+                                                                            <span>피킹</span>
+                                                                        </a>
+                                                                        <a href="#" data-page="outbound" data-tab="packing" class="nav-link flex items-center px-4 py-2 rounded-lg group text-sm" onclick="closeSidebarOnMobile()">
+                                                                            <i class="fas fa-box-open w-5 text-center mr-3 text-xs opacity-70"></i>
+                                                                            <span>패킹 / 송장</span>
+                                                                        </a>
                                                                         <a href="#" data-page="outbound" data-tab="hist" class="nav-link flex items-center px-4 py-2 rounded-lg group text-sm" onclick="closeSidebarOnMobile()">
                                                                             <i class="fas fa-history w-5 text-center mr-3 text-xs opacity-70"></i>
-                                                                            <span>출고 이력 조회</span>
+                                                                            <span>출고 이력</span>
                                                                         </a>
                                                                         <a href="#" data-page="outbound" data-tab="warehouse" class="nav-link flex items-center px-4 py-2 rounded-lg group text-sm" onclick="closeSidebarOnMobile()">
                                                                             <i class="fas fa-warehouse w-5 text-center mr-3 text-xs opacity-70"></i>
@@ -1028,92 +1090,143 @@ app.get('/', (c: Context) => {
                                                                         </a>
                                                                     </div>
                                                                 </div>
+
+                                                                <!-- 재고 · SCM -->
                                                                 <div class="nav-item-group">
-                                                                    <button onclick="toggleSubMenu(this, 'purchases-submenu')" class="flex items-center justify-between w-full px-4 py-3 rounded-lg group hover:bg-white/5 transition-all text-slate-400 hover:text-white">
-                                                                        <div class="flex items-center">
-                                                                            <i class="fas fa-shopping-cart w-6 text-center text-lg mr-3"></i>
-                                                                            <span class="font-medium">입고/발주 관리</span>
-                                                                        </div>
-                                                                        <i class="fas fa-chevron-down text-[10px] submenu-arrow"></i>
-                                                                    </button>
-                                                                    <div id="purchases-submenu" class="nav-submenu ml-4 space-y-1">
-                                                                        <a href="#" data-page="purchases" data-tab="purchases" class="nav-link flex items-center px-4 py-2 rounded-lg group text-sm" onclick="closeSidebarOnMobile()">
-                                                                            <i class="fas fa-file-invoice-dollar w-5 text-center mr-3 text-xs opacity-70"></i>
-                                                                            <span>발주 관리</span>
-                                                                        </a>
-                                                                        <a href="#" data-page="purchases" data-tab="suppliers" class="nav-link flex items-center px-4 py-2 rounded-lg group text-sm" onclick="closeSidebarOnMobile()">
-                                                                            <i class="fas fa-users w-5 text-center mr-3 text-xs opacity-70"></i>
-                                                                            <span>공급사 관리</span>
-                                                                        </a>
-                                                                    </div>
-                                                                </div>
-                                                                <div class="nav-item-group">
-                                                                    <button onclick="toggleSubMenu(this, 'stock-submenu')" class="flex items-center justify-between w-full px-4 py-3 rounded-lg group hover:bg-white/5 transition-all text-slate-400 hover:text-white">
+                                                                    <button onclick="toggleSubMenu(this, 'erp-stock-submenu')" class="flex items-center justify-between w-full px-4 py-3 rounded-lg group hover:bg-white/5 transition-all text-slate-400 hover:text-white">
                                                                         <div class="flex items-center">
                                                                             <i class="fas fa-cubes w-6 text-center text-lg mr-3"></i>
-                                                                            <span class="font-medium">재고 관리</span>
+                                                                            <span class="font-medium">재고 · SCM</span>
                                                                         </div>
                                                                         <i class="fas fa-chevron-down text-[10px] submenu-arrow"></i>
                                                                     </button>
-                                                                    <div id="stock-submenu" class="nav-submenu ml-4 space-y-1">
+                                                                    <div id="erp-stock-submenu" class="nav-submenu ml-4 space-y-1">
+                                                                        <a href="#" data-page="stock" data-tab="levels" class="nav-link flex items-center px-4 py-2 rounded-lg group text-sm" onclick="closeSidebarOnMobile()">
+                                                                            <i class="fas fa-boxes w-5 text-center mr-3 text-xs opacity-70"></i>
+                                                                            <span>창고별 재고</span>
+                                                                        </a>
                                                                         <a href="#" data-page="stock" data-tab="movements" class="nav-link flex items-center px-4 py-2 rounded-lg group text-sm" onclick="closeSidebarOnMobile()">
                                                                             <i class="fas fa-list-ul w-5 text-center mr-3 text-xs opacity-70"></i>
                                                                             <span>재고 이동 내역</span>
                                                                         </a>
-                                                                        <a href="#" data-page="stock" data-tab="levels" class="nav-link flex items-center px-4 py-2 rounded-lg group text-sm" onclick="closeSidebarOnMobile()">
-                                                                            <i class="fas fa-boxes w-5 text-center mr-3 text-xs opacity-70"></i>
-                                                                            <span>창고별 재고 현황</span>
+                                                                        <a href="#" data-page="erp-stub" data-tab="scm-reserve" class="nav-link flex items-center px-4 py-2 rounded-lg group text-sm opacity-80" onclick="closeSidebarOnMobile()">
+                                                                            <i class="fas fa-lock w-5 text-center mr-3 text-xs opacity-70"></i>
+                                                                            <span class="flex-1">예약 재고</span>
+                                                                            <span class="text-[9px] font-bold px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300">준비중</span>
+                                                                        </a>
+                                                                        <a href="#" data-page="erp-stub" data-tab="scm-reorder" class="nav-link flex items-center px-4 py-2 rounded-lg group text-sm opacity-80" onclick="closeSidebarOnMobile()">
+                                                                            <i class="fas fa-chart-line w-5 text-center mr-3 text-xs opacity-70"></i>
+                                                                            <span class="flex-1">적정재고 · 발주제안</span>
+                                                                            <span class="text-[9px] font-bold px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300">준비중</span>
                                                                         </a>
                                                                     </div>
                                                                 </div>
-                                                                <a href="#" data-page="transaction-statement" class="nav-link flex items-center px-4 py-3 rounded-lg group" onclick="closeSidebarOnMobile()">
-                                                                    <i class="fas fa-file-invoice w-6 text-center text-lg mr-3"></i>
-                                                                    <span class="font-medium">거래명세서 출력</span>
-                                                                </a>
-                                                            </div>
-                                                        </div>
 
-                                                        <!-- Resources Group -->
-                                                        <div>
-                                                            <p class="px-4 text-[11px] font-bold text-slate-500 uppercase tracking-widest mb-3 flex items-center gap-2">
-                                                                <span class="w-1.5 h-1.5 rounded-full bg-purple-500/50"></span>
-                                                                기준 정보
-                                                            </p>
-                                                            <div class="space-y-1">
+                                                                <!-- 재무 · 회계 -->
                                                                 <div class="nav-item-group">
-                                                                    <button onclick="toggleSubMenu(this, 'product-submenu')" class="flex items-center justify-between w-full px-4 py-3 rounded-lg group hover:bg-white/5 transition-all text-slate-400 hover:text-white">
+                                                                    <button onclick="toggleSubMenu(this, 'erp-finance-submenu')" class="flex items-center justify-between w-full px-4 py-3 rounded-lg group hover:bg-white/5 transition-all text-slate-400 hover:text-white">
                                                                         <div class="flex items-center">
-                                                                            <i class="fas fa-box w-6 text-center text-lg mr-3"></i>
-                                                                            <span class="font-medium">상품 관리</span>
+                                                                            <i class="fas fa-balance-scale w-6 text-center text-lg mr-3"></i>
+                                                                            <span class="font-medium">재무 · 회계</span>
                                                                         </div>
                                                                         <i class="fas fa-chevron-down text-[10px] submenu-arrow"></i>
                                                                     </button>
-                                                                    <div id="product-submenu" class="nav-submenu ml-4 space-y-1">
+                                                                    <div id="erp-finance-submenu" class="nav-submenu ml-4 space-y-1">
+                                                                        <a href="#" data-page="finance-ar" class="nav-link flex items-center px-4 py-2 rounded-lg group text-sm" onclick="closeSidebarOnMobile()">
+                                                                            <i class="fas fa-file-invoice-dollar w-5 text-center mr-3 text-xs opacity-70"></i>
+                                                                            <span>매출채권 (AR)</span>
+                                                                        </a>
+                                                                        <a href="#" data-page="finance-ap" class="nav-link flex items-center px-4 py-2 rounded-lg group text-sm" onclick="closeSidebarOnMobile()">
+                                                                            <i class="fas fa-hand-holding-usd w-5 text-center mr-3 text-xs opacity-70"></i>
+                                                                            <span>매입채무 (AP)</span>
+                                                                        </a>
+                                                                        <a href="#" data-page="finance-vouchers" class="nav-link flex items-center px-4 py-2 rounded-lg group text-sm" onclick="closeSidebarOnMobile()">
+                                                                            <i class="fas fa-book w-5 text-center mr-3 text-xs opacity-70"></i>
+                                                                            <span>전표</span>
+                                                                        </a>
+                                                                        <a href="#" data-page="erp-stub" data-tab="fin-cash" class="nav-link flex items-center px-4 py-2 rounded-lg group text-sm opacity-80" onclick="closeSidebarOnMobile()">
+                                                                            <i class="fas fa-wallet w-5 text-center mr-3 text-xs opacity-70"></i>
+                                                                            <span class="flex-1">자금 관리</span>
+                                                                            <span class="text-[9px] font-bold px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300">준비중</span>
+                                                                        </a>
+                                                                        <a href="#" data-page="erp-stub" data-tab="fin-close" class="nav-link flex items-center px-4 py-2 rounded-lg group text-sm opacity-80" onclick="closeSidebarOnMobile()">
+                                                                            <i class="fas fa-file-alt w-5 text-center mr-3 text-xs opacity-70"></i>
+                                                                            <span class="flex-1">결산 · 재무제표</span>
+                                                                            <span class="text-[9px] font-bold px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300">준비중</span>
+                                                                        </a>
+                                                                        <a href="#" data-page="erp-stub" data-tab="fin-tax" class="nav-link flex items-center px-4 py-2 rounded-lg group text-sm opacity-80" onclick="closeSidebarOnMobile()">
+                                                                            <i class="fas fa-landmark w-5 text-center mr-3 text-xs opacity-70"></i>
+                                                                            <span class="flex-1">세무</span>
+                                                                            <span class="text-[9px] font-bold px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300">준비중</span>
+                                                                        </a>
+                                                                    </div>
+                                                                </div>
+
+                                                                <!-- 인사 · 급여 -->
+                                                                <div class="nav-item-group">
+                                                                    <button onclick="toggleSubMenu(this, 'erp-hr-submenu')" class="flex items-center justify-between w-full px-4 py-3 rounded-lg group hover:bg-white/5 transition-all text-slate-400 hover:text-white">
+                                                                        <div class="flex items-center">
+                                                                            <i class="fas fa-id-badge w-6 text-center text-lg mr-3"></i>
+                                                                            <span class="font-medium">인사 · 급여</span>
+                                                                        </div>
+                                                                        <i class="fas fa-chevron-down text-[10px] submenu-arrow"></i>
+                                                                    </button>
+                                                                    <div id="erp-hr-submenu" class="nav-submenu ml-4 space-y-1">
+                                                                        <a href="#" data-page="erp-stub" data-tab="hr-org" class="nav-link flex items-center px-4 py-2 rounded-lg group text-sm opacity-80" onclick="closeSidebarOnMobile()">
+                                                                            <i class="fas fa-sitemap w-5 text-center mr-3 text-xs opacity-70"></i>
+                                                                            <span class="flex-1">조직 · 사원</span>
+                                                                            <span class="text-[9px] font-bold px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300">준비중</span>
+                                                                        </a>
+                                                                        <a href="#" data-page="erp-stub" data-tab="hr-attendance" class="nav-link flex items-center px-4 py-2 rounded-lg group text-sm opacity-80" onclick="closeSidebarOnMobile()">
+                                                                            <i class="fas fa-clock w-5 text-center mr-3 text-xs opacity-70"></i>
+                                                                            <span class="flex-1">근태</span>
+                                                                            <span class="text-[9px] font-bold px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300">준비중</span>
+                                                                        </a>
+                                                                        <a href="#" data-page="erp-stub" data-tab="hr-payroll" class="nav-link flex items-center px-4 py-2 rounded-lg group text-sm opacity-80" onclick="closeSidebarOnMobile()">
+                                                                            <i class="fas fa-money-check-alt w-5 text-center mr-3 text-xs opacity-70"></i>
+                                                                            <span class="flex-1">급여</span>
+                                                                            <span class="text-[9px] font-bold px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300">준비중</span>
+                                                                        </a>
+                                                                        <a href="#" data-page="erp-stub" data-tab="hr-talent" class="nav-link flex items-center px-4 py-2 rounded-lg group text-sm opacity-80" onclick="closeSidebarOnMobile()">
+                                                                            <i class="fas fa-user-graduate w-5 text-center mr-3 text-xs opacity-70"></i>
+                                                                            <span class="flex-1">채용 · 평가 · 교육</span>
+                                                                            <span class="text-[9px] font-bold px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300">준비중</span>
+                                                                        </a>
+                                                                    </div>
+                                                                </div>
+
+                                                                <!-- 기준정보 -->
+                                                                <div class="nav-item-group">
+                                                                    <button onclick="toggleSubMenu(this, 'erp-master-submenu')" class="flex items-center justify-between w-full px-4 py-3 rounded-lg group hover:bg-white/5 transition-all text-slate-400 hover:text-white">
+                                                                        <div class="flex items-center">
+                                                                            <i class="fas fa-database w-6 text-center text-lg mr-3"></i>
+                                                                            <span class="font-medium">기준정보</span>
+                                                                        </div>
+                                                                        <i class="fas fa-chevron-down text-[10px] submenu-arrow"></i>
+                                                                    </button>
+                                                                    <div id="erp-master-submenu" class="nav-submenu ml-4 space-y-1">
                                                                         <a href="#" data-page="products" class="nav-link flex items-center px-4 py-2 rounded-lg group text-sm" onclick="closeSidebarOnMobile()">
-                                                                            <i class="fas fa-list w-5 text-center mr-3 text-xs opacity-70"></i>
-                                                                            <span>품목 정보 관리</span>
+                                                                            <i class="fas fa-box w-5 text-center mr-3 text-xs opacity-70"></i>
+                                                                            <span>품목 정보</span>
                                                                         </a>
                                                                         <a href="#" data-page="product-options" class="nav-link flex items-center px-4 py-2 rounded-lg group text-sm" onclick="closeSidebarOnMobile()">
                                                                             <i class="fas fa-tags w-5 text-center mr-3 text-xs opacity-70"></i>
-                                                                            <span>옵션 프리셋 관리</span>
+                                                                            <span>옵션 프리셋</span>
                                                                         </a>
                                                                         <a href="#" data-page="pricing-policy" class="nav-link flex items-center px-4 py-2 rounded-lg group text-sm" onclick="closeSidebarOnMobile()">
                                                                             <i class="fas fa-hand-holding-usd w-5 text-center mr-3 text-xs opacity-70"></i>
-                                                                            <span>가격 정책 관리</span>
-                                                                        </a></div>
+                                                                            <span>가격 정책</span>
+                                                                        </a>
+                                                                    </div>
                                                                 </div>
-                                                                <a href="#" data-page="customers" class="nav-link flex items-center px-4 py-3 rounded-lg group" onclick="closeSidebarOnMobile()">
-                                                                    <i class="fas fa-users w-6 text-center text-lg mr-3"></i>
-                                                                    <span class="font-medium">고객 관리</span>
-                                                                </a>
                                                             </div>
                                                         </div>
 
-                                                        <!-- MES Group — 업무 프로세스 순서 -->
+                                                        <!-- MES Group — 업무 프로세스 순서 (구조 유지) -->
                                                         <div id="nav-mes-group" data-module="mes">
                                                             <p class="px-4 text-[11px] font-bold text-slate-500 uppercase tracking-widest mb-3 flex items-center gap-2">
                                                                 <span class="w-1.5 h-1.5 rounded-full bg-orange-500/50"></span>
-                                                                MES (제조실행)
+                                                                MES
                                                             </p>
                                                             <div class="space-y-1">
                                                                 <div class="nav-item-group">
@@ -1370,7 +1483,7 @@ app.get('/', (c: Context) => {
                                             <script src="/static/js/utils.js?v=2"></script>
                                             <script src="/static/js/utils_address.js?v=1"></script>
                                             <script src="/static/js/auth.js?v=1"></script>
-                                            <script src="/static/app.js?v=44"></script>
+                                            <script src="/static/app.js?v=46"></script>
                                             <script src="/static/js/outbound.js?v=12"></script>
                                             <script src="/static/js/purchases.js?v=3"></script>
                                             <script src="/static/js/options.js?v=1"></script>
@@ -1380,12 +1493,13 @@ app.get('/', (c: Context) => {
                                             <script src="/static/js/tracking.js?v=1"></script>
                                             <script src="/static/js/transaction-statement.js?v=2"></script>
                                             <script src="/static/js/quotations.js?v=1"></script>
+                                            <script src="/static/js/finance.js?v=1"></script>
                                             <script src="/static/js/qr-mes.js?v=6"></script>
                                             <script src="/static/js/production.js?v=14"></script>
                                             <script src="/static/js/shopfloor.js?v=2"></script>
                                             <script src="/static/js/mes-schedule.js?v=1"></script>
                                             <script src="/static/js/barcode-manager.js?v=3"></script>
-                                            <script src="/static/js/help-guides.js?v=4"></script>
+                                            <script src="/static/js/help-guides.js?v=6"></script>
                                         </body>
                                     </html>
                                     `)

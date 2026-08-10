@@ -339,6 +339,174 @@ const HELP_GUIDES = {
       { label: '고객', page: 'customers' }
     ]
   },
+
+  // ---------- ERP 스텁 (Phase 0 골격) ----------
+  'erp-stub': {
+    title: 'ERP 준비중 메뉴',
+    summary: '사이드바 ERP 모듈 골격이 잡혀 있으며, 아직 기능 구현 전인 항목입니다.',
+    steps: [
+      '준비중 뱃지 메뉴를 누르면 예정 Phase와 요약이 표시됩니다.',
+      '관련 메뉴로 이동해 현재 가능한 업무를 진행합니다.'
+    ],
+    tips: ['구현 순서: 재무(Phase 1) → 구매·재고 → 영업 CRM → 인사.'],
+    related: [{ label: '대시보드', page: 'dashboard' }]
+  },
+  'erp-stub:crm-pipeline': {
+    title: '영업 기회 (준비중)',
+    summary: '리드·기회·파이프라인. Phase 3 예정.',
+    steps: ['견적·고객·주문 화면을 이용하세요.'],
+    tips: [],
+    related: [
+      { label: '견적', page: 'quotations' },
+      { label: '고객', page: 'customers' }
+    ]
+  },
+  'erp-stub:proc-receive': {
+    title: '입고 · 검수 (준비중)',
+    summary: '전용 입고·검수. Phase 2. 당장은 발주 관리에서 입고하세요.',
+    steps: [],
+    tips: [],
+    related: [{ label: '발주 관리', page: 'purchases', tab: 'purchases' }]
+  },
+  'erp-stub:proc-price': {
+    title: '단가 관리 (준비중)',
+    summary: '구매 단가 이력. Phase 2 예정.',
+    steps: [],
+    tips: [],
+    related: [{ label: '발주 관리', page: 'purchases', tab: 'purchases' }]
+  },
+  'erp-stub:proc-eval': {
+    title: '공급사 평가 (준비중)',
+    summary: '공급사 평가·등급. Phase 2 예정.',
+    steps: [],
+    tips: [],
+    related: [{ label: '공급사', page: 'purchases', tab: 'suppliers' }]
+  },
+  'erp-stub:scm-reserve': {
+    title: '예약 재고 (준비중)',
+    summary: '예약재고 현황 UI. Phase 2. API는 견적과 연동됨.',
+    steps: [],
+    tips: [],
+    related: [{ label: '견적', page: 'quotations' }]
+  },
+  'erp-stub:scm-reorder': {
+    title: '적정재고 · 발주제안 (준비중)',
+    summary: '안전재고·발주 제안. Phase 2 예정.',
+    steps: [],
+    tips: [],
+    related: [{ label: '창고별 재고', page: 'stock', tab: 'levels' }]
+  },
+  'erp-stub:fin-ar': {
+    title: '매출채권 AR',
+    summary: 'ERP → 재무 · 회계 → 매출채권 메뉴로 이동하세요.',
+    steps: [],
+    tips: [],
+    related: [{ label: '매출채권', page: 'finance-ar' }]
+  },
+  'erp-stub:fin-ap': {
+    title: '매입채무 AP',
+    summary: 'ERP → 재무 · 회계 → 매입채무 메뉴로 이동하세요.',
+    steps: [],
+    tips: [],
+    related: [{ label: '매입채무', page: 'finance-ap' }]
+  },
+  'erp-stub:fin-voucher': {
+    title: '전표',
+    summary: 'ERP → 재무 · 회계 → 전표 메뉴로 이동하세요.',
+    steps: [],
+    tips: [],
+    related: [{ label: '전표', page: 'finance-vouchers' }]
+  },
+  'finance-ar': {
+    title: '매출채권 (AR)',
+    summary: '외상·부분입금 판매의 미수 잔액을 조회하고 입금 처리합니다.',
+    steps: [
+      '미수 필터로 미결제·부분입금 건을 조회합니다.',
+      '연령 카드(0–30 / 31–60 / 61–90 / 90+)로 회수 우선순위를 봅니다.',
+      '[전액입금] 또는 [부분입금]으로 결제 상태를 갱신합니다.'
+    ],
+    tips: ['입금 시 전표(매출수금)가 자동 생성됩니다.', 'POS에서 외상(credit)으로 등록한 판매가 여기에 나타납니다.'],
+    related: [
+      { label: '주문 관리', page: 'sales', tab: 'orders' },
+      { label: '전표', page: 'finance-vouchers' }
+    ]
+  },
+  'finance-ap': {
+    title: '매입채무 (AP)',
+    summary: '입고된 발주의 미지급 잔액을 조회하고 지급 처리합니다.',
+    steps: [
+      '입고(부분/전량)된 발주만 채무로 표시됩니다.',
+      '[전액지급] 또는 [부분지급]으로 상태를 갱신합니다.'
+    ],
+    tips: ['입고 시 매입채무 전표, 지급 시 매입지급 전표가 생성됩니다.'],
+    related: [
+      { label: '발주 관리', page: 'purchases', tab: 'purchases' },
+      { label: '전표', page: 'finance-vouchers' }
+    ]
+  },
+  'finance-vouchers': {
+    title: '전표',
+    summary: '매출·매입·입금·지급 이벤트에서 자동 생성된 전표를 조회합니다.',
+    steps: [
+      '유형 필터로 매출채권/수금/매입채무/지급을 걸러봅니다.',
+      '적요·거래처·금액으로 기장 이력을 확인합니다.'
+    ],
+    tips: ['복식원장·계정과목은 이후 Phase에서 확장됩니다.'],
+    related: [
+      { label: '매출채권', page: 'finance-ar' },
+      { label: '매입채무', page: 'finance-ap' }
+    ]
+  },
+  'erp-stub:fin-cash': {
+    title: '자금 관리 (준비중)',
+    summary: '계좌·현금흐름. Phase 6 예정.',
+    steps: [],
+    tips: [],
+    related: []
+  },
+  'erp-stub:fin-close': {
+    title: '결산 · 재무제표 (준비중)',
+    summary: '결산·재무제표. Phase 6 예정.',
+    steps: [],
+    tips: [],
+    related: []
+  },
+  'erp-stub:fin-tax': {
+    title: '세무 (준비중)',
+    summary: '세무 신고 지원. Phase 6 예정.',
+    steps: [],
+    tips: [],
+    related: []
+  },
+  'erp-stub:hr-org': {
+    title: '조직 · 사원 (준비중)',
+    summary: '조직·사원 마스터. Phase 5 예정.',
+    steps: [],
+    tips: [],
+    related: []
+  },
+  'erp-stub:hr-attendance': {
+    title: '근태 (준비중)',
+    summary: '출퇴근·휴가. Phase 5 예정.',
+    steps: [],
+    tips: [],
+    related: []
+  },
+  'erp-stub:hr-payroll': {
+    title: '급여 (준비중)',
+    summary: '급여 계산. Phase 5 예정.',
+    steps: [],
+    tips: [],
+    related: []
+  },
+  'erp-stub:hr-talent': {
+    title: '채용 · 평가 · 교육 (준비중)',
+    summary: '채용·평가·교육. Phase 5 예정.',
+    steps: [],
+    tips: [],
+    related: []
+  },
+
   settings: {
     title: '설정',
     summary: '회사·사용자·권한 등 시스템 설정을 다룹니다.',
@@ -593,13 +761,15 @@ const HELP_HUB_SECTIONS = [
     ]
   },
   {
-    title: '유통·공통',
+    title: 'ERP',
     items: [
       { key: 'dashboard', label: '대시보드' },
       { key: 'sales:pos', label: '판매(POS)' },
       { key: 'quotations', label: '견적' },
       { key: 'sales:orders', label: '주문 관리' },
       { key: 'sales:claims', label: '클레임' },
+      { key: 'customers', label: '고객' },
+      { key: 'transaction-statement', label: '거래명세서' },
       { key: 'outbound:reg', label: '간편 출고' },
       { key: 'outbound:picking', label: '피킹' },
       { key: 'outbound:packing', label: '패킹/송장' },
@@ -608,11 +778,12 @@ const HELP_HUB_SECTIONS = [
       { key: 'purchases:suppliers', label: '공급사' },
       { key: 'stock:movements', label: '재고 이동' },
       { key: 'stock:levels', label: '창고별 재고' },
-      { key: 'transaction-statement', label: '거래명세서' },
-      { key: 'products', label: '상품' },
+      { key: 'products', label: '품목' },
       { key: 'product-options', label: '옵션 관리' },
       { key: 'pricing-policy', label: '가격 정책' },
-      { key: 'customers', label: '고객' },
+      { key: 'finance-ar', label: '매출채권 AR' },
+      { key: 'finance-ap', label: '매입채무 AP' },
+      { key: 'finance-vouchers', label: '전표' },
       { key: 'settings', label: '설정' }
     ]
   }

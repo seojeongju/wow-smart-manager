@@ -4,6 +4,7 @@ import { resolveLineUnitPrice } from '../utils/sale-price'
 import { linkSaleItemLot } from '../utils/mes-distribution'
 import { createOutboundFromSale } from '../utils/sale-outbound'
 import { releaseReservationsForSource } from '../utils/stock-reservation'
+import { insertVoucher } from '../utils/vouchers'
 
 const app = new Hono<{ Bindings: Bindings; Variables: Variables }>()
 
@@ -498,6 +499,27 @@ app.post('/', async (c) => {
     }
   }
 
+  if (paymentStatus === 'unpaid' || paymentStatus === 'partial') {
+    let partnerName: string | null = null
+    if (body.customer_id) {
+      const cust = await DB.prepare(
+        'SELECT name FROM customers WHERE id = ? AND tenant_id = ?'
+      ).bind(body.customer_id, tenantId).first<{ name: string }>()
+      partnerName = cust?.name || null
+    }
+    const invoiceAmt = paymentStatus === 'unpaid' ? finalAmount : Math.max(0, finalAmount - paidAmount)
+    await insertVoucher(DB, {
+      tenantId,
+      voucherType: 'AR_INVOICE',
+      sourceType: 'sale',
+      sourceId: saleId,
+      partnerName,
+      description: `매출채권 #${saleId}`,
+      amount: invoiceAmt > 0 ? invoiceAmt : finalAmount,
+      createdBy: userId
+    })
+  }
+
   return c.json({
     success: true,
     data: {
@@ -697,10 +719,17 @@ app.put('/:id/payment', async (c) => {
   }
 
   const sale = await DB.prepare(
-    'SELECT id, final_amount FROM sales WHERE id = ? AND tenant_id = ?'
-  ).bind(id, tenantId).first<{ id: number; final_amount: number }>()
+    'SELECT id, final_amount, paid_amount, payment_status, customer_id FROM sales WHERE id = ? AND tenant_id = ?'
+  ).bind(id, tenantId).first<{
+    id: number
+    final_amount: number
+    paid_amount: number | null
+    payment_status: string | null
+    customer_id: number | null
+  }>()
   if (!sale) return c.json({ success: false, error: '판매 내역을 찾을 수 없습니다.' }, 404)
 
+  const prevPaid = Number(sale.paid_amount) || 0
   let paidAmount = Number(body.paid_amount)
   if (body.payment_status === 'paid') paidAmount = Number(sale.final_amount)
   if (body.payment_status === 'unpaid') paidAmount = 0
@@ -723,6 +752,27 @@ app.put('/:id/payment', async (c) => {
       success: false,
       error: '결제 상태 컬럼이 없습니다. 마이그레이션 0041을 적용해 주세요. ' + e.message
     }, 500)
+  }
+
+  const receiptAmt = Math.max(0, paidAmount - prevPaid)
+  if (receiptAmt > 0) {
+    let partnerName: string | null = null
+    if (sale.customer_id) {
+      const cust = await DB.prepare(
+        'SELECT name FROM customers WHERE id = ? AND tenant_id = ?'
+      ).bind(sale.customer_id, tenantId).first<{ name: string }>()
+      partnerName = cust?.name || null
+    }
+    await insertVoucher(DB, {
+      tenantId,
+      voucherType: 'AR_RECEIPT',
+      sourceType: 'sale',
+      sourceId: Number(id),
+      partnerName,
+      description: `매출수금 #${id}`,
+      amount: receiptAmt,
+      createdBy: c.get('userId')
+    })
   }
 
   return c.json({
