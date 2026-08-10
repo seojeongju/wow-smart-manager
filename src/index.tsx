@@ -1148,25 +1148,25 @@ app.get('/', (c: Context) => {
                                                                         <i class="fas fa-chevron-down text-[10px] submenu-arrow"></i>
                                                                     </button>
                                                                     <div id="mes-qr-submenu" class="nav-submenu ml-4 space-y-1">
-                                                                        <a href="#" data-page="qr-dashboard" class="nav-link flex items-center px-4 py-2 rounded-lg group text-sm" onclick="closeSidebarOnMobile()">
+                                                                        <a href="#" data-page="qr" data-tab="dashboard" class="nav-link flex items-center px-4 py-2 rounded-lg group text-sm" onclick="closeSidebarOnMobile()">
                                                                             <i class="fas fa-chart-line w-5 text-center mr-3 text-xs opacity-70"></i>
-                                                                            <span>QR 현황</span>
+                                                                            <span>1. QR 현황</span>
                                                                         </a>
-                                                                        <a href="#" data-page="qr-inbound" class="nav-link flex items-center px-4 py-2 rounded-lg group text-sm" onclick="closeSidebarOnMobile()">
+                                                                        <a href="#" data-page="qr" data-tab="inbound" class="nav-link flex items-center px-4 py-2 rounded-lg group text-sm" onclick="closeSidebarOnMobile()">
                                                                             <i class="fas fa-sign-in-alt w-5 text-center mr-3 text-xs opacity-70"></i>
-                                                                            <span>QR 입고</span>
+                                                                            <span>2. QR 입고</span>
                                                                         </a>
-                                                                        <a href="#" data-page="qr-outbound" class="nav-link flex items-center px-4 py-2 rounded-lg group text-sm" onclick="closeSidebarOnMobile()">
+                                                                        <a href="#" data-page="qr" data-tab="outbound" class="nav-link flex items-center px-4 py-2 rounded-lg group text-sm" onclick="closeSidebarOnMobile()">
                                                                             <i class="fas fa-dolly w-5 text-center mr-3 text-xs opacity-70"></i>
-                                                                            <span>QR 출고</span>
+                                                                            <span>3. QR 출고</span>
                                                                         </a>
-                                                                        <a href="#" data-page="qr-sale" class="nav-link flex items-center px-4 py-2 rounded-lg group text-sm" onclick="closeSidebarOnMobile()">
+                                                                        <a href="#" data-page="qr" data-tab="sale" class="nav-link flex items-center px-4 py-2 rounded-lg group text-sm" onclick="closeSidebarOnMobile()">
                                                                             <i class="fas fa-cash-register w-5 text-center mr-3 text-xs opacity-70"></i>
-                                                                            <span>QR 판매</span>
+                                                                            <span>4. QR 판매</span>
                                                                         </a>
-                                                                        <a href="#" data-page="qr-management" class="nav-link flex items-center px-4 py-2 rounded-lg group text-sm" onclick="closeSidebarOnMobile()">
+                                                                        <a href="#" data-page="qr" data-tab="management" class="nav-link flex items-center px-4 py-2 rounded-lg group text-sm" onclick="closeSidebarOnMobile()">
                                                                             <i class="fas fa-tags w-5 text-center mr-3 text-xs opacity-70"></i>
-                                                                            <span>QR 라벨관리</span>
+                                                                            <span>5. 라벨관리</span>
                                                                         </a>
                                                                     </div>
                                                                 </div>
@@ -1317,7 +1317,7 @@ app.get('/', (c: Context) => {
                                             <script src="/static/js/utils.js?v=2"></script>
                                             <script src="/static/js/utils_address.js?v=1"></script>
                                             <script src="/static/js/auth.js?v=1"></script>
-                                            <script src="/static/app.js?v=31"></script>
+                                            <script src="/static/app.js?v=32"></script>
                                             <script src="/static/js/outbound.js?v=9"></script>
                                             <script src="/static/js/purchases.js?v=1"></script>
                                             <script src="/static/js/options.js?v=1"></script>
@@ -1326,7 +1326,7 @@ app.get('/', (c: Context) => {
                                             <script src="/static/js/system-settings.js?v=1"></script>
                                             <script src="/static/js/tracking.js?v=1"></script>
                                             <script src="/static/js/transaction-statement.js?v=1"></script>
-                                            <script src="/static/js/qr-mes.js?v=1"></script>
+                                            <script src="/static/js/qr-mes.js?v=2"></script>
                                             <script src="/static/js/production.js?v=6"></script>
                                         </body>
                                     </html>

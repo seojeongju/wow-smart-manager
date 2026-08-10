@@ -2174,6 +2174,94 @@ async function refreshQRDashboard() {
   showToast('대시보드를 새로고침했습니다', 'success');
 }
 
+// ================================================
+// QR 현장 — 탭 셸 (제조실행과 동일한 메뉴 트리 패턴)
+// ================================================
+window.loadQRFieldPage = async function (initialTab = 'dashboard') {
+  const alias = {
+    'qr-dashboard': 'dashboard',
+    'qr-inbound': 'inbound',
+    'qr-outbound': 'outbound',
+    'qr-sale': 'sale',
+    'qr-management': 'management'
+  };
+  const tab = alias[initialTab] || initialTab || 'dashboard';
+
+  const content = document.getElementById('content');
+  content.innerHTML = `
+    <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-4">
+      <div>
+        <h1 class="text-2xl font-bold text-slate-800">
+          <i class="fas fa-qrcode mr-2 text-violet-600"></i>QR 현장
+        </h1>
+        <p class="text-sm text-slate-500 mt-1">현황 → 입고 → 출고 → 판매 → 라벨관리</p>
+      </div>
+    </div>
+
+    <div class="flex mb-6 border-b border-slate-200 overflow-x-auto">
+      <button onclick="switchQrTab('dashboard')" id="qr-tab-dashboard" class="px-4 py-3 text-sm font-medium border-b-2 whitespace-nowrap">1.현황</button>
+      <button onclick="switchQrTab('inbound')" id="qr-tab-inbound" class="px-4 py-3 text-sm font-medium border-b-2 whitespace-nowrap">2.입고</button>
+      <button onclick="switchQrTab('outbound')" id="qr-tab-outbound" class="px-4 py-3 text-sm font-medium border-b-2 whitespace-nowrap">3.출고</button>
+      <button onclick="switchQrTab('sale')" id="qr-tab-sale" class="px-4 py-3 text-sm font-medium border-b-2 whitespace-nowrap">4.판매</button>
+      <button onclick="switchQrTab('management')" id="qr-tab-management" class="px-4 py-3 text-sm font-medium border-b-2 whitespace-nowrap">5.라벨관리</button>
+    </div>
+
+    <div id="qr-tab-content"></div>
+  `;
+
+  await switchQrTab(tab);
+};
+
+window.switchQrTab = async function (tabName) {
+  const tabs = ['dashboard', 'inbound', 'outbound', 'sale', 'management'];
+  tabs.forEach((t) => {
+    const btn = document.getElementById(`qr-tab-${t}`);
+    if (!btn) return;
+    if (t === tabName) {
+      btn.classList.add('border-violet-600', 'text-violet-600');
+      btn.classList.remove('border-transparent', 'text-slate-500');
+    } else {
+      btn.classList.remove('border-violet-600', 'text-violet-600');
+      btn.classList.add('border-transparent', 'text-slate-500');
+    }
+  });
+
+  // 사이드바 active 동기화
+  document.querySelectorAll('.nav-link').forEach((link) => {
+    const page = link.getAttribute('data-page');
+    const tab = link.getAttribute('data-tab');
+    if (page === 'qr' && tab === tabName) link.classList.add('active');
+    else if (page === 'qr') link.classList.remove('active');
+  });
+
+  const titles = {
+    dashboard: ['QR 현황', '실시간 QR 작업 현황 및 통계'],
+    inbound: ['QR 입고', 'QR 스캔으로 간편 입고'],
+    outbound: ['QR 출고', 'QR 스캔으로 간편 출고'],
+    sale: ['QR 판매', 'QR 스캔으로 즉시 판매'],
+    management: ['라벨관리', 'QR 코드 생성 및 라벨 출력']
+  };
+  if (typeof updatePageTitle === 'function') {
+    const [title, desc] = titles[tabName] || titles.dashboard;
+    updatePageTitle(title, desc);
+  }
+
+  const container = document.getElementById('qr-tab-content');
+  if (!container) return;
+  container.innerHTML = '<div class="text-center py-10"><i class="fas fa-spinner fa-spin text-3xl text-violet-500"></i></div>';
+
+  try {
+    if (tabName === 'dashboard') await renderQRDashboardPage(container);
+    else if (tabName === 'inbound') await renderQRInboundPage(container);
+    else if (tabName === 'outbound') await renderQROutboundPage(container);
+    else if (tabName === 'sale') await renderQRSalePage(container);
+    else await renderQRManagementPage(container);
+  } catch (e) {
+    console.error(e);
+    container.innerHTML = `<div class="text-center py-10 text-rose-600">${e.message || '페이지 로드 실패'}</div>`;
+  }
+};
+
 // 전역으로 내보내기
 window.renderQRDashboardPage = renderQRDashboardPage;
 window.renderQRInboundPage = renderQRInboundPage;

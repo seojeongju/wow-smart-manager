@@ -304,26 +304,33 @@ async function loadPage(page, subPage = null) {
       else content.innerHTML = '<div class="text-center py-10">모듈 로딩 중...</div>';
       break;
     }
+    case 'qr':
     case 'qr-dashboard':
-      updatePageTitle('QR 대시보드', 'QR 작업 현황 및 실시간 통계');
-      await renderQRDashboardPage(content);
-      break;
     case 'qr-inbound':
-      updatePageTitle('QR 입고', 'QR 코드 스캔으로 간편 입고');
-      await renderQRInboundPage(content);
-      break;
     case 'qr-outbound':
-      updatePageTitle('QR 출고', 'QR 코드 스캔으로 간편 출고');
-      await renderQROutboundPage(content);
-      break;
     case 'qr-sale':
-      updatePageTitle('QR 판매', 'QR 코드 스캔으로 즉시 판매');
-      await renderQRSalePage(content);
+    case 'qr-management': {
+      const qrAlias = {
+        'qr-dashboard': 'dashboard',
+        'qr-inbound': 'inbound',
+        'qr-outbound': 'outbound',
+        'qr-sale': 'sale',
+        'qr-management': 'management'
+      };
+      const qrTitles = {
+        dashboard: ['QR 현황', '실시간 QR 작업 현황 및 통계'],
+        inbound: ['QR 입고', 'QR 스캔으로 간편 입고'],
+        outbound: ['QR 출고', 'QR 스캔으로 간편 출고'],
+        sale: ['QR 판매', 'QR 스캔으로 즉시 판매'],
+        management: ['라벨관리', 'QR 코드 생성 및 라벨 출력']
+      };
+      const qrTab = page === 'qr' ? (subPage || 'dashboard') : (qrAlias[page] || 'dashboard');
+      const [qrTitle, qrDesc] = qrTitles[qrTab] || qrTitles.dashboard;
+      updatePageTitle(qrTitle, qrDesc);
+      if (window.loadQRFieldPage) await window.loadQRFieldPage(qrTab);
+      else content.innerHTML = '<div class="text-center py-10">QR 모듈 로딩 중...</div>';
       break;
-    case 'qr-management':
-      updatePageTitle('QR 관리', 'QR 코드 생성 및 관리');
-      await renderQRManagementPage(content);
-      break;
+    }
     default:
       content.innerHTML = '<div class="p-4">준비 중인 페이지입니다.</div>';
   }
