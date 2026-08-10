@@ -1124,6 +1124,36 @@ app.get('/', (c: Context) => {
                                                                     </div>
                                                                 </div>
 
+                                                                <!-- 인사 · 급여 -->
+                                                                <div class="nav-item-group">
+                                                                    <button onclick="toggleSubMenu(this, 'erp-hr-submenu')" class="flex items-center justify-between w-full px-4 py-3 rounded-lg group hover:bg-white/5 transition-all text-slate-400 hover:text-white">
+                                                                        <div class="flex items-center">
+                                                                            <i class="fas fa-id-badge w-6 text-center text-lg mr-3"></i>
+                                                                            <span class="font-medium">인사 · 급여</span>
+                                                                        </div>
+                                                                        <i class="fas fa-chevron-down text-[10px] submenu-arrow"></i>
+                                                                    </button>
+                                                                    <div id="erp-hr-submenu" class="nav-submenu ml-4 space-y-1">
+                                                                        <a href="#" data-page="hr-org" class="nav-link flex items-center px-4 py-2 rounded-lg group text-sm" onclick="closeSidebarOnMobile()">
+                                                                            <i class="fas fa-sitemap w-5 text-center mr-3 text-xs opacity-70"></i>
+                                                                            <span class="flex-1">조직 · 사원</span>
+                                                                        </a>
+                                                                        <a href="#" data-page="hr-attendance" class="nav-link flex items-center px-4 py-2 rounded-lg group text-sm" onclick="closeSidebarOnMobile()">
+                                                                            <i class="fas fa-clock w-5 text-center mr-3 text-xs opacity-70"></i>
+                                                                            <span class="flex-1">근태</span>
+                                                                        </a>
+                                                                        <a href="#" data-page="hr-payroll" class="nav-link flex items-center px-4 py-2 rounded-lg group text-sm" onclick="closeSidebarOnMobile()">
+                                                                            <i class="fas fa-money-check-alt w-5 text-center mr-3 text-xs opacity-70"></i>
+                                                                            <span class="flex-1">급여</span>
+                                                                        </a>
+                                                                        <a href="#" data-page="erp-stub" data-tab="hr-talent" class="nav-link flex items-center px-4 py-2 rounded-lg group text-sm opacity-80" onclick="closeSidebarOnMobile()">
+                                                                            <i class="fas fa-user-graduate w-5 text-center mr-3 text-xs opacity-70"></i>
+                                                                            <span class="flex-1">채용 · 평가 · 교육</span>
+                                                                            <span class="text-[9px] font-bold px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300">준비중</span>
+                                                                        </a>
+                                                                    </div>
+                                                                </div>
+
                                                                 <!-- 재무 · 회계 -->
                                                                 <div class="nav-item-group">
                                                                     <button onclick="toggleSubMenu(this, 'erp-finance-submenu')" class="flex items-center justify-between w-full px-4 py-3 rounded-lg group hover:bg-white/5 transition-all text-slate-400 hover:text-white">
@@ -1159,36 +1189,6 @@ app.get('/', (c: Context) => {
                                                                         <a href="#" data-page="erp-stub" data-tab="fin-tax" class="nav-link flex items-center px-4 py-2 rounded-lg group text-sm opacity-80" onclick="closeSidebarOnMobile()">
                                                                             <i class="fas fa-landmark w-5 text-center mr-3 text-xs opacity-70"></i>
                                                                             <span class="flex-1">세무</span>
-                                                                            <span class="text-[9px] font-bold px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300">준비중</span>
-                                                                        </a>
-                                                                    </div>
-                                                                </div>
-
-                                                                <!-- 인사 · 급여 -->
-                                                                <div class="nav-item-group">
-                                                                    <button onclick="toggleSubMenu(this, 'erp-hr-submenu')" class="flex items-center justify-between w-full px-4 py-3 rounded-lg group hover:bg-white/5 transition-all text-slate-400 hover:text-white">
-                                                                        <div class="flex items-center">
-                                                                            <i class="fas fa-id-badge w-6 text-center text-lg mr-3"></i>
-                                                                            <span class="font-medium">인사 · 급여</span>
-                                                                        </div>
-                                                                        <i class="fas fa-chevron-down text-[10px] submenu-arrow"></i>
-                                                                    </button>
-                                                                    <div id="erp-hr-submenu" class="nav-submenu ml-4 space-y-1">
-                                                                        <a href="#" data-page="hr-org" class="nav-link flex items-center px-4 py-2 rounded-lg group text-sm" onclick="closeSidebarOnMobile()">
-                                                                            <i class="fas fa-sitemap w-5 text-center mr-3 text-xs opacity-70"></i>
-                                                                            <span class="flex-1">조직 · 사원</span>
-                                                                        </a>
-                                                                        <a href="#" data-page="hr-attendance" class="nav-link flex items-center px-4 py-2 rounded-lg group text-sm" onclick="closeSidebarOnMobile()">
-                                                                            <i class="fas fa-clock w-5 text-center mr-3 text-xs opacity-70"></i>
-                                                                            <span class="flex-1">근태</span>
-                                                                        </a>
-                                                                        <a href="#" data-page="hr-payroll" class="nav-link flex items-center px-4 py-2 rounded-lg group text-sm" onclick="closeSidebarOnMobile()">
-                                                                            <i class="fas fa-money-check-alt w-5 text-center mr-3 text-xs opacity-70"></i>
-                                                                            <span class="flex-1">급여</span>
-                                                                        </a>
-                                                                        <a href="#" data-page="erp-stub" data-tab="hr-talent" class="nav-link flex items-center px-4 py-2 rounded-lg group text-sm opacity-80" onclick="closeSidebarOnMobile()">
-                                                                            <i class="fas fa-user-graduate w-5 text-center mr-3 text-xs opacity-70"></i>
-                                                                            <span class="flex-1">채용 · 평가 · 교육</span>
                                                                             <span class="text-[9px] font-bold px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300">준비중</span>
                                                                         </a>
                                                                     </div>
