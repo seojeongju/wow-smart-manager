@@ -362,39 +362,99 @@ const HELP_GUIDES = {
     ]
   },
   'erp-stub:proc-receive': {
-    title: '입고 · 검수 (준비중)',
-    summary: '전용 입고·검수. Phase 2. 당장은 발주 관리에서 입고하세요.',
+    title: '입고 · 검수',
+    summary: 'ERP → 구매 → 입고 · 검수 메뉴로 이동하세요.',
     steps: [],
     tips: [],
-    related: [{ label: '발주 관리', page: 'purchases', tab: 'purchases' }]
+    related: [{ label: '입고 · 검수', page: 'proc-receive' }]
   },
   'erp-stub:proc-price': {
-    title: '단가 관리 (준비중)',
-    summary: '구매 단가 이력. Phase 2 예정.',
+    title: '단가 관리',
+    summary: 'ERP → 구매 → 단가 관리 메뉴로 이동하세요.',
     steps: [],
     tips: [],
-    related: [{ label: '발주 관리', page: 'purchases', tab: 'purchases' }]
+    related: [{ label: '단가 관리', page: 'proc-price' }]
   },
   'erp-stub:proc-eval': {
-    title: '공급사 평가 (준비중)',
-    summary: '공급사 평가·등급. Phase 2 예정.',
+    title: '공급사 평가',
+    summary: 'ERP → 구매 → 공급사 평가 메뉴로 이동하세요.',
     steps: [],
     tips: [],
-    related: [{ label: '공급사', page: 'purchases', tab: 'suppliers' }]
+    related: [{ label: '공급사 평가', page: 'proc-eval' }]
   },
   'erp-stub:scm-reserve': {
-    title: '예약 재고 (준비중)',
-    summary: '예약재고 현황 UI. Phase 2. API는 견적과 연동됨.',
+    title: '예약 재고',
+    summary: 'ERP → 재고 · SCM → 예약 재고 메뉴로 이동하세요.',
     steps: [],
     tips: [],
-    related: [{ label: '견적', page: 'quotations' }]
+    related: [{ label: '예약 재고', page: 'scm-reserve' }]
   },
   'erp-stub:scm-reorder': {
-    title: '적정재고 · 발주제안 (준비중)',
-    summary: '안전재고·발주 제안. Phase 2 예정.',
+    title: '적정재고 · 발주제안',
+    summary: 'ERP → 재고 · SCM → 적정재고 · 발주제안 메뉴로 이동하세요.',
     steps: [],
     tips: [],
-    related: [{ label: '창고별 재고', page: 'stock', tab: 'levels' }]
+    related: [{ label: '발주제안', page: 'scm-reorder' }]
+  },
+  'proc-receive': {
+    title: '입고 · 검수',
+    summary: '발주 대기 건을 선택해 창고별 입고·검수합니다.',
+    steps: [
+      '왼쪽 목록에서 발주를 선택합니다.',
+      '입고 창고를 고르고 이번 입고 수량을 입력합니다.',
+      '검수 보류면 수량을 0으로 두거나 합격으로 바꾼 뒤 [입고 확정]합니다.'
+    ],
+    tips: ['입고 시 매입채무 전표·단가 이력이 자동 기록됩니다.'],
+    related: [
+      { label: '발주 관리', page: 'purchases', tab: 'purchases' },
+      { label: '단가 관리', page: 'proc-price' }
+    ]
+  },
+  'proc-price': {
+    title: '구매 단가',
+    summary: '공급사×품목 단가 이력을 조회·등록합니다.',
+    steps: [
+      '공급사를 선택해 이력을 확인합니다.',
+      '품목·단가·적용일을 입력해 수동 등록할 수 있습니다.'
+    ],
+    tips: ['입고 확정 시에도 이력이 쌓입니다.'],
+    related: [{ label: '입고 · 검수', page: 'proc-receive' }]
+  },
+  'proc-eval': {
+    title: '공급사 평가',
+    summary: '납기·품질·가격 점수로 공급사를 평가합니다.',
+    steps: [
+      '공급사와 기간을 입력합니다.',
+      '각 항목 0–10점을 넣고 저장합니다.'
+    ],
+    tips: ['종합 점수는 세 항목 평균입니다.'],
+    related: [{ label: '공급사', page: 'purchases', tab: 'suppliers' }]
+  },
+  'scm-reserve': {
+    title: '예약 재고',
+    summary: '활성 soft allocation을 조회하고 해제합니다.',
+    steps: [
+      '활성 예약을 확인합니다.',
+      '필요 없으면 [해제]로 가용재고를 되돌립니다.'
+    ],
+    tips: ['견적에서 재고 예약을 켠 경우 여기에 나타납니다.'],
+    related: [
+      { label: '견적', page: 'quotations' },
+      { label: '발주제안', page: 'scm-reorder' }
+    ]
+  },
+  'scm-reorder': {
+    title: '적정재고 · 발주제안',
+    summary: '가용재고가 최소재고보다 낮은 품목을 제안합니다.',
+    steps: [
+      '부족 품목·제안 수량을 확인합니다.',
+      '[발주 작성]으로 발주 관리로 이동합니다.'
+    ],
+    tips: ['최소재고는 품목의 재고 알림 수량을 사용합니다.'],
+    related: [
+      { label: '창고별 재고', page: 'stock', tab: 'levels' },
+      { label: '발주 관리', page: 'purchases', tab: 'purchases' }
+    ]
   },
   'erp-stub:fin-ar': {
     title: '매출채권 AR',
@@ -776,8 +836,13 @@ const HELP_HUB_SECTIONS = [
       { key: 'outbound:hist', label: '출고 이력' },
       { key: 'purchases:purchases', label: '발주 관리' },
       { key: 'purchases:suppliers', label: '공급사' },
+      { key: 'proc-receive', label: '입고 · 검수' },
+      { key: 'proc-price', label: '단가 관리' },
+      { key: 'proc-eval', label: '공급사 평가' },
       { key: 'stock:movements', label: '재고 이동' },
       { key: 'stock:levels', label: '창고별 재고' },
+      { key: 'scm-reserve', label: '예약 재고' },
+      { key: 'scm-reorder', label: '발주제안' },
       { key: 'products', label: '품목' },
       { key: 'product-options', label: '옵션 관리' },
       { key: 'pricing-policy', label: '가격 정책' },

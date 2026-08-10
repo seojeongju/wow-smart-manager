@@ -624,6 +624,31 @@ async function loadPage(page, subPage = null) {
       if (window.loadFinanceVouchersPage) await window.loadFinanceVouchersPage();
       else content.innerHTML = '<div class="text-center py-10">재무 모듈 로딩 중...</div>';
       break;
+    case 'proc-receive':
+      updatePageTitle('입고 · 검수', '발주 대기 건 창고별 입고');
+      if (window.loadProcReceivePage) await window.loadProcReceivePage();
+      else content.innerHTML = '<div class="text-center py-10">구매 모듈 로딩 중...</div>';
+      break;
+    case 'proc-price':
+      updatePageTitle('구매 단가', '공급사×품목 단가 이력');
+      if (window.loadProcPricePage) await window.loadProcPricePage();
+      else content.innerHTML = '<div class="text-center py-10">구매 모듈 로딩 중...</div>';
+      break;
+    case 'proc-eval':
+      updatePageTitle('공급사 평가', '납기·품질·가격 평가');
+      if (window.loadProcEvalPage) await window.loadProcEvalPage();
+      else content.innerHTML = '<div class="text-center py-10">구매 모듈 로딩 중...</div>';
+      break;
+    case 'scm-reserve':
+      updatePageTitle('예약 재고', 'soft allocation 현황·해제');
+      if (window.loadScmReservePage) await window.loadScmReservePage();
+      else content.innerHTML = '<div class="text-center py-10">재고 모듈 로딩 중...</div>';
+      break;
+    case 'scm-reorder':
+      updatePageTitle('적정재고 · 발주제안', '가용재고 기준 부족 품목');
+      if (window.loadScmReorderPage) await window.loadScmReorderPage();
+      else content.innerHTML = '<div class="text-center py-10">재고 모듈 로딩 중...</div>';
+      break;
     case 'shopfloor':
       updatePageTitle('현장 실행', '작업지시 · QR 스캔 · 투입/공정/실적');
       if (window.loadProductionPage) await window.loadProductionPage('shopfloor');

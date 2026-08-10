@@ -1,6 +1,6 @@
 import { Hono } from 'hono'
 import type { Bindings, Variables, StockMovementRequest, StockTransferRequest } from '../types'
-import { getAvailableQty } from '../utils/stock-reservation'
+import { getAvailableQty, releaseReservationsForSource } from '../utils/stock-reservation'
 
 const app = new Hono<{ Bindings: Bindings; Variables: Variables }>()
 
@@ -1038,6 +1038,122 @@ app.get('/availability', async (c) => {
   if (!productId) return c.json({ success: false, error: 'product_id 필요' }, 400)
   const data = await getAvailableQty(DB, tenantId, productId)
   return c.json({ success: true, data: { product_id: productId, ...data } })
+})
+
+/** 예약재고 목록 */
+app.get('/reservations', async (c) => {
+  const { DB } = c.env
+  const tenantId = c.get('tenantId')
+  const status = (c.req.query('status') || 'active').toLowerCase()
+  const limit = Math.min(parseInt(c.req.query('limit') || '100', 10) || 100, 200)
+
+  let q = `
+    SELECT sr.*, p.name as product_name, p.sku,
+           w.name as warehouse_name
+    FROM stock_reservations sr
+    LEFT JOIN products p ON p.id = sr.product_id
+    LEFT JOIN warehouses w ON w.id = sr.warehouse_id
+    WHERE sr.tenant_id = ?
+  `
+  const params: any[] = [tenantId]
+  if (status !== 'all') {
+    q += ' AND sr.status = ?'
+    params.push(status)
+  }
+  q += ' ORDER BY sr.id DESC LIMIT ?'
+  params.push(limit)
+
+  try {
+    const { results } = await DB.prepare(q).bind(...params).all()
+    return c.json({ success: true, data: results || [] })
+  } catch (e: any) {
+    return c.json({
+      success: false,
+      error: '예약재고 조회 실패. 마이그레이션 0042를 확인해 주세요. ' + e.message
+    }, 500)
+  }
+})
+
+/** 예약 단건/출처 해제 */
+app.post('/reservations/release', async (c) => {
+  const { DB } = c.env
+  const tenantId = c.get('tenantId')
+  const body = await c.req.json<{
+    id?: number
+    source_type?: string
+    source_id?: number
+  }>()
+
+  try {
+    if (body.id) {
+      await DB.prepare(`
+        UPDATE stock_reservations
+        SET status = 'released', updated_at = CURRENT_TIMESTAMP
+        WHERE id = ? AND tenant_id = ? AND status = 'active'
+      `).bind(body.id, tenantId).run()
+      return c.json({ success: true, message: '예약이 해제되었습니다.' })
+    }
+    if (body.source_type && body.source_id) {
+      await releaseReservationsForSource(DB, tenantId, body.source_type, Number(body.source_id))
+      return c.json({ success: true, message: '출처 기준 예약이 해제되었습니다.' })
+    }
+    return c.json({ success: false, error: 'id 또는 source_type+source_id 필요' }, 400)
+  } catch (e: any) {
+    return c.json({ success: false, error: e.message || '해제 실패' }, 500)
+  }
+})
+
+/** 적정재고 미만 발주 제안 (가용재고 기준) */
+app.get('/reorder-suggestions', async (c) => {
+  const { DB } = c.env
+  const tenantId = c.get('tenantId')
+  const limit = Math.min(parseInt(c.req.query('limit') || '100', 10) || 100, 200)
+
+  try {
+    const { results } = await DB.prepare(`
+      SELECT
+        p.id as product_id,
+        p.sku,
+        p.name,
+        p.min_stock_alert,
+        COALESCE(p.purchase_price, 0) as purchase_price,
+        COALESCE(w.sum_qty, 0) as physical,
+        COALESCE(r.reserved_qty, 0) as reserved,
+        (COALESCE(w.sum_qty, 0) - COALESCE(r.reserved_qty, 0)) as available,
+        COALESCE(p.min_stock_alert, 0) - (COALESCE(w.sum_qty, 0) - COALESCE(r.reserved_qty, 0)) as shortage
+      FROM products p
+      LEFT JOIN (
+        SELECT product_id, SUM(quantity) as sum_qty
+        FROM product_warehouse_stocks
+        WHERE tenant_id = ?
+        GROUP BY product_id
+      ) w ON w.product_id = p.id
+      LEFT JOIN (
+        SELECT product_id, SUM(quantity) as reserved_qty
+        FROM stock_reservations
+        WHERE tenant_id = ? AND status = 'active'
+          AND (expires_at IS NULL OR expires_at >= datetime('now'))
+        GROUP BY product_id
+      ) r ON r.product_id = p.id
+      WHERE p.tenant_id = ? AND p.is_active = 1
+        AND COALESCE(p.min_stock_alert, 0) > 0
+        AND (COALESCE(w.sum_qty, 0) - COALESCE(r.reserved_qty, 0)) < COALESCE(p.min_stock_alert, 0)
+      ORDER BY shortage DESC
+      LIMIT ?
+    `).bind(tenantId, tenantId, tenantId, limit).all()
+
+    const data = (results || []).map((row: any) => ({
+      ...row,
+      suggest_qty: Math.max(0, Math.ceil(Number(row.shortage) || 0))
+    }))
+
+    return c.json({ success: true, data, count: data.length })
+  } catch (e: any) {
+    return c.json({
+      success: false,
+      error: '발주제안 조회 실패: ' + e.message
+    }, 500)
+  }
 })
 
 // 총재고 vs 창고합 불일치 목록

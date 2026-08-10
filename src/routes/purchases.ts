@@ -371,10 +371,10 @@ app.post('/:id/receive', async (c) => {
 
     if (receiveAmount > 0) {
         const supplier = await DB.prepare(`
-          SELECT s.name FROM suppliers s
+          SELECT s.name, s.id as supplier_id FROM suppliers s
           JOIN purchase_orders po ON po.supplier_id = s.id
           WHERE po.id = ? AND po.tenant_id = ?
-        `).bind(id, tenantId).first<{ name: string }>()
+        `).bind(id, tenantId).first<{ name: string; supplier_id: number }>()
         await insertVoucher(DB, {
             tenantId,
             voucherType: 'AP_INVOICE',
@@ -385,6 +385,36 @@ app.post('/:id/receive', async (c) => {
             amount: receiveAmount,
             createdBy: userId
         })
+
+        // 공급사 단가 이력 기록
+        if (supplier?.supplier_id) {
+            for (const item of items) {
+                const qty = Number(item.quantity) || 0
+                if (qty <= 0) continue
+                const pi = await DB.prepare(
+                    'SELECT product_id, unit_price FROM purchase_items WHERE id = ?'
+                ).bind(item.id).first<{ product_id: number; unit_price: number }>()
+                if (!pi) continue
+                try {
+                    await DB.prepare(`
+                      INSERT INTO supplier_unit_prices (
+                        tenant_id, supplier_id, product_id, unit_price,
+                        effective_from, notes, source_type, source_id, created_by
+                      ) VALUES (?, ?, ?, ?, date('now'), ?, 'purchase_order', ?, ?)
+                    `).bind(
+                        tenantId,
+                        supplier.supplier_id,
+                        pi.product_id,
+                        Number(pi.unit_price) || 0,
+                        `입고 PO#${(po as any).code || id}`,
+                        Number(id),
+                        userId
+                    ).run()
+                } catch {
+                    /* 0044 미적용 시 무시 */
+                }
+            }
+        }
     }
 
     return c.json({

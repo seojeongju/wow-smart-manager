@@ -1040,20 +1040,17 @@ app.get('/', (c: Context) => {
                                                                             <i class="fas fa-truck-loading w-5 text-center mr-3 text-xs opacity-70"></i>
                                                                             <span>공급사 관리</span>
                                                                         </a>
-                                                                        <a href="#" data-page="erp-stub" data-tab="proc-receive" class="nav-link flex items-center px-4 py-2 rounded-lg group text-sm opacity-80" onclick="closeSidebarOnMobile()">
+                                                                        <a href="#" data-page="proc-receive" class="nav-link flex items-center px-4 py-2 rounded-lg group text-sm" onclick="closeSidebarOnMobile()">
                                                                             <i class="fas fa-clipboard-check w-5 text-center mr-3 text-xs opacity-70"></i>
-                                                                            <span class="flex-1">입고 · 검수</span>
-                                                                            <span class="text-[9px] font-bold px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300">준비중</span>
+                                                                            <span>입고 · 검수</span>
                                                                         </a>
-                                                                        <a href="#" data-page="erp-stub" data-tab="proc-price" class="nav-link flex items-center px-4 py-2 rounded-lg group text-sm opacity-80" onclick="closeSidebarOnMobile()">
+                                                                        <a href="#" data-page="proc-price" class="nav-link flex items-center px-4 py-2 rounded-lg group text-sm" onclick="closeSidebarOnMobile()">
                                                                             <i class="fas fa-tags w-5 text-center mr-3 text-xs opacity-70"></i>
-                                                                            <span class="flex-1">단가 관리</span>
-                                                                            <span class="text-[9px] font-bold px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300">준비중</span>
+                                                                            <span>단가 관리</span>
                                                                         </a>
-                                                                        <a href="#" data-page="erp-stub" data-tab="proc-eval" class="nav-link flex items-center px-4 py-2 rounded-lg group text-sm opacity-80" onclick="closeSidebarOnMobile()">
+                                                                        <a href="#" data-page="proc-eval" class="nav-link flex items-center px-4 py-2 rounded-lg group text-sm" onclick="closeSidebarOnMobile()">
                                                                             <i class="fas fa-star-half-alt w-5 text-center mr-3 text-xs opacity-70"></i>
-                                                                            <span class="flex-1">공급사 평가</span>
-                                                                            <span class="text-[9px] font-bold px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300">준비중</span>
+                                                                            <span>공급사 평가</span>
                                                                         </a>
                                                                     </div>
                                                                 </div>
@@ -1109,15 +1106,13 @@ app.get('/', (c: Context) => {
                                                                             <i class="fas fa-list-ul w-5 text-center mr-3 text-xs opacity-70"></i>
                                                                             <span>재고 이동 내역</span>
                                                                         </a>
-                                                                        <a href="#" data-page="erp-stub" data-tab="scm-reserve" class="nav-link flex items-center px-4 py-2 rounded-lg group text-sm opacity-80" onclick="closeSidebarOnMobile()">
+                                                                        <a href="#" data-page="scm-reserve" class="nav-link flex items-center px-4 py-2 rounded-lg group text-sm" onclick="closeSidebarOnMobile()">
                                                                             <i class="fas fa-lock w-5 text-center mr-3 text-xs opacity-70"></i>
-                                                                            <span class="flex-1">예약 재고</span>
-                                                                            <span class="text-[9px] font-bold px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300">준비중</span>
+                                                                            <span>예약 재고</span>
                                                                         </a>
-                                                                        <a href="#" data-page="erp-stub" data-tab="scm-reorder" class="nav-link flex items-center px-4 py-2 rounded-lg group text-sm opacity-80" onclick="closeSidebarOnMobile()">
+                                                                        <a href="#" data-page="scm-reorder" class="nav-link flex items-center px-4 py-2 rounded-lg group text-sm" onclick="closeSidebarOnMobile()">
                                                                             <i class="fas fa-chart-line w-5 text-center mr-3 text-xs opacity-70"></i>
-                                                                            <span class="flex-1">적정재고 · 발주제안</span>
-                                                                            <span class="text-[9px] font-bold px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300">준비중</span>
+                                                                            <span>적정재고 · 발주제안</span>
                                                                         </a>
                                                                     </div>
                                                                 </div>
@@ -1483,7 +1478,7 @@ app.get('/', (c: Context) => {
                                             <script src="/static/js/utils.js?v=2"></script>
                                             <script src="/static/js/utils_address.js?v=1"></script>
                                             <script src="/static/js/auth.js?v=1"></script>
-                                            <script src="/static/app.js?v=46"></script>
+                                            <script src="/static/app.js?v=47"></script>
                                             <script src="/static/js/outbound.js?v=12"></script>
                                             <script src="/static/js/purchases.js?v=3"></script>
                                             <script src="/static/js/options.js?v=1"></script>
@@ -1494,12 +1489,13 @@ app.get('/', (c: Context) => {
                                             <script src="/static/js/transaction-statement.js?v=2"></script>
                                             <script src="/static/js/quotations.js?v=1"></script>
                                             <script src="/static/js/finance.js?v=1"></script>
+                                            <script src="/static/js/erp-procurement.js?v=1"></script>
                                             <script src="/static/js/qr-mes.js?v=6"></script>
                                             <script src="/static/js/production.js?v=14"></script>
                                             <script src="/static/js/shopfloor.js?v=2"></script>
                                             <script src="/static/js/mes-schedule.js?v=1"></script>
                                             <script src="/static/js/barcode-manager.js?v=3"></script>
-                                            <script src="/static/js/help-guides.js?v=6"></script>
+                                            <script src="/static/js/help-guides.js?v=7"></script>
                                         </body>
                                     </html>
                                     `)
