@@ -288,6 +288,11 @@ async function loadPage(page, subPage = null) {
       if (window.renderTransactionStatementPage) await window.renderTransactionStatementPage(content);
       else content.innerHTML = '<div class="text-center py-10">모듈 로딩 중...</div>';
       break;
+    case 'shopfloor':
+      updatePageTitle('현장 실행', '작업지시 · QR 스캔 · 투입/공정/실적');
+      if (window.loadShopfloorPage) await window.loadShopfloorPage();
+      else content.innerHTML = '<div class="text-center py-10">현장 모듈 로딩 중...</div>';
+      break;
     case 'production': {
       const mesTitles = {
         kpi: ['제조 현황', '계획달성·수율·불량·납기 KPI'],

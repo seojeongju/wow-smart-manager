@@ -28,18 +28,19 @@ window.loadProductionPage = async function (initialTab = 'kpi') {
         <h1 class="text-2xl font-bold text-slate-800">
           <i class="fas fa-industry mr-2 text-orange-600"></i>제조실행 MES
         </h1>
-        <p class="text-sm text-slate-500 mt-1">현황 → 기준정보 → 작업지시 → 자재/외주 → 추적 → 품질</p>
+        <p class="text-sm text-slate-500 mt-1">현장실행 → 현황 → 기준정보 → 작업지시 → 자재/외주 → 추적 → 품질</p>
       </div>
       <div id="mes-stats" class="grid grid-cols-2 md:grid-cols-4 gap-2 text-sm"></div>
     </div>
 
     <div class="flex mb-6 border-b border-slate-200 overflow-x-auto">
-      <button onclick="switchMesTab('kpi')" id="mes-tab-kpi" class="px-4 py-3 text-sm font-medium border-b-2 whitespace-nowrap">1.현황</button>
-      <button onclick="switchMesTab('masters')" id="mes-tab-masters" class="px-4 py-3 text-sm font-medium border-b-2 whitespace-nowrap">2.기준정보</button>
-      <button onclick="switchMesTab('work-orders')" id="mes-tab-work-orders" class="px-4 py-3 text-sm font-medium border-b-2 whitespace-nowrap">3.작업지시</button>
-      <button onclick="switchMesTab('materials')" id="mes-tab-materials" class="px-4 py-3 text-sm font-medium border-b-2 whitespace-nowrap">4.자재·외주</button>
-      <button onclick="switchMesTab('trace')" id="mes-tab-trace" class="px-4 py-3 text-sm font-medium border-b-2 whitespace-nowrap">5.현장추적</button>
-      <button onclick="switchMesTab('quality')" id="mes-tab-quality" class="px-4 py-3 text-sm font-medium border-b-2 whitespace-nowrap">6.품질</button>
+      <button onclick="loadPage('shopfloor')" class="px-4 py-3 text-sm font-medium border-b-2 border-transparent text-slate-500 whitespace-nowrap hover:text-orange-600">1.현장실행</button>
+      <button onclick="switchMesTab('kpi')" id="mes-tab-kpi" class="px-4 py-3 text-sm font-medium border-b-2 whitespace-nowrap">2.현황</button>
+      <button onclick="switchMesTab('masters')" id="mes-tab-masters" class="px-4 py-3 text-sm font-medium border-b-2 whitespace-nowrap">3.기준정보</button>
+      <button onclick="switchMesTab('work-orders')" id="mes-tab-work-orders" class="px-4 py-3 text-sm font-medium border-b-2 whitespace-nowrap">4.작업지시</button>
+      <button onclick="switchMesTab('materials')" id="mes-tab-materials" class="px-4 py-3 text-sm font-medium border-b-2 whitespace-nowrap">5.자재·외주</button>
+      <button onclick="switchMesTab('trace')" id="mes-tab-trace" class="px-4 py-3 text-sm font-medium border-b-2 whitespace-nowrap">6.현장추적</button>
+      <button onclick="switchMesTab('quality')" id="mes-tab-quality" class="px-4 py-3 text-sm font-medium border-b-2 whitespace-nowrap">7.품질</button>
     </div>
 
     <div id="mes-tab-content"></div>

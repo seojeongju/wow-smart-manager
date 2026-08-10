@@ -1113,29 +1113,33 @@ app.get('/', (c: Context) => {
                                                                         <i class="fas fa-chevron-down text-[10px] submenu-arrow"></i>
                                                                     </button>
                                                                     <div id="mes-exec-submenu" class="nav-submenu ml-4 space-y-1 open">
+                                                                        <a href="#" data-page="shopfloor" class="nav-link flex items-center px-4 py-2 rounded-lg group text-sm" onclick="closeSidebarOnMobile()">
+                                                                            <i class="fas fa-mobile-alt w-5 text-center mr-3 text-xs opacity-70"></i>
+                                                                            <span>1. 현장 실행</span>
+                                                                        </a>
                                                                         <a href="#" data-page="production" data-tab="kpi" class="nav-link flex items-center px-4 py-2 rounded-lg group text-sm" onclick="closeSidebarOnMobile()">
                                                                             <i class="fas fa-chart-pie w-5 text-center mr-3 text-xs opacity-70"></i>
-                                                                            <span>1. 제조 현황</span>
+                                                                            <span>2. 제조 현황</span>
                                                                         </a>
                                                                         <a href="#" data-page="production" data-tab="masters" class="nav-link flex items-center px-4 py-2 rounded-lg group text-sm" onclick="closeSidebarOnMobile()">
                                                                             <i class="fas fa-sitemap w-5 text-center mr-3 text-xs opacity-70"></i>
-                                                                            <span>2. 기준정보</span>
+                                                                            <span>3. 기준정보</span>
                                                                         </a>
                                                                         <a href="#" data-page="production" data-tab="work-orders" class="nav-link flex items-center px-4 py-2 rounded-lg group text-sm" onclick="closeSidebarOnMobile()">
                                                                             <i class="fas fa-clipboard-list w-5 text-center mr-3 text-xs opacity-70"></i>
-                                                                            <span>3. 작업지시</span>
+                                                                            <span>4. 작업지시</span>
                                                                         </a>
                                                                         <a href="#" data-page="production" data-tab="materials" class="nav-link flex items-center px-4 py-2 rounded-lg group text-sm" onclick="closeSidebarOnMobile()">
                                                                             <i class="fas fa-boxes w-5 text-center mr-3 text-xs opacity-70"></i>
-                                                                            <span>4. 자재·외주</span>
+                                                                            <span>5. 자재·외주</span>
                                                                         </a>
                                                                         <a href="#" data-page="production" data-tab="trace" class="nav-link flex items-center px-4 py-2 rounded-lg group text-sm" onclick="closeSidebarOnMobile()">
                                                                             <i class="fas fa-route w-5 text-center mr-3 text-xs opacity-70"></i>
-                                                                            <span>5. 현장추적</span>
+                                                                            <span>6. 현장추적</span>
                                                                         </a>
                                                                         <a href="#" data-page="production" data-tab="quality" class="nav-link flex items-center px-4 py-2 rounded-lg group text-sm" onclick="closeSidebarOnMobile()">
                                                                             <i class="fas fa-clipboard-check w-5 text-center mr-3 text-xs opacity-70"></i>
-                                                                            <span>6. 품질검사</span>
+                                                                            <span>7. 품질검사</span>
                                                                         </a>
                                                                     </div>
                                                                 </div>
@@ -1317,7 +1321,7 @@ app.get('/', (c: Context) => {
                                             <script src="/static/js/utils.js?v=2"></script>
                                             <script src="/static/js/utils_address.js?v=1"></script>
                                             <script src="/static/js/auth.js?v=1"></script>
-                                            <script src="/static/app.js?v=32"></script>
+                                            <script src="/static/app.js?v=33"></script>
                                             <script src="/static/js/outbound.js?v=9"></script>
                                             <script src="/static/js/purchases.js?v=1"></script>
                                             <script src="/static/js/options.js?v=1"></script>
@@ -1327,7 +1331,8 @@ app.get('/', (c: Context) => {
                                             <script src="/static/js/tracking.js?v=1"></script>
                                             <script src="/static/js/transaction-statement.js?v=1"></script>
                                             <script src="/static/js/qr-mes.js?v=2"></script>
-                                            <script src="/static/js/production.js?v=6"></script>
+                                            <script src="/static/js/production.js?v=7"></script>
+                                            <script src="/static/js/shopfloor.js?v=1"></script>
                                         </body>
                                     </html>
                                     `)
