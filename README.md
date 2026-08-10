@@ -18,9 +18,9 @@
 
 ## 🌐 공개 URL
 
-- **프로덕션**: https://smart-link-f.pages.dev
-- **GitHub**: https://github.com/seojeongju/Smart-Link-f
-- **API Base**: https://smart-link-f.pages.dev/api
+- **프로덕션**: https://wow-smart-manager.pages.dev
+- **GitHub**: https://github.com/seojeongju/wow-smart-manager
+- **API Base**: https://wow-smart-manager.pages.dev/api
 
 ## 🏗️ 기술 스택
 
@@ -241,8 +241,9 @@ npm run preview
 - **데이터베이스**: Cloudflare D1 (프로덕션)
   - Database ID: 463de385-2845-4930-b64e-c0c4e872e01a
   - Region: ENAM (유럽/북미)
-- **프로덕션 URL**: https://smart-link-f.pages.dev
-- **D1**: `smart-link-f-db`
+- **프로덕션 URL**: https://wow-smart-manager.pages.dev
+- **Pages**: `wow-smart-manager`
+- **D1**: `smart-link-f-db` (binding: `DB`)
 - **R2**: `smart-link-f-assets` (binding: `R2`)
 - **상태**: ✅ 프로덕션 배포 완료
 - **최종 업데이트**: 2025-10-31
