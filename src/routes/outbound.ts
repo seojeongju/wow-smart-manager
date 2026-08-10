@@ -566,13 +566,15 @@ app.post('/:id/ship', async (c) => {
 
     // 1. Order 조회
     const order = await DB.prepare('SELECT * FROM outbound_orders WHERE id = ? AND tenant_id = ?')
-        .bind(id, tenantId).first<OutboundOrder>();
+        .bind(id, tenantId).first<OutboundOrder & { stock_mode?: string }>();
 
     if (!order) return c.json({ success: false, error: 'Order not found' }, 404);
     // PENDING: 간편 즉시출고 / PACKING: 피킹·패킹 완료 후 확정
     if (order.status !== 'PENDING' && order.status !== 'PACKING') {
         return c.json({ success: false, error: '출고 확정은 PENDING 또는 PACKING 상태에서만 가능합니다.' }, 400);
     }
+
+    const skipStock = order.stock_mode === 'pre_deducted';
 
     // 2. Items 조회
     const { results: items } = await DB.prepare(`
@@ -591,20 +593,22 @@ app.post('/:id/ship', async (c) => {
     }>();
 
     try {
-        // 재고 체크
-        for (const item of items) {
-            const shipQty = order.status === 'PACKING'
-                ? (Number(item.quantity_packed) || Number(item.quantity_picked) || Number(item.quantity_ordered))
-                : Number(item.quantity_ordered)
+        // 재고 체크 (사전차감 모드는 스킵)
+        if (!skipStock) {
+            for (const item of items) {
+                const shipQty = order.status === 'PACKING'
+                    ? (Number(item.quantity_packed) || Number(item.quantity_picked) || Number(item.quantity_ordered))
+                    : Number(item.quantity_ordered)
 
-            if (item.current_stock < shipQty) {
-                throw new Error(`상품 '${item.product_name}'의 재고가 부족합니다.`);
-            }
-            const whStock = await DB.prepare('SELECT quantity FROM product_warehouse_stocks WHERE product_id = ? AND warehouse_id = ?')
-                .bind(item.product_id, warehouseId).first<{ quantity: number }>();
-            const currentWhStock = whStock?.quantity || 0;
-            if (currentWhStock < shipQty) {
-                throw new Error(`상품 '${item.product_name}'의 창고 재고가 부족합니다. (현재: ${currentWhStock})`);
+                if (item.current_stock < shipQty) {
+                    throw new Error(`상품 '${item.product_name}'의 재고가 부족합니다.`);
+                }
+                const whStock = await DB.prepare('SELECT quantity FROM product_warehouse_stocks WHERE product_id = ? AND warehouse_id = ?')
+                    .bind(item.product_id, warehouseId).first<{ quantity: number }>();
+                const currentWhStock = whStock?.quantity || 0;
+                if (currentWhStock < shipQty) {
+                    throw new Error(`상품 '${item.product_name}'의 창고 재고가 부족합니다. (현재: ${currentWhStock})`);
+                }
             }
         }
 
@@ -614,22 +618,24 @@ app.post('/:id/ship', async (c) => {
                 ? (Number(item.quantity_packed) || Number(item.quantity_picked) || Number(item.quantity_ordered))
                 : Number(item.quantity_ordered)
 
-            await DB.prepare('UPDATE products SET current_stock = current_stock - ? WHERE id = ?')
-                .bind(shipQty, item.product_id).run();
+            if (!skipStock) {
+                await DB.prepare('UPDATE products SET current_stock = current_stock - ? WHERE id = ?')
+                    .bind(shipQty, item.product_id).run();
 
-            await DB.prepare(`
-                UPDATE product_warehouse_stocks 
-                SET quantity = quantity - ?, updated_at = CURRENT_TIMESTAMP 
-                WHERE product_id = ? AND warehouse_id = ?
-            `).bind(shipQty, item.product_id, warehouseId).run();
+                await DB.prepare(`
+                    UPDATE product_warehouse_stocks 
+                    SET quantity = quantity - ?, updated_at = CURRENT_TIMESTAMP 
+                    WHERE product_id = ? AND warehouse_id = ?
+                `).bind(shipQty, item.product_id, warehouseId).run();
 
-            await DB.prepare(`
-              INSERT INTO stock_movements (tenant_id, product_id, warehouse_id, movement_type, quantity, reason, notes, created_by)
-              VALUES (?, ?, ?, '출고', ?, ?, ?, ?)
-            `).bind(
-                tenantId, item.product_id, warehouseId, -shipQty,
-                '출고확정', `Order: ${order.order_number}`, userId
-            ).run();
+                await DB.prepare(`
+                  INSERT INTO stock_movements (tenant_id, product_id, warehouse_id, movement_type, quantity, reason, notes, created_by)
+                  VALUES (?, ?, ?, '출고', ?, ?, ?, ?)
+                `).bind(
+                    tenantId, item.product_id, warehouseId, -shipQty,
+                    '출고확정', `Order: ${order.order_number}`, userId
+                ).run();
+            }
 
             await DB.prepare('UPDATE outbound_items SET status = ?, quantity_picked = ?, quantity_packed = ? WHERE id = ?')
                 .bind('SHIPPED', shipQty, shipQty, item.id).run();
@@ -639,11 +645,22 @@ app.post('/:id/ship', async (c) => {
             .bind('SHIPPED', warehouseId, id).run();
 
         const { results: mappings } = await DB.prepare('SELECT sale_id FROM outbound_order_mappings WHERE outbound_order_id = ?').bind(id).all<{ sale_id: number }>();
+        const pkg = await DB.prepare(
+            'SELECT courier, tracking_number FROM outbound_packages WHERE outbound_order_id = ? ORDER BY id DESC LIMIT 1'
+        ).bind(id).first<{ courier: string; tracking_number: string }>()
+
         for (const map of mappings) {
-            await DB.prepare("UPDATE sales SET status = 'shipped' WHERE id = ?").bind(map.sale_id).run();
+            await DB.prepare(`
+              UPDATE sales SET status = 'shipped',
+                courier = COALESCE(?, courier),
+                tracking_number = COALESCE(?, tracking_number),
+                warehouse_id = COALESCE(?, warehouse_id),
+                updated_at = CURRENT_TIMESTAMP
+              WHERE id = ?
+            `).bind(pkg?.courier || null, pkg?.tracking_number || null, warehouseId, map.sale_id).run();
         }
 
-        return c.json({ success: true });
+        return c.json({ success: true, data: { stock_skipped: skipStock } });
 
     } catch (e: any) {
         console.error('Ship error:', e);
@@ -748,6 +765,16 @@ app.post('/:id/packing', async (c) => {
     await DB.prepare(`
         UPDATE outbound_orders SET status = 'PACKING', updated_at = CURRENT_TIMESTAMP WHERE id = ?
     `).bind(id).run()
+
+    // 연결된 판매에 송장 동기화
+    const { results: maps } = await DB.prepare(
+        'SELECT sale_id FROM outbound_order_mappings WHERE outbound_order_id = ?'
+    ).bind(id).all<{ sale_id: number }>()
+    for (const m of maps || []) {
+        await DB.prepare(`
+          UPDATE sales SET courier = ?, tracking_number = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?
+        `).bind(body.courier || null, body.tracking_number, m.sale_id).run()
+    }
 
     return c.json({ success: true, message: '패킹·송장이 저장되었습니다. 출고 확정 단계에서 재고가 차감됩니다.' })
 })

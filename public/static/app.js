@@ -1521,13 +1521,24 @@ async function renderStockLevelsTab(container) {
 
     container.innerHTML = `
         <div class="bg-white rounded-lg shadow-sm p-4 mb-6 border border-slate-100">
-          <div class="flex items-center gap-4">
-            <label class="font-semibold text-slate-700">창고 선택:</label>
-            <select id="levelWarehouseFilter" class="border border-slate-300 rounded-lg px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-teal-500 bg-white min-w-[200px]" onchange="loadWarehouseStockLevels()">
-              <option value="">전체 창고</option>
-              ${warehouses.map(w => `<option value="${w.id}">${w.name}</option>`).join('')}
-            </select>
+          <div class="flex flex-wrap items-center gap-4 justify-between">
+            <div class="flex items-center gap-4">
+              <label class="font-semibold text-slate-700">창고 선택:</label>
+              <select id="levelWarehouseFilter" class="border border-slate-300 rounded-lg px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-teal-500 bg-white min-w-[200px]" onchange="loadStockLevelsTable()">
+                <option value="">전체 창고</option>
+                ${warehouses.map(w => `<option value="${w.id}">${w.name}</option>`).join('')}
+              </select>
+            </div>
+            <div class="flex gap-2">
+              <button type="button" onclick="showStockDrift()" class="px-3 py-2 rounded-lg border border-amber-200 bg-amber-50 text-amber-800 text-sm font-semibold hover:bg-amber-100">
+                <i class="fas fa-balance-scale mr-1"></i>불일치 검사
+              </button>
+              <button type="button" onclick="syncGlobalStockFromLevels()" class="px-3 py-2 rounded-lg border border-teal-200 bg-teal-50 text-teal-800 text-sm font-semibold hover:bg-teal-100">
+                <i class="fas fa-sync-alt mr-1"></i>총재고 동기화
+              </button>
+            </div>
           </div>
+          <div id="stockDriftBox" class="hidden mt-4"></div>
         </div>
         <div class="bg-white rounded-xl shadow-sm border border-slate-100 overflow-hidden flex-1">
           <div class="overflow-x-auto h-full" id="stockLevelsContainer">
@@ -1537,7 +1548,7 @@ async function renderStockLevelsTab(container) {
     `;
 
     // 자동으로 전체 로드
-    loadWarehouseStockLevels();
+    loadStockLevelsTable();
 
   } catch (error) {
     console.error('창고 목록 로드 실패:', error);
@@ -1545,8 +1556,59 @@ async function renderStockLevelsTab(container) {
   }
 }
 
-// 창고별 재고 현황 로드
-async function loadWarehouseStockLevels() {
+async function showStockDrift() {
+  const box = document.getElementById('stockDriftBox');
+  if (!box) return;
+  box.classList.remove('hidden');
+  box.innerHTML = '<div class="text-sm text-slate-500"><i class="fas fa-spinner fa-spin mr-2"></i>검사 중...</div>';
+  try {
+    const res = await axios.get(`${API_BASE}/stock/drift`);
+    const rows = res.data.data || [];
+    if (!rows.length) {
+      box.innerHTML = '<div class="text-sm text-emerald-700 bg-emerald-50 border border-emerald-100 rounded-lg px-3 py-2">총재고와 창고합이 일치합니다.</div>';
+      return;
+    }
+    box.innerHTML = `
+      <div class="rounded-lg border border-amber-200 overflow-hidden">
+        <div class="px-3 py-2 bg-amber-50 text-sm font-semibold text-amber-900">${rows.length}건 불일치 — [총재고 동기화]로 창고합 기준으로 맞출 수 있습니다.</div>
+        <table class="min-w-full text-xs">
+          <thead class="bg-slate-50"><tr>
+            <th class="px-3 py-2 text-left">SKU</th><th class="px-3 py-2 text-left">상품</th>
+            <th class="px-3 py-2 text-right">총재고</th><th class="px-3 py-2 text-right">창고합</th><th class="px-3 py-2 text-right">차이</th>
+          </tr></thead>
+          <tbody class="divide-y">
+            ${rows.slice(0, 50).map(r => `
+              <tr>
+                <td class="px-3 py-1.5 font-mono">${r.sku || ''}</td>
+                <td class="px-3 py-1.5">${r.name || ''}</td>
+                <td class="px-3 py-1.5 text-right">${r.total_stock}</td>
+                <td class="px-3 py-1.5 text-right">${r.warehouse_sum}</td>
+                <td class="px-3 py-1.5 text-right font-bold ${Number(r.drift) === 0 ? '' : 'text-rose-600'}">${r.drift}</td>
+              </tr>`).join('')}
+          </tbody>
+        </table>
+      </div>`;
+  } catch (e) {
+    box.innerHTML = `<div class="text-sm text-rose-600">${e.response?.data?.error || e.message}</div>`;
+  }
+}
+window.showStockDrift = showStockDrift;
+
+async function syncGlobalStockFromLevels() {
+  if (!confirm('모든 상품의 총재고를 창고별 재고 합계로 맞출까요?')) return;
+  try {
+    const res = await axios.post(`${API_BASE}/stock/sync-global`);
+    showSuccess(res.data.message || '동기화 완료');
+    loadStockLevelsTable();
+    showStockDrift();
+  } catch (e) {
+    alert('동기화 실패: ' + (e.response?.data?.error || e.message));
+  }
+}
+window.syncGlobalStockFromLevels = syncGlobalStockFromLevels;
+
+// 창고별 재고 현황 로드 (levels API)
+async function loadStockLevelsTable() {
   const warehouseId = document.getElementById('levelWarehouseFilter')?.value || '';
   const container = document.getElementById('stockLevelsContainer');
 
@@ -1619,9 +1681,7 @@ async function loadWarehouseStockLevels() {
     container.innerHTML = '<div class="text-center py-10 text-red-500">재고 현황을 불러오는데 실패했습니다.</div>';
   }
 }
-window.loadWarehouseStockLevels = loadWarehouseStockLevels;
-
-async function loadStock_old(content) {
+window.loadStockLevelsTable = loadStockLevelsTable;
   try {
     // 재고 이동 내역 조회
     const response = await axios.get(`${API_BASE}/stock/movements`);
@@ -2055,22 +2115,31 @@ async function renderPosTab(container) {
               <span id="posFinalAmount">0원</span>
             </div>
 
-            <div class="mb-6">
-              <div class="flex gap-2">
-                <label class="flex-1 cursor-pointer">
+            <div class="mb-4">
+              <div class="flex gap-2 flex-wrap">
+                <label class="flex-1 min-w-[70px] cursor-pointer">
                   <input type="radio" name="paymentMethod" value="card" checked class="peer sr-only">
                   <div class="text-center py-2.5 border border-slate-200 rounded-lg peer-checked:bg-teal-600 peer-checked:text-white peer-checked:border-teal-600 hover:bg-slate-50 transition-all font-medium text-sm">카드</div>
                 </label>
-                <label class="flex-1 cursor-pointer">
+                <label class="flex-1 min-w-[70px] cursor-pointer">
                   <input type="radio" name="paymentMethod" value="cash" class="peer sr-only">
                   <div class="text-center py-2.5 border border-slate-200 rounded-lg peer-checked:bg-teal-600 peer-checked:text-white peer-checked:border-teal-600 hover:bg-slate-50 transition-all font-medium text-sm">현금</div>
                 </label>
-                <label class="flex-1 cursor-pointer">
+                <label class="flex-1 min-w-[70px] cursor-pointer">
                   <input type="radio" name="paymentMethod" value="transfer" class="peer sr-only">
                   <div class="text-center py-2.5 border border-slate-200 rounded-lg peer-checked:bg-teal-600 peer-checked:text-white peer-checked:border-teal-600 hover:bg-slate-50 transition-all font-medium text-sm">이체</div>
                 </label>
+                <label class="flex-1 min-w-[70px] cursor-pointer">
+                  <input type="radio" name="paymentMethod" value="credit" class="peer sr-only">
+                  <div class="text-center py-2.5 border border-slate-200 rounded-lg peer-checked:bg-amber-500 peer-checked:text-white peer-checked:border-amber-500 hover:bg-slate-50 transition-all font-medium text-sm">외상</div>
+                </label>
               </div>
             </div>
+
+            <label class="mb-4 flex items-center gap-2 text-sm text-slate-600 cursor-pointer select-none">
+              <input type="checkbox" id="posFulfillmentShipment" class="rounded border-slate-300 text-teal-600 focus:ring-teal-500">
+              배송출고 (재고는 출고 확정 시 차감, 출고지시 자동 생성)
+            </label>
 
             <button onclick="checkout()" class="w-full bg-teal-600 text-white py-3.5 rounded-xl font-bold text-lg hover:bg-teal-700 shadow-lg shadow-indigo-200 transition-all transform active:scale-[0.98]">
               결제하기
@@ -2561,8 +2630,8 @@ async function checkout() {
     })),
     discount_amount: discount,
     payment_method: paymentMethod,
-    // POS 판매는 바로 완료 처리
-    status: 'completed'
+    payment_status: paymentMethod === 'credit' ? 'unpaid' : 'paid',
+    fulfillment: document.getElementById('posFulfillmentShipment')?.checked ? 'shipment' : 'immediate'
   };
 
   try {
@@ -2669,7 +2738,21 @@ async function renderOrderManagementTab(container) {
                     ` : '<span class="text-slate-400 text-xs">출고 대기중</span>'}
                   </td>
                   <td class="px-6 py-4 space-x-2">
-                    <button onclick="viewShippingInfo(${s.id}, '${s.tracking_number || ''}', '${s.courier || ''}')" 
+                    ${!s.outbound_order_id && s.status !== 'cancelled' ? `
+                      <button onclick="createSaleOutbound(${s.id})" class="text-indigo-600 hover:text-indigo-800 font-medium text-xs bg-indigo-50 px-2 py-1 rounded hover:bg-indigo-100 transition-colors">
+                        <i class="fas fa-truck-loading mr-1"></i>출고지시
+                      </button>
+                    ` : s.outbound_order_id ? `
+                      <button onclick="loadPage('outbound','picking')" class="text-slate-600 hover:text-slate-800 font-medium text-xs bg-slate-100 px-2 py-1 rounded" title="${s.outbound_order_number || ''}">
+                        출고 ${s.outbound_status || ''}
+                      </button>
+                    ` : ''}
+                    ${s.payment_status === 'unpaid' || s.payment_status === 'partial' ? `
+                      <button onclick="markSalePaid(${s.id})" class="text-emerald-700 hover:text-emerald-900 font-medium text-xs bg-emerald-50 px-2 py-1 rounded hover:bg-emerald-100 transition-colors">
+                        입금확인
+                      </button>
+                    ` : ''}
+                    <button onclick="viewShippingInfo(${s.id}, '${s.tracking_number || ''}', '${s.courier || ''})" 
                             class="text-teal-600 hover:text-teal-800 font-medium text-xs bg-teal-50 px-2 py-1 rounded hover:bg-teal-100 transition-colors">
                       <i class="fas fa-shipping-fast mr-1"></i>배송조회
                     </button>
@@ -2877,6 +2960,30 @@ async function renderClaimsTab(container) {
   }
 }
 
+async function createSaleOutbound(saleId) {
+  if (!confirm('이 판매로 출고지시를 생성할까요?\n(피킹 → 패킹 → 출고확정 흐름으로 이어집니다)')) return;
+  try {
+    const res = await axios.post(`${API_BASE}/sales/${saleId}/outbound`);
+    alert(res.data.message || '출고지시가 생성되었습니다.');
+    switchSalesTab('orders');
+  } catch (e) {
+    alert('출고지시 생성 실패: ' + (e.response?.data?.error || e.message));
+  }
+}
+window.createSaleOutbound = createSaleOutbound;
+
+async function markSalePaid(saleId) {
+  if (!confirm('전액 입금 확인으로 처리할까요?')) return;
+  try {
+    await axios.put(`${API_BASE}/sales/${saleId}/payment`, { payment_status: 'paid' });
+    showSuccess('입금 확인되었습니다.');
+    switchSalesTab('orders');
+  } catch (e) {
+    alert('처리 실패: ' + (e.response?.data?.error || e.message));
+  }
+}
+window.markSalePaid = markSalePaid;
+
 function getKoreanStatus(status) {
   const map = {
     'completed': '완료',
@@ -2886,7 +2993,10 @@ function getKoreanStatus(status) {
     'delivered': '배송완료',
     'requested': '요청됨',
     'approved': '승인됨',
-    'rejected': '거절됨'
+    'rejected': '거절됨',
+    'paid': '완납',
+    'unpaid': '미수',
+    'partial': '부분입금'
   };
   return map[status] || status;
 }

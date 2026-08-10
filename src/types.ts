@@ -239,6 +239,10 @@ export interface CreateSaleRequest {
   customer_id?: number;
   /** POS·매장 판매 시 출고 창고(미지정 시 창고 재고가 많은 순으로 자동 배분) */
   warehouse_id?: number;
+  /** immediate=즉시재고차감 / shipment=출고지시 후 확정 시 차감 */
+  fulfillment?: 'immediate' | 'shipment';
+  payment_status?: 'paid' | 'unpaid' | 'partial';
+  paid_amount?: number;
   items: {
     product_id: number;
     quantity: number;

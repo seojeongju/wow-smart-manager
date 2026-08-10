@@ -2,6 +2,7 @@ import { Hono } from 'hono'
 import type { Bindings, Variables, Sale, CreateSaleRequest } from '../types'
 import { resolveLineUnitPrice } from '../utils/sale-price'
 import { linkSaleItemLot } from '../utils/mes-distribution'
+import { createOutboundFromSale } from '../utils/sale-outbound'
 
 const app = new Hono<{ Bindings: Bindings; Variables: Variables }>()
 
@@ -103,6 +104,9 @@ app.get('/', async (c) => {
            u.name as created_by_name,
            COALESCE(s.courier, op.courier) as courier,
            COALESCE(s.tracking_number, op.tracking_number) as tracking_number,
+           oom.outbound_order_id as outbound_order_id,
+           oo.order_number as outbound_order_number,
+           oo.status as outbound_status,
            (SELECT GROUP_CONCAT(p.name, ', ') 
             FROM sale_items si 
             JOIN products p ON si.product_id = p.id 
@@ -111,6 +115,7 @@ app.get('/', async (c) => {
     LEFT JOIN customers c ON s.customer_id = c.id
     LEFT JOIN users u ON s.created_by = u.id
     LEFT JOIN outbound_order_mappings oom ON s.id = oom.sale_id
+    LEFT JOIN outbound_orders oo ON oom.outbound_order_id = oo.id
     LEFT JOIN outbound_packages op ON oom.outbound_order_id = op.outbound_order_id
     WHERE s.tenant_id = ?
   `
@@ -296,47 +301,92 @@ app.post('/', async (c) => {
       ? Number(body.warehouse_id)
       : null
 
+  const isShipmentFulfillment = body.fulfillment === 'shipment'
+
   type StockPlan = { productId: number; qty: number; allocations: WarehouseAllocation[] }
   const stockPlan: StockPlan[] = []
 
-  for (const [productId, qty] of qtyByProduct) {
-    try {
-      const allocations = await allocateWarehouseDeductions(
-        DB,
-        tenantId,
-        productId,
-        qty,
-        preferredWarehouseId
-      )
-      stockPlan.push({ productId, qty, allocations })
-    } catch (e: any) {
-      console.error('allocateWarehouseDeductions:', e)
-      return c.json(
-        {
-          success: false,
-          error: e?.message || '창고 출고 배분에 실패했습니다.'
-        },
-        400
-      )
+  // 즉시 판매(POS)만 여기서 재고 차감. shipment는 출고 확정 시 차감.
+  if (!isShipmentFulfillment) {
+    for (const [productId, qty] of qtyByProduct) {
+      try {
+        const allocations = await allocateWarehouseDeductions(
+          DB,
+          tenantId,
+          productId,
+          qty,
+          preferredWarehouseId
+        )
+        stockPlan.push({ productId, qty, allocations })
+      } catch (e: any) {
+        console.error('allocateWarehouseDeductions:', e)
+        return c.json(
+          {
+            success: false,
+            error: e?.message || '창고 출고 배분에 실패했습니다.'
+          },
+          400
+        )
+      }
     }
   }
 
-  const saleResult = await DB.prepare(`
-    INSERT INTO sales (tenant_id, customer_id, total_amount, discount_amount, final_amount, payment_method, notes, created_by, warehouse_id)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-  `).bind(
-    tenantId,
-    body.customer_id || null,
-    totalAmount,
-    discountAmount,
-    finalAmount,
-    body.payment_method,
-    body.notes || null,
-    userId,
-    preferredWarehouseId
-  ).run()
+  const paymentStatus = (() => {
+    const ps = (body as any).payment_status
+    if (ps === 'unpaid' || ps === 'partial' || ps === 'paid') return ps
+    if (body.payment_method === 'credit' || body.payment_method === '외상') return 'unpaid'
+    return 'paid'
+  })()
+  const paidAmount = paymentStatus === 'unpaid'
+    ? 0
+    : paymentStatus === 'partial'
+      ? Number((body as any).paid_amount) || 0
+      : finalAmount
 
-  const saleId = saleResult.meta.last_row_id as number
+  let saleId: number
+  try {
+    const saleResult = await DB.prepare(`
+      INSERT INTO sales (
+        tenant_id, customer_id, total_amount, discount_amount, final_amount,
+        payment_method, notes, created_by, warehouse_id, status,
+        payment_status, paid_amount, fulfillment
+      )
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).bind(
+      tenantId,
+      body.customer_id || null,
+      totalAmount,
+      discountAmount,
+      finalAmount,
+      body.payment_method,
+      body.notes || null,
+      userId,
+      preferredWarehouseId,
+      isShipmentFulfillment ? 'pending_shipment' : 'completed',
+      paymentStatus,
+      paidAmount,
+      isShipmentFulfillment ? 'shipment' : 'immediate'
+    ).run()
+    saleId = saleResult.meta.last_row_id as number
+  } catch (e) {
+    console.warn('sales insert with AR columns failed, fallback:', e)
+    const saleResult = await DB.prepare(`
+      INSERT INTO sales (tenant_id, customer_id, total_amount, discount_amount, final_amount, payment_method, notes, created_by, warehouse_id, status)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).bind(
+      tenantId,
+      body.customer_id || null,
+      totalAmount,
+      discountAmount,
+      finalAmount,
+      body.payment_method,
+      body.notes || null,
+      userId,
+      preferredWarehouseId,
+      isShipmentFulfillment ? 'pending_shipment' : 'completed'
+    ).run()
+    saleId = saleResult.meta.last_row_id as number
+  }
 
   const batchStmts: D1PreparedStatement[] = []
 
@@ -433,10 +483,32 @@ app.post('/', async (c) => {
     `).bind(finalAmount, body.customer_id, tenantId).run()
   }
 
+  let outbound: { outboundId: number; orderNumber: string; created: boolean } | null = null
+  if (isShipmentFulfillment) {
+    try {
+      outbound = await createOutboundFromSale(DB, {
+        tenantId,
+        userId,
+        saleId,
+        stockMode: 'deduct_on_ship'
+      })
+    } catch (e: any) {
+      console.error('auto outbound create failed:', e)
+    }
+  }
+
   return c.json({
     success: true,
-    data: { id: saleId, final_amount: finalAmount },
-    message: '판매가 완료되었습니다.'
+    data: {
+      id: saleId,
+      final_amount: finalAmount,
+      fulfillment: isShipmentFulfillment ? 'shipment' : 'immediate',
+      payment_status: paymentStatus,
+      outbound
+    },
+    message: isShipmentFulfillment
+      ? '판매가 등록되고 출고지시가 생성되었습니다.'
+      : '판매가 완료되었습니다.'
   })
 })
 
@@ -447,9 +519,9 @@ app.put('/:id/cancel', async (c) => {
   const userId = c.get('userId')
   const id = c.req.param('id')
 
-  const sale = await DB.prepare('SELECT * FROM sales WHERE id = ? AND status = ? AND tenant_id = ?')
-    .bind(id, 'completed', tenantId)
-    .first<Sale>()
+  const sale = await DB.prepare(
+    `SELECT * FROM sales WHERE id = ? AND tenant_id = ? AND status IN ('completed', 'pending_shipment', 'shipped')`
+  ).bind(id, tenantId).first<Sale>()
 
   if (!sale) {
     return c.json({ success: false, error: '판매 내역을 찾을 수 없거나 이미 취소되었습니다.' }, 404)
@@ -562,11 +634,102 @@ app.put('/:id/shipping', async (c) => {
   return c.json({ success: true, message: '배송 정보가 업데이트되었습니다.' })
 })
 
+/** 판매 → 출고지시 생성 (PENDING). 이미 있으면 기존 반환 */
+app.post('/:id/outbound', async (c) => {
+  const { DB } = c.env
+  const tenantId = c.get('tenantId')
+  const userId = c.get('userId')
+  const id = Number(c.req.param('id'))
+  const body = await c.req.json().catch(() => ({} as any))
+
+  const sale = await DB.prepare('SELECT id, status, fulfillment FROM sales WHERE id = ? AND tenant_id = ?')
+    .bind(id, tenantId).first<{ id: number; status: string; fulfillment?: string }>()
+  if (!sale) return c.json({ success: false, error: '판매 내역을 찾을 수 없습니다.' }, 404)
+  if (sale.status === 'cancelled') {
+    return c.json({ success: false, error: '취소된 판매입니다.' }, 400)
+  }
+
+  // 이미 재고를 차감한 판매(즉시판매)면 pre_deducted, 아니면 출고확정 시 차감
+  const stockMode =
+    body.stock_mode === 'deduct_on_ship' || body.stock_mode === 'pre_deducted'
+      ? body.stock_mode
+      : (sale.fulfillment === 'shipment' ? 'deduct_on_ship' : 'pre_deducted')
+
+  try {
+    const result = await createOutboundFromSale(DB, {
+      tenantId,
+      userId,
+      saleId: id,
+      stockMode
+    })
+    return c.json({
+      success: true,
+      data: result,
+      message: result.created
+        ? `출고지시 ${result.orderNumber}가 생성되었습니다.`
+        : `이미 연결된 출고지시 ${result.orderNumber}가 있습니다.`
+    })
+  } catch (e: any) {
+    return c.json({ success: false, error: e.message || '출고지시 생성 실패' }, 400)
+  }
+})
+
+/** 결제/미수 상태 변경 */
+app.put('/:id/payment', async (c) => {
+  const { DB } = c.env
+  const tenantId = c.get('tenantId')
+  const id = c.req.param('id')
+  const body = await c.req.json<{
+    payment_status: 'paid' | 'unpaid' | 'partial'
+    paid_amount?: number
+    payment_method?: string
+  }>()
+
+  if (!['paid', 'unpaid', 'partial'].includes(body.payment_status)) {
+    return c.json({ success: false, error: 'payment_status는 paid/unpaid/partial 이어야 합니다.' }, 400)
+  }
+
+  const sale = await DB.prepare(
+    'SELECT id, final_amount FROM sales WHERE id = ? AND tenant_id = ?'
+  ).bind(id, tenantId).first<{ id: number; final_amount: number }>()
+  if (!sale) return c.json({ success: false, error: '판매 내역을 찾을 수 없습니다.' }, 404)
+
+  let paidAmount = Number(body.paid_amount)
+  if (body.payment_status === 'paid') paidAmount = Number(sale.final_amount)
+  if (body.payment_status === 'unpaid') paidAmount = 0
+  if (body.payment_status === 'partial') {
+    if (!Number.isFinite(paidAmount) || paidAmount < 0) {
+      return c.json({ success: false, error: 'partial 일 때 paid_amount가 필요합니다.' }, 400)
+    }
+  }
+
+  try {
+    await DB.prepare(`
+      UPDATE sales
+      SET payment_status = ?, paid_amount = ?,
+          payment_method = COALESCE(?, payment_method),
+          updated_at = CURRENT_TIMESTAMP
+      WHERE id = ? AND tenant_id = ?
+    `).bind(body.payment_status, paidAmount, body.payment_method || null, id, tenantId).run()
+  } catch (e: any) {
+    return c.json({
+      success: false,
+      error: '결제 상태 컬럼이 없습니다. 마이그레이션 0041을 적용해 주세요. ' + e.message
+    }, 500)
+  }
+
+  return c.json({
+    success: true,
+    message: '결제 상태가 업데이트되었습니다.',
+    data: { payment_status: body.payment_status, paid_amount: paidAmount }
+  })
+})
+
 // 판매 통계
 app.get('/stats/summary', async (c) => {
   const { DB } = c.env
   const tenantId = c.get('tenantId')
-  const period = c.req.query('period') || 'today' // today, week, month
+  const period = c.req.query('period') || 'today'
 
   let dateCondition = ''
   switch (period) {
@@ -589,7 +752,7 @@ app.get('/stats/summary', async (c) => {
       SUM(final_amount) as total_revenue,
       AVG(final_amount) as avg_sale_amount
     FROM sales
-    WHERE status = 'completed' AND tenant_id = ? AND ${dateCondition}
+    WHERE status IN ('completed', 'pending_shipment', 'shipped', 'delivered') AND tenant_id = ? AND ${dateCondition}
   `).bind(tenantId).first()
 
   return c.json({ success: true, data: summary })
@@ -609,33 +772,13 @@ app.get('/stats/bestsellers', async (c) => {
     FROM sale_items si
     JOIN products p ON si.product_id = p.id
     JOIN sales s ON si.sale_id = s.id
-    WHERE s.status = 'completed' AND s.tenant_id = ?
+    WHERE s.status IN ('completed', 'pending_shipment', 'shipped', 'delivered') AND s.tenant_id = ?
     GROUP BY p.id
     ORDER BY total_sold DESC
     LIMIT ?
   `).bind(tenantId, limit).all()
 
   return c.json({ success: true, data: results })
-})
-
-// 배송 정보 업데이트
-app.put('/:id/shipping', async (c) => {
-  const { DB } = c.env
-  const tenantId = c.get('tenantId')
-  const id = c.req.param('id')
-  const { courier, tracking_number, shipping_address, status, warehouse_id } = await c.req.json()
-
-  try {
-    await DB.prepare(`
-      UPDATE sales 
-      SET courier = ?, tracking_number = ?, shipping_address = ?, status = ?, warehouse_id = ?, updated_at = CURRENT_TIMESTAMP
-      WHERE id = ? AND tenant_id = ?
-    `).bind(courier, tracking_number, shipping_address, status, warehouse_id, id, tenantId).run()
-
-    return c.json({ success: true, message: '배송 정보가 업데이트되었습니다.' })
-  } catch (e) {
-    return c.json({ success: false, error: (e as Error).message }, 500)
-  }
 })
 
 export default app

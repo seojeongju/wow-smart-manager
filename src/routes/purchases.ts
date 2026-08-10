@@ -272,20 +272,39 @@ app.post('/:id/receive', async (c) => {
 
         if (!productId) continue;
 
+        const qty = Number(item.quantity) || 0
+        if (qty <= 0) continue
+
+        const pi = await DB.prepare(
+            'SELECT unit_price, quantity, received_quantity FROM purchase_items WHERE id = ?'
+        ).bind(item.id).first<{ unit_price: number; quantity: number; received_quantity: number }>()
+        const unitPrice = Number(pi?.unit_price) || 0
+
         // Update Purchase Item
         refinedStatements.push(DB.prepare(`
         UPDATE purchase_items 
         SET received_quantity = received_quantity + ?, 
             status = CASE WHEN quantity <= (received_quantity + ?) THEN 'RECEIVED' ELSE 'PENDING' END
         WHERE id = ?
-     `).bind(item.quantity, item.quantity, item.id))
+     `).bind(qty, qty, item.id))
 
-        // Update Product Total Stock
+        // Update Product Total Stock + 이동평균 매입가
+        const prod = await DB.prepare(
+            'SELECT current_stock, purchase_price FROM products WHERE id = ? AND tenant_id = ?'
+        ).bind(productId, tenantId).first<{ current_stock: number; purchase_price: number }>()
+        const oldStock = Number(prod?.current_stock) || 0
+        const oldCost = Number(prod?.purchase_price) || 0
+        const newCost = (oldStock + qty) > 0
+            ? Math.round(((oldStock * oldCost) + (qty * unitPrice)) / (oldStock + qty) * 100) / 100
+            : unitPrice
+
         refinedStatements.push(DB.prepare(`
         UPDATE products 
-        SET current_stock = current_stock + ?, updated_at = CURRENT_TIMESTAMP
+        SET current_stock = current_stock + ?,
+            purchase_price = ?,
+            updated_at = CURRENT_TIMESTAMP
         WHERE id = ?
-     `).bind(item.quantity, productId))
+     `).bind(qty, newCost, productId))
 
         // Insert/Update Warehouse Stock
         refinedStatements.push(DB.prepare(`
@@ -293,36 +312,43 @@ app.post('/:id/receive', async (c) => {
         VALUES (?, ?, ?, ?)
         ON CONFLICT(tenant_id, product_id, warehouse_id) 
         DO UPDATE SET quantity = quantity + ?
-     `).bind(tenantId, productId, warehouseId, item.quantity, item.quantity))
+     `).bind(tenantId, productId, warehouseId, qty, qty))
 
         // Log Movement
         refinedStatements.push(DB.prepare(`
         INSERT INTO stock_movements (tenant_id, product_id, warehouse_id, movement_type, quantity, reason, created_by)
         VALUES (?, ?, ?, '입고', ?, '발주 입고 (' || ? || ')', ?)
-     `).bind(tenantId, productId, warehouseId, item.quantity, po.code, userId))
+     `).bind(tenantId, productId, warehouseId, qty, po.code, userId))
     }
 
-    // Update PO level status (Simple logic: if all items received -> RECEIVED, else PARTIAL)
-    // This verification is complex to do in batch. 
-    // We will assume PARTIAL first, and user can manually set COMPLETED or we check later.
-    // Or we just set it to 'PARTIAL_RECEIVED' if it was 'ORDERED'.
-    if (po.status === 'ORDERED') {
-        refinedStatements.push(DB.prepare(`UPDATE purchase_orders SET status = 'PARTIAL_RECEIVED', received_at = CURRENT_TIMESTAMP WHERE id = ?`).bind(id))
+    // Update PO level status
+    if (po.status === 'ORDERED' || po.status === 'DRAFT' || po.status === 'PARTIAL' || po.status === 'PARTIAL_RECEIVED') {
+        refinedStatements.push(DB.prepare(
+            `UPDATE purchase_orders SET status = 'PARTIAL', received_at = CURRENT_TIMESTAMP WHERE id = ?`
+        ).bind(id))
     }
 
     await DB.batch(refinedStatements)
 
     // Check if fully received (Post-check)
-    const remaining = await DB.prepare(`
-    SELECT COUNT(*) as count FROM purchase_items 
+    const remainingRow = await DB.prepare(`
+    SELECT COUNT(*) as cnt FROM purchase_items 
     WHERE purchase_order_id = ? AND quantity > received_quantity
-  `).bind(id).first('count')
+  `).bind(id).first<{ cnt: number }>()
 
-    if (remaining === 0) {
-        await DB.prepare(`UPDATE purchase_orders SET status = 'COMPLETED', received_at = CURRENT_TIMESTAMP WHERE id = ?`).bind(id).run()
+    if (Number(remainingRow?.cnt || 0) === 0) {
+        await DB.prepare(
+            `UPDATE purchase_orders SET status = 'COMPLETED', received_at = CURRENT_TIMESTAMP WHERE id = ?`
+        ).bind(id).run()
     }
 
-    return c.json({ success: true, message: '입고 처리가 완료되었습니다.' })
+    return c.json({
+        success: true,
+        message: Number(remainingRow?.cnt || 0) === 0
+            ? '전량 입고 완료. 매입가가 반영되었습니다.'
+            : '부분 입고 처리가 완료되었습니다. 매입가가 반영되었습니다.',
+        data: { fully_received: Number(remainingRow?.cnt || 0) === 0 }
+    })
 })
 
 export default app

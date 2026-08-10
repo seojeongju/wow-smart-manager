@@ -1029,6 +1029,39 @@ app.get('/warehouse-stocks', async (c) => {
   })
 })
 
+// 총재고 vs 창고합 불일치 목록
+app.get('/drift', async (c) => {
+  const { DB } = c.env
+  const tenantId = c.get('tenantId')
+
+  const { results } = await DB.prepare(`
+    SELECT
+      p.id as product_id,
+      p.sku,
+      p.name,
+      COALESCE(p.current_stock, 0) as total_stock,
+      COALESCE(w.sum_qty, 0) as warehouse_sum,
+      (COALESCE(p.current_stock, 0) - COALESCE(w.sum_qty, 0)) as drift
+    FROM products p
+    LEFT JOIN (
+      SELECT product_id, SUM(quantity) as sum_qty
+      FROM product_warehouse_stocks
+      WHERE tenant_id = ?
+      GROUP BY product_id
+    ) w ON w.product_id = p.id
+    WHERE p.tenant_id = ? AND p.is_active = 1
+      AND COALESCE(p.current_stock, 0) != COALESCE(w.sum_qty, 0)
+    ORDER BY ABS(COALESCE(p.current_stock, 0) - COALESCE(w.sum_qty, 0)) DESC
+    LIMIT 200
+  `).bind(tenantId, tenantId).all()
+
+  return c.json({
+    success: true,
+    data: results || [],
+    count: (results || []).length
+  })
+})
+
 // 창고별 재고 현황 (레벨) 조회 - 안전재고 정보 포함
 app.get('/levels', async (c) => {
   const { DB } = c.env
