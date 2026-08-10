@@ -767,7 +767,14 @@ async function loadPage(page, subPage = null, opts = {}) {
         subPage === 'mes' ? '대시보드 · MES' : '대시보드 · ERP',
         subPage === 'mes' ? '제조 성과지표 · OEE · 작업지시' : '매출 · 재고 · 오늘의 업무'
       );
-      await loadDashboard(content, subPage || 'erp');
+      // 탭 셸이 이미 있으면 전체 리마운트하지 않고 패널만 전환 (탭 소실 방지)
+      if (document.getElementById('dashTabBar') && typeof window.switchDashboardTab === 'function') {
+        await window.switchDashboardTab(subPage === 'mes' ? 'mes' : 'erp', { skipHistory: true });
+      } else if (typeof window.loadDashboard === 'function') {
+        await window.loadDashboard(content, subPage === 'mes' ? 'mes' : 'erp');
+      } else {
+        content.innerHTML = '<div class="text-center py-10 text-rose-600">대시보드 모듈을 불러오지 못했습니다. 새로고침 해 주세요.</div>';
+      }
       break;
     case 'products':
       updatePageTitle('상품 관리', '상품 등록 및 재고 관리');
@@ -1105,7 +1112,11 @@ function renderDashboardSales(sales) {
 
 function renderCharts(salesData, categoryData, profitData) {
   // Profit Insight 차트 (Line)
-  const salesCtx = document.getElementById('salesChart').getContext('2d');
+  const salesCanvas = document.getElementById('salesChart');
+  const categoryCanvas = document.getElementById('categoryChart');
+  if (!salesCanvas || !categoryCanvas || typeof Chart === 'undefined') return;
+
+  const salesCtx = salesCanvas.getContext('2d');
 
   if (window.salesChartInstance) {
     window.salesChartInstance.destroy();
@@ -1174,7 +1185,7 @@ function renderCharts(salesData, categoryData, profitData) {
   });
 
   // 카테고리별 판매 비중 차트 (Doughnut)
-  const categoryCtx = document.getElementById('categoryChart').getContext('2d');
+  const categoryCtx = categoryCanvas.getContext('2d');
 
   if (window.categoryChartInstance) {
     window.categoryChartInstance.destroy();

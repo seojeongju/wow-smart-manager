@@ -21,49 +21,65 @@ function dashFetch(url, fallback) {
 
 async function loadDashboard(content, initialTab = 'erp') {
   const tab = initialTab === 'mes' ? 'mes' : 'erp';
+  const gen = (window._dashLoadGen = (window._dashLoadGen || 0) + 1);
+  window._dashActiveGen = gen;
+
   const headerHtml =
     typeof window.renderPageHeader === 'function'
       ? window.renderPageHeader({
           title: '대시보드',
-          subtitle: 'ERP 매출·재고와 MES 제조 성과를 한곳에서',
+          subtitle: 'ERP 매출·재고와 MES 제조 성과를 탭으로 전환',
           icon: 'fa-tachometer-alt',
           accent: tab === 'mes' ? 'orange' : 'teal'
         })
-      : `<div class="mb-6">
+      : `<div class="mb-4">
           <h1 class="text-2xl font-bold text-slate-800">
             <i class="fas fa-tachometer-alt mr-2 text-teal-600"></i>대시보드
           </h1>
-          <p class="text-sm text-slate-500 mt-1">ERP 매출·재고와 MES 제조 성과를 한곳에서</p>
+          <p class="text-sm text-slate-500 mt-1">ERP 매출·재고와 MES 제조 성과를 탭으로 전환</p>
         </div>`;
 
   content.innerHTML = `
-    <div class="flex flex-col h-full">
+    <div class="flex flex-col min-h-0">
       ${headerHtml}
-      <div class="flex mb-6 border-b border-slate-200 overflow-x-auto">
-        <button type="button" id="dash-tab-erp" onclick="switchDashboardTab('erp')"
-          class="px-6 py-4 font-medium text-slate-500 border-b-2 border-transparent transition-colors flex items-center whitespace-nowrap">
-          <i class="fas fa-chart-pie mr-2"></i>ERP
-        </button>
-        <button type="button" id="dash-tab-mes" onclick="switchDashboardTab('mes')"
-          class="px-6 py-4 font-medium text-slate-500 border-b-2 border-transparent transition-colors flex items-center whitespace-nowrap">
-          <i class="fas fa-industry mr-2"></i>MES 성과지표
-        </button>
+      <div id="dashTabBar" class="sticky top-0 z-30 -mx-4 sm:-mx-6 px-4 sm:px-6 mb-4 bg-gradient-to-b from-teal-50 via-teal-50 to-teal-50/95 border-b border-slate-200 backdrop-blur-sm">
+        <div class="flex gap-1 overflow-x-auto">
+          <button type="button" id="dash-tab-erp" data-dash-tab="erp"
+            class="px-6 py-3.5 text-sm font-bold border-b-2 -mb-px transition-colors flex items-center whitespace-nowrap border-transparent text-slate-500">
+            <i class="fas fa-store mr-2"></i>ERP
+          </button>
+          <button type="button" id="dash-tab-mes" data-dash-tab="mes"
+            class="px-6 py-3.5 text-sm font-bold border-b-2 -mb-px transition-colors flex items-center whitespace-nowrap border-transparent text-slate-500">
+            <i class="fas fa-industry mr-2"></i>MES 성과지표
+          </button>
+        </div>
       </div>
-      <div id="dashTabPanel"></div>
+      <div id="dashTabPanel" class="min-h-[40vh]"></div>
     </div>
   `;
 
-  await switchDashboardTab(tab, { skipHistory: true });
+  const bar = document.getElementById('dashTabBar');
+  bar?.addEventListener('click', (e) => {
+    const btn = e.target.closest('[data-dash-tab]');
+    if (!btn) return;
+    e.preventDefault();
+    switchDashboardTab(btn.getAttribute('data-dash-tab'));
+  });
+
+  content.scrollTop = 0;
+  await switchDashboardTab(tab, { skipHistory: true, gen });
 }
 
 async function switchDashboardTab(tab, opts = {}) {
   const resolved = tab === 'mes' ? 'mes' : 'erp';
+  const gen = opts.gen != null ? opts.gen : window._dashActiveGen;
+  window.dashActiveTab = resolved;
+
   const erpBtn = document.getElementById('dash-tab-erp');
   const mesBtn = document.getElementById('dash-tab-mes');
-
-  const inactive = 'px-6 py-4 font-medium text-slate-500 border-b-2 border-transparent transition-colors flex items-center whitespace-nowrap';
-  const erpActive = 'px-6 py-4 font-bold text-teal-600 border-b-2 border-teal-600 transition-colors flex items-center whitespace-nowrap';
-  const mesActive = 'px-6 py-4 font-bold text-orange-600 border-b-2 border-orange-600 transition-colors flex items-center whitespace-nowrap';
+  const inactive = 'px-6 py-3.5 text-sm font-bold border-b-2 -mb-px transition-colors flex items-center whitespace-nowrap border-transparent text-slate-500 hover:text-slate-700';
+  const erpActive = 'px-6 py-3.5 text-sm font-bold border-b-2 -mb-px transition-colors flex items-center whitespace-nowrap border-teal-600 text-teal-700';
+  const mesActive = 'px-6 py-3.5 text-sm font-bold border-b-2 -mb-px transition-colors flex items-center whitespace-nowrap border-orange-500 text-orange-700';
 
   if (erpBtn) erpBtn.className = resolved === 'erp' ? erpActive : inactive;
   if (mesBtn) mesBtn.className = resolved === 'mes' ? mesActive : inactive;
@@ -80,21 +96,26 @@ async function switchDashboardTab(tab, opts = {}) {
     window.setHelpContext(resolved === 'mes' ? 'dashboard:mes' : 'dashboard');
   }
 
-  if (!opts.skipHistory && typeof window.syncSidebarNav === 'function') {
-    window.syncSidebarNav('dashboard', resolved);
+  if (!opts.skipHistory && typeof window.commitAppRoute === 'function') {
+    window.commitAppRoute('dashboard', resolved);
   }
 
   const panel = document.getElementById('dashTabPanel');
   if (!panel) return;
 
+  const content = document.getElementById('content');
+  if (content) content.scrollTop = 0;
+
   if (resolved === 'mes') {
-    await fillDashboardMesTab(panel);
+    await fillDashboardMesTab(panel, gen);
   } else {
-    await fillDashboardErpTab(panel);
+    await fillDashboardErpTab(panel, gen);
   }
+
+  if (content) content.scrollTop = 0;
 }
 
-async function fillDashboardErpTab(panel) {
+async function fillDashboardErpTab(panel, gen) {
   panel.innerHTML = `
     <div class="flex justify-center py-16">
       <div class="animate-spin rounded-full h-10 w-10 border-b-2 border-teal-600"></div>
@@ -130,6 +151,9 @@ async function fillDashboardErpTab(panel) {
       dashFetch(`${API_BASE}/dashboard/profit-chart?days=30`, []),
       dashFetch(`${API_BASE}/dashboard-kpi/kpi-comparison`, {})
     ]);
+
+    if (gen != null && gen !== window._dashActiveGen) return;
+    if (!document.getElementById('dashTabBar')) return;
 
     void summaryRes;
     const chartData = salesChartRes.data.data || [];
@@ -403,7 +427,11 @@ async function fillDashboardErpTab(panel) {
     `;
 
     if (typeof renderCharts === 'function') {
-      renderCharts(chartData, categoryStats, profitData);
+      try {
+        renderCharts(chartData, categoryStats, profitData);
+      } catch (chartErr) {
+        console.error('ERP 차트 렌더 실패:', chartErr);
+      }
     }
 
     window.dashProdPage = 0;
@@ -414,7 +442,11 @@ async function fillDashboardErpTab(panel) {
     if (typeof renderDashboardSales === 'function') renderDashboardSales(sales);
     if (typeof renderDashboardLowStock === 'function') renderDashboardLowStock(lowStockAlerts);
     if (typeof renderDashboardDeadStock === 'function') renderDashboardDeadStock(deadStocks);
+
+    const contentEl = document.getElementById('content');
+    if (contentEl) contentEl.scrollTop = 0;
   } catch (error) {
+    if (gen != null && gen !== window._dashActiveGen) return;
     console.error('ERP 대시보드 로드 실패:', error);
     panel.innerHTML = `
       <div class="text-center py-16 text-rose-600">
@@ -433,7 +465,7 @@ function mesDashKpiCard(title, value, sub, valueClass = 'text-slate-800') {
   </div>`;
 }
 
-async function fillDashboardMesTab(panel) {
+async function fillDashboardMesTab(panel, gen) {
   panel.innerHTML = `
     <div class="flex justify-center py-16">
       <div class="animate-spin rounded-full h-10 w-10 border-b-2 border-orange-600"></div>
@@ -449,6 +481,8 @@ async function fillDashboardMesTab(panel) {
       dashFetch(`${API_BASE}/production/kpi/trend`, { production: [] })
     ]);
 
+    if (gen != null && gen !== window._dashActiveGen) return;
+    if (!document.getElementById('dashTabBar')) return;
     const s = kpiRes.data.data || {};
     const oeePayload = oeeRes.data.data || {};
     const oeeSummary = oeePayload.summary || {};
@@ -641,7 +675,10 @@ async function fillDashboardMesTab(panel) {
     `;
 
     renderMesDashboardTrend(trendRows);
+    const contentEl = document.getElementById('content');
+    if (contentEl) contentEl.scrollTop = 0;
   } catch (error) {
+    if (gen != null && gen !== window._dashActiveGen) return;
     console.error('MES 대시보드 로드 실패:', error);
     panel.innerHTML = `
       <div class="text-center py-16 text-rose-600">
