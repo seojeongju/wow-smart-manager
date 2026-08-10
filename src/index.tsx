@@ -1108,6 +1108,10 @@ app.get('/', (c: Context) => {
                                                                     <i class="fas fa-industry w-6 text-center text-lg mr-3"></i>
                                                                     <span class="font-medium">생산 MES</span>
                                                                 </a>
+                                                                <a href="#" data-page="production" data-tab="trace" class="nav-link flex items-center px-4 py-3 rounded-lg group" onclick="closeSidebarOnMobile()">
+                                                                    <i class="fas fa-route w-6 text-center text-lg mr-3"></i>
+                                                                    <span class="font-medium">생산 추적</span>
+                                                                </a>
                                                                 <a href="#" data-page="qr-dashboard" class="nav-link flex items-center px-4 py-3 rounded-lg group" onclick="closeSidebarOnMobile()">
                                                                     <i class="fas fa-chart-line w-6 text-center text-lg mr-3"></i>
                                                                     <span class="font-medium">QR 대시보드</span>
@@ -1285,7 +1289,7 @@ app.get('/', (c: Context) => {
                                             <script src="/static/js/tracking.js?v=1"></script>
                                             <script src="/static/js/transaction-statement.js?v=1"></script>
                                             <script src="/static/js/qr-mes.js?v=1"></script>
-                                            <script src="/static/js/production.js?v=1"></script>
+                                            <script src="/static/js/production.js?v=2"></script>
                                         </body>
                                     </html>
                                     `)

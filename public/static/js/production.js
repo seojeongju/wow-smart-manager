@@ -24,7 +24,7 @@ window.loadProductionPage = async function (initialTab = 'work-orders') {
         <h1 class="text-2xl font-bold text-slate-800">
           <i class="fas fa-industry mr-2 text-orange-600"></i>생산 MES
         </h1>
-        <p class="text-sm text-slate-500 mt-1">작업지시 · BOM · 공정 · 생산실적(재고연동)</p>
+        <p class="text-sm text-slate-500 mt-1">작업지시 · BOM · 공정 · 실적 · Lot/QR 추적</p>
       </div>
       <div id="mes-stats" class="grid grid-cols-2 md:grid-cols-4 gap-2 text-sm"></div>
     </div>
@@ -33,6 +33,7 @@ window.loadProductionPage = async function (initialTab = 'work-orders') {
       <button onclick="switchMesTab('work-orders')" id="mes-tab-work-orders" class="px-5 py-3 text-sm font-medium border-b-2 whitespace-nowrap">작업지시</button>
       <button onclick="switchMesTab('boms')" id="mes-tab-boms" class="px-5 py-3 text-sm font-medium border-b-2 whitespace-nowrap">BOM</button>
       <button onclick="switchMesTab('processes')" id="mes-tab-processes" class="px-5 py-3 text-sm font-medium border-b-2 whitespace-nowrap">공정</button>
+      <button onclick="switchMesTab('trace')" id="mes-tab-trace" class="px-5 py-3 text-sm font-medium border-b-2 whitespace-nowrap">생산 추적</button>
     </div>
 
     <div id="mes-tab-content"></div>
@@ -61,7 +62,7 @@ async function refreshMesStats() {
 }
 
 window.switchMesTab = function (tabName) {
-  ['work-orders', 'boms', 'processes'].forEach((t) => {
+  ['work-orders', 'boms', 'processes', 'trace'].forEach((t) => {
     const btn = document.getElementById(`mes-tab-${t}`);
     if (!btn) return;
     if (t === tabName) {
@@ -75,7 +76,8 @@ window.switchMesTab = function (tabName) {
 
   if (tabName === 'work-orders') loadMesWorkOrders();
   else if (tabName === 'boms') loadMesBoms();
-  else loadMesProcesses();
+  else if (tabName === 'processes') loadMesProcesses();
+  else loadMesTrace();
 };
 
 // ---------- 작업지시 ----------
@@ -694,4 +696,317 @@ window.deactivateMesProcess = async function (id) {
 window.closeMesModal = function () {
   const el = document.getElementById('mes-modals');
   if (el) el.innerHTML = '';
+};
+
+// ---------- 생산 추적 (Phase 2) ----------
+const MES_EVENT_LABEL = {
+  qr_issue: 'QR 발행',
+  material_issue: '자재 투입',
+  process_complete: '공정 완료',
+  fg_pack: '완제품 포장',
+  lookup: '조회'
+};
+
+async function loadMesTrace() {
+  const container = document.getElementById('mes-tab-content');
+  container.innerHTML = '<div class="text-center py-10"><i class="fas fa-spinner fa-spin text-3xl text-orange-500"></i></div>';
+
+  try {
+    const [woRes, lotsRes] = await Promise.all([
+      axios.get(`${API_BASE}/production/work-orders`),
+      axios.get(`${API_BASE}/production/trace/lots`)
+    ]);
+    const workOrders = (woRes.data.data || []).filter((w) => !['cancelled'].includes(w.status));
+    const lots = lotsRes.data.data || [];
+
+    container.innerHTML = `
+      <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+        <div class="bg-white border border-slate-200 rounded-xl p-5">
+          <h3 class="font-bold text-slate-800 mb-3"><i class="fas fa-search mr-2 text-orange-600"></i>역추적 조회</h3>
+          <p class="text-xs text-slate-500 mb-3">완제품/자재 QR을 입력하면 작업지시·투입 자재·이력을 조회합니다.</p>
+          <div class="flex gap-2">
+            <input id="mes-trace-lookup" class="flex-1 border rounded-lg px-3 py-2 text-sm" placeholder="QR 코드 입력 (예: QR-...)">
+            <button onclick="lookupMesTrace()" class="bg-orange-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-orange-700">조회</button>
+          </div>
+          <div id="mes-trace-lookup-result" class="mt-4"></div>
+        </div>
+
+        <div class="bg-white border border-slate-200 rounded-xl p-5">
+          <h3 class="font-bold text-slate-800 mb-3"><i class="fas fa-qrcode mr-2 text-orange-600"></i>현장 스캔 작업</h3>
+          <div class="space-y-3 text-sm">
+            <div>
+              <label class="text-slate-600">작업지시</label>
+              <select id="mes-trace-wo" class="w-full border rounded-lg px-3 py-2 mt-1">
+                <option value="">선택</option>
+                ${workOrders.map((w) => `<option value="${w.id}">${w.wo_number} — ${w.product_name} (${MES_STATUS_LABEL[w.status] || w.status})</option>`).join('')}
+              </select>
+            </div>
+            <div>
+              <label class="text-slate-600">QR 코드</label>
+              <input id="mes-trace-qr" class="w-full border rounded-lg px-3 py-2 mt-1" placeholder="스캔/입력">
+            </div>
+            <div class="grid grid-cols-2 gap-2">
+              <div>
+                <label class="text-slate-600">수량</label>
+                <input id="mes-trace-qty" type="number" min="0.01" step="any" value="1" class="w-full border rounded-lg px-3 py-2 mt-1">
+              </div>
+              <div>
+                <label class="text-slate-600">발행 수량</label>
+                <input id="mes-trace-gen-qty" type="number" min="1" max="100" value="1" class="w-full border rounded-lg px-3 py-2 mt-1">
+              </div>
+            </div>
+            <div class="flex flex-wrap gap-2 pt-1">
+              <button onclick="mesTraceGenerate('fg')" class="px-3 py-2 rounded-lg bg-emerald-600 text-white text-xs hover:bg-emerald-700">완제품 QR 발행</button>
+              <button onclick="mesTraceGenerate('material')" class="px-3 py-2 rounded-lg bg-slate-700 text-white text-xs hover:bg-slate-800">자재 QR 발행</button>
+              <button onclick="mesTraceMaterialIssue()" class="px-3 py-2 rounded-lg bg-blue-600 text-white text-xs hover:bg-blue-700">자재 투입</button>
+              <button onclick="mesTraceProcessComplete()" class="px-3 py-2 rounded-lg bg-amber-600 text-white text-xs hover:bg-amber-700">공정 완료</button>
+              <button onclick="mesTraceFgPack()" class="px-3 py-2 rounded-lg bg-orange-600 text-white text-xs hover:bg-orange-700">완제품 포장</button>
+              <button onclick="mesTraceShowTimeline()" class="px-3 py-2 rounded-lg border text-xs hover:bg-slate-50">타임라인</button>
+            </div>
+            <div id="mes-trace-action-result" class="text-sm text-slate-600"></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="bg-white border border-slate-200 rounded-xl overflow-hidden">
+        <div class="px-4 py-3 border-b bg-slate-50 flex justify-between items-center">
+          <h3 class="font-bold text-slate-800 text-sm">Lot 목록</h3>
+          <input id="mes-lot-search" onkeydown="if(event.key==='Enter')refreshMesLots()" placeholder="Lot/상품/WO 검색" class="border rounded-lg px-3 py-1.5 text-sm w-52">
+        </div>
+        <div class="overflow-x-auto">
+          <table class="w-full text-sm">
+            <thead class="text-xs uppercase bg-white border-b">
+              <tr>
+                <th class="px-4 py-3 text-left">Lot</th>
+                <th class="px-4 py-3 text-left">상품</th>
+                <th class="px-4 py-3 text-left">WO</th>
+                <th class="px-4 py-3 text-right">수량</th>
+                <th class="px-4 py-3 text-left">상태</th>
+              </tr>
+            </thead>
+            <tbody id="mes-lots-tbody">${renderMesLotRows(lots)}</tbody>
+          </table>
+        </div>
+      </div>
+    `;
+  } catch (e) {
+    container.innerHTML = `<div class="text-center py-10 text-rose-600">${e.response?.data?.error || e.message}</div>`;
+  }
+}
+
+function renderMesLotRows(lots) {
+  if (!lots.length) return '<tr><td colspan="5" class="px-4 py-8 text-center text-slate-400">등록된 Lot이 없습니다.</td></tr>';
+  return lots.map((l) => `
+    <tr class="border-t hover:bg-slate-50">
+      <td class="px-4 py-3 font-medium">${l.lot_number}</td>
+      <td class="px-4 py-3">${l.product_name}<div class="text-xs text-slate-400">${l.product_sku || ''}</div></td>
+      <td class="px-4 py-3">${l.wo_number || '-'}</td>
+      <td class="px-4 py-3 text-right">${l.remaining_quantity} / ${l.quantity}</td>
+      <td class="px-4 py-3">${l.status}</td>
+    </tr>
+  `).join('');
+}
+
+window.refreshMesLots = async function () {
+  const search = document.getElementById('mes-lot-search')?.value || '';
+  const tbody = document.getElementById('mes-lots-tbody');
+  if (!tbody) return;
+  try {
+    const res = await axios.get(`${API_BASE}/production/trace/lots`, { params: { search } });
+    tbody.innerHTML = renderMesLotRows(res.data.data || []);
+  } catch (e) {
+    alert(e.response?.data?.error || e.message);
+  }
+};
+
+function mesTraceSelectedWo() {
+  return Number(document.getElementById('mes-trace-wo')?.value || 0);
+}
+
+function setMesTraceActionResult(html, isError = false) {
+  const el = document.getElementById('mes-trace-action-result');
+  if (!el) return;
+  el.className = `text-sm ${isError ? 'text-rose-600' : 'text-emerald-700'}`;
+  el.innerHTML = html;
+}
+
+window.lookupMesTrace = async function () {
+  const code = document.getElementById('mes-trace-lookup')?.value?.trim();
+  const box = document.getElementById('mes-trace-lookup-result');
+  if (!code) {
+    alert('QR 코드를 입력해주세요.');
+    return;
+  }
+  box.innerHTML = '<div class="text-slate-400 text-sm">조회 중...</div>';
+  try {
+    const res = await axios.get(`${API_BASE}/production/trace/lookup/${encodeURIComponent(code)}`);
+    const d = res.data.data;
+    const mats = d.materials || [];
+    const used = d.used_in || [];
+    const events = d.events || [];
+    box.innerHTML = `
+      <div class="border rounded-lg p-3 bg-slate-50 text-sm space-y-2">
+        <div><span class="text-slate-500">QR</span> <span class="font-mono font-medium">${d.qr.code}</span></div>
+        <div><span class="text-slate-500">상품</span> ${d.qr.product_name || '-'} (${d.qr.product_sku || ''})</div>
+        <div><span class="text-slate-500">Lot</span> ${d.qr.lot_number || '-'} · <span class="text-slate-500">S/N</span> ${d.qr.serial_number || '-'}</div>
+        <div><span class="text-slate-500">작업지시</span> ${d.work_order ? `${d.work_order.wo_number} (${MES_STATUS_LABEL[d.work_order.status] || d.work_order.status})` : '-'}</div>
+        ${mats.length ? `<div class="pt-2"><div class="font-semibold mb-1">투입 자재</div>${mats.map((m) => `<div class="text-xs">• ${m.material_name} ${m.quantity}${m.material_qr_code ? ` <span class="text-slate-400">[${m.material_qr_code}]</span>` : ''} Lot:${m.lot_number || '-'}</div>`).join('')}</div>` : ''}
+        ${used.length ? `<div class="pt-2"><div class="font-semibold mb-1">사용된 완제품</div>${used.map((u) => `<div class="text-xs">• ${u.finished_name || '-'} <span class="font-mono">${u.finished_qr_code || '(미연결)'}</span></div>`).join('')}</div>` : ''}
+        <div class="pt-2"><div class="font-semibold mb-1">최근 이벤트</div>
+          ${events.length ? events.slice(0, 8).map((e) => `<div class="text-xs text-slate-600">${(e.created_at || '').replace('T', ' ').slice(0, 19)} · ${MES_EVENT_LABEL[e.event_type] || e.event_type}${e.process_name ? ` (${e.process_name})` : ''}</div>`).join('') : '<div class="text-xs text-slate-400">없음</div>'}
+        </div>
+      </div>
+    `;
+  } catch (e) {
+    box.innerHTML = `<div class="text-rose-600 text-sm">${e.response?.data?.error || e.message}</div>`;
+  }
+};
+
+window.mesTraceGenerate = async function (kind) {
+  const work_order_id = mesTraceSelectedWo();
+  if (!work_order_id) {
+    alert('작업지시를 선택해주세요.');
+    return;
+  }
+  const quantity = Number(document.getElementById('mes-trace-gen-qty').value) || 1;
+  const payload = { work_order_id, quantity, type: kind === 'material' ? 'material' : 'fg' };
+
+  if (kind === 'material') {
+    try {
+      const woRes = await axios.get(`${API_BASE}/production/work-orders/${work_order_id}`);
+      const items = woRes.data.data?.bom_items || [];
+      if (!items.length) {
+        alert('이 작업지시에 BOM 자재가 없습니다. 먼저 BOM을 연결해주세요.');
+        return;
+      }
+      const options = items.map((i, idx) => `${idx + 1}. ${i.component_name} (ID:${i.component_product_id})`).join('\n');
+      const pick = prompt(`자재 번호를 선택하세요:\n${options}`, '1');
+      if (!pick) return;
+      const item = items[Number(pick) - 1];
+      if (!item) {
+        alert('잘못된 선택입니다.');
+        return;
+      }
+      payload.product_id = Number(item.component_product_id);
+    } catch (e) {
+      setMesTraceActionResult(e.response?.data?.error || e.message, true);
+      return;
+    }
+  }
+
+  try {
+    const res = await axios.post(`${API_BASE}/production/trace/generate`, payload);
+    const codes = res.data.data?.codes || [];
+    setMesTraceActionResult(`발행 완료: ${codes.map((c) => c.code).join(', ')}<br>Lot: ${res.data.data?.lot_number || ''}`);
+    if (codes[0]) document.getElementById('mes-trace-qr').value = codes[0].code;
+    refreshMesLots();
+  } catch (e) {
+    setMesTraceActionResult(e.response?.data?.error || e.message, true);
+  }
+};
+
+window.mesTraceMaterialIssue = async function () {
+  const work_order_id = mesTraceSelectedWo();
+  const qr_code = document.getElementById('mes-trace-qr')?.value?.trim();
+  const quantity = Number(document.getElementById('mes-trace-qty').value) || 1;
+  if (!work_order_id || !qr_code) {
+    alert('작업지시와 QR을 입력해주세요.');
+    return;
+  }
+  try {
+    const res = await axios.post(`${API_BASE}/production/trace/material-issue`, { work_order_id, qr_code, quantity });
+    setMesTraceActionResult(res.data.message + ` — ${res.data.data?.product_name || ''}`);
+  } catch (e) {
+    setMesTraceActionResult(e.response?.data?.error || e.message, true);
+  }
+};
+
+window.mesTraceProcessComplete = async function () {
+  const work_order_id = mesTraceSelectedWo();
+  if (!work_order_id) {
+    alert('작업지시를 선택해주세요.');
+    return;
+  }
+  const qr_code = document.getElementById('mes-trace-qr')?.value?.trim() || null;
+  const quantity = Number(document.getElementById('mes-trace-qty').value) || 1;
+  try {
+    const res = await axios.post(`${API_BASE}/production/trace/process-complete`, { work_order_id, qr_code, quantity });
+    setMesTraceActionResult(res.data.message);
+  } catch (e) {
+    setMesTraceActionResult(e.response?.data?.error || e.message, true);
+  }
+};
+
+window.mesTraceFgPack = async function () {
+  const work_order_id = mesTraceSelectedWo();
+  if (!work_order_id) {
+    alert('작업지시를 선택해주세요.');
+    return;
+  }
+  const qr_code = document.getElementById('mes-trace-qr')?.value?.trim() || null;
+  const quantity = Number(document.getElementById('mes-trace-qty').value) || 1;
+  try {
+    const res = await axios.post(`${API_BASE}/production/trace/fg-pack`, {
+      work_order_id,
+      qr_code,
+      quantity,
+      create_qr: !qr_code
+    });
+    setMesTraceActionResult(`${res.data.message}<br>QR: ${res.data.data?.qr_code || ''} · Lot: ${res.data.data?.lot_number || ''}`);
+    if (res.data.data?.qr_code) document.getElementById('mes-trace-qr').value = res.data.data.qr_code;
+    refreshMesLots();
+  } catch (e) {
+    setMesTraceActionResult(e.response?.data?.error || e.message, true);
+  }
+};
+
+window.mesTraceShowTimeline = async function () {
+  const work_order_id = mesTraceSelectedWo();
+  if (!work_order_id) {
+    alert('작업지시를 선택해주세요.');
+    return;
+  }
+  try {
+    const res = await axios.get(`${API_BASE}/production/trace/work-orders/${work_order_id}/timeline`);
+    const d = res.data.data;
+    const events = d.events || [];
+    const codes = d.qr_codes || [];
+    const pending = d.pending_materials || [];
+
+    document.getElementById('mes-modals').innerHTML = `
+      <div class="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4" onclick="if(event.target===this)closeMesModal()">
+        <div class="bg-white rounded-xl shadow-xl w-full max-w-3xl max-h-[90vh] overflow-y-auto p-6">
+          <h3 class="text-lg font-bold mb-1">${d.work_order.wo_number} 추적 타임라인</h3>
+          <p class="text-sm text-slate-500 mb-4">${d.work_order.product_name}</p>
+
+          <h4 class="font-semibold text-sm mb-2">이벤트</h4>
+          <div class="border rounded-lg divide-y mb-4 max-h-64 overflow-y-auto">
+            ${events.length ? events.map((e) => `
+              <div class="px-3 py-2 text-sm">
+                <div class="flex justify-between gap-2">
+                  <span class="font-medium">${MES_EVENT_LABEL[e.event_type] || e.event_type}</span>
+                  <span class="text-xs text-slate-400">${(e.created_at || '').replace('T', ' ').slice(0, 19)}</span>
+                </div>
+                <div class="text-xs text-slate-600">${e.product_name || ''} ${e.qr_code ? `· ${e.qr_code}` : ''} ${e.lot_number ? `· Lot ${e.lot_number}` : ''} ${e.process_name ? `· ${e.process_name}` : ''}</div>
+                ${e.notes ? `<div class="text-xs text-slate-400">${e.notes}</div>` : ''}
+              </div>`).join('') : '<div class="px-3 py-6 text-center text-slate-400 text-sm">이벤트 없음</div>'}
+          </div>
+
+          <h4 class="font-semibold text-sm mb-2">연결 QR (${codes.length})</h4>
+          <div class="text-xs font-mono text-slate-600 mb-4 space-y-1">
+            ${codes.length ? codes.map((c) => `<div>${c.code} · ${c.type} · ${c.lot_number || '-'}</div>`).join('') : '<div class="text-slate-400">없음</div>'}
+          </div>
+
+          <h4 class="font-semibold text-sm mb-2">미연결 자재 투입</h4>
+          <div class="text-xs text-slate-600 mb-4">
+            ${pending.length ? pending.map((p) => `<div>• ${p.material_name} ${p.quantity} ${p.material_qr_code || ''}</div>`).join('') : '<div class="text-slate-400">없음</div>'}
+          </div>
+
+          <div class="flex justify-end"><button onclick="closeMesModal()" class="px-4 py-2 rounded-lg border">닫기</button></div>
+        </div>
+      </div>
+    `;
+  } catch (e) {
+    alert(e.response?.data?.error || e.message);
+  }
 };
