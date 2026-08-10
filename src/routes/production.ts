@@ -1,10 +1,12 @@
 import { Hono } from 'hono'
 import type { Bindings, Variables } from '../types'
 import productionTraceRouter from './production-trace'
+import productionKpiRouter from './production-kpi'
 
 const app = new Hono<{ Bindings: Bindings; Variables: Variables }>()
 
 app.route('/trace', productionTraceRouter)
+app.route('/kpi', productionKpiRouter)
 
 type D1Like = Bindings['DB']
 

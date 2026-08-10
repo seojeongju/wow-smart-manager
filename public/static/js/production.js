@@ -24,7 +24,7 @@ window.loadProductionPage = async function (initialTab = 'work-orders') {
         <h1 class="text-2xl font-bold text-slate-800">
           <i class="fas fa-industry mr-2 text-orange-600"></i>생산 MES
         </h1>
-        <p class="text-sm text-slate-500 mt-1">작업지시 · BOM · 공정 · 실적 · Lot/QR 추적</p>
+        <p class="text-sm text-slate-500 mt-1">작업지시 · BOM · 공정 · 실적 · 추적 · KPI</p>
       </div>
       <div id="mes-stats" class="grid grid-cols-2 md:grid-cols-4 gap-2 text-sm"></div>
     </div>
@@ -34,6 +34,7 @@ window.loadProductionPage = async function (initialTab = 'work-orders') {
       <button onclick="switchMesTab('boms')" id="mes-tab-boms" class="px-5 py-3 text-sm font-medium border-b-2 whitespace-nowrap">BOM</button>
       <button onclick="switchMesTab('processes')" id="mes-tab-processes" class="px-5 py-3 text-sm font-medium border-b-2 whitespace-nowrap">공정</button>
       <button onclick="switchMesTab('trace')" id="mes-tab-trace" class="px-5 py-3 text-sm font-medium border-b-2 whitespace-nowrap">생산 추적</button>
+      <button onclick="switchMesTab('kpi')" id="mes-tab-kpi" class="px-5 py-3 text-sm font-medium border-b-2 whitespace-nowrap">KPI/리포트</button>
     </div>
 
     <div id="mes-tab-content"></div>
@@ -62,7 +63,7 @@ async function refreshMesStats() {
 }
 
 window.switchMesTab = function (tabName) {
-  ['work-orders', 'boms', 'processes', 'trace'].forEach((t) => {
+  ['work-orders', 'boms', 'processes', 'trace', 'kpi'].forEach((t) => {
     const btn = document.getElementById(`mes-tab-${t}`);
     if (!btn) return;
     if (t === tabName) {
@@ -77,7 +78,8 @@ window.switchMesTab = function (tabName) {
   if (tabName === 'work-orders') loadMesWorkOrders();
   else if (tabName === 'boms') loadMesBoms();
   else if (tabName === 'processes') loadMesProcesses();
-  else loadMesTrace();
+  else if (tabName === 'trace') loadMesTrace();
+  else loadMesKpi();
 };
 
 // ---------- 작업지시 ----------
@@ -1006,6 +1008,277 @@ window.mesTraceShowTimeline = async function () {
         </div>
       </div>
     `;
+  } catch (e) {
+    alert(e.response?.data?.error || e.message);
+  }
+};
+
+// ---------- KPI / 리포트 (Phase 3) ----------
+function mesKpiDefaultRange() {
+  const to = new Date();
+  const from = new Date();
+  from.setDate(from.getDate() - 29);
+  const fmt = (d) => d.toISOString().slice(0, 10);
+  return { from: fmt(from), to: fmt(to) };
+}
+
+async function loadMesKpi() {
+  const container = document.getElementById('mes-tab-content');
+  const range = window._mesKpiRange || mesKpiDefaultRange();
+  window._mesKpiRange = range;
+
+  container.innerHTML = `
+    <div class="flex flex-col md:flex-row md:items-end md:justify-between gap-3 mb-5">
+      <div class="flex flex-wrap items-end gap-3">
+        <div>
+          <label class="text-xs text-slate-500">시작일</label>
+          <input id="mes-kpi-from" type="date" value="${range.from}" class="block border rounded-lg px-3 py-2 text-sm mt-1">
+        </div>
+        <div>
+          <label class="text-xs text-slate-500">종료일</label>
+          <input id="mes-kpi-to" type="date" value="${range.to}" class="block border rounded-lg px-3 py-2 text-sm mt-1">
+        </div>
+        <button onclick="refreshMesKpi()" class="bg-orange-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-orange-700">
+          <i class="fas fa-sync-alt mr-1"></i>조회
+        </button>
+      </div>
+      <div class="flex gap-2">
+        <button onclick="printMesKpiReport()" class="px-4 py-2 rounded-lg border text-sm hover:bg-slate-50"><i class="fas fa-print mr-1"></i>인쇄</button>
+        <button onclick="exportMesKpiExcel()" class="px-4 py-2 rounded-lg border text-sm hover:bg-slate-50"><i class="fas fa-file-excel mr-1"></i>엑셀</button>
+      </div>
+    </div>
+    <div id="mes-kpi-body" class="text-center py-10"><i class="fas fa-spinner fa-spin text-3xl text-orange-500"></i></div>
+  `;
+
+  await refreshMesKpi();
+}
+
+window.refreshMesKpi = async function () {
+  const from = document.getElementById('mes-kpi-from')?.value || mesKpiDefaultRange().from;
+  const to = document.getElementById('mes-kpi-to')?.value || mesKpiDefaultRange().to;
+  window._mesKpiRange = { from, to };
+  const body = document.getElementById('mes-kpi-body');
+  if (!body) return;
+  body.innerHTML = '<div class="text-center py-10"><i class="fas fa-spinner fa-spin text-3xl text-orange-500"></i></div>';
+
+  try {
+    const params = { from, to };
+    const [summaryRes, trendRes, productRes, processRes, varianceRes] = await Promise.all([
+      axios.get(`${API_BASE}/production/kpi/summary`, { params }),
+      axios.get(`${API_BASE}/production/kpi/trend`, { params }),
+      axios.get(`${API_BASE}/production/kpi/by-product`, { params }),
+      axios.get(`${API_BASE}/production/kpi/by-process`, { params }),
+      axios.get(`${API_BASE}/production/kpi/material-variance`, { params })
+    ]);
+
+    const s = summaryRes.data.data || {};
+    const trend = trendRes.data.data?.production || [];
+    const products = productRes.data.data?.items || [];
+    const processes = processRes.data.data?.items || [];
+    const variance = varianceRes.data.data?.items || [];
+    window._mesKpiCache = { s, trend, products, processes, variance, from, to };
+
+    body.innerHTML = `
+      <div class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
+        ${mesKpiCard('계획 달성률', s.plan_achievement_rate + '%', `${s.completed_qty}/${s.planned_qty}`, 'text-orange-700')}
+        ${mesKpiCard('수율', s.yield_rate + '%', `양품 ${s.record_good_qty}`, 'text-emerald-700')}
+        ${mesKpiCard('불량률', s.scrap_rate + '%', `불량 ${s.record_scrap_qty}`, 'text-rose-600')}
+        ${mesKpiCard('납기 준수율', s.on_time_rate + '%', `완료 WO ${s.completed_wo}`, 'text-blue-700')}
+      </div>
+      <div class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
+        ${mesKpiCard('미완료 WO', s.open_wo, `진행중 ${s.in_progress_wo}`, 'text-slate-800')}
+        ${mesKpiCard('오늘 양품', s.today_good_qty, `불량 ${s.today_scrap_qty}`, 'text-emerald-700')}
+        ${mesKpiCard('자재 스캔', s.material_scans, `공정완료 ${s.process_completes}`, 'text-slate-800')}
+        ${mesKpiCard('완제품 포장', s.fg_packs, `실적건수 ${s.record_count}`, 'text-slate-800')}
+      </div>
+
+      <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+        <div class="bg-white border rounded-xl p-4">
+          <h3 class="font-bold text-sm mb-3">일별 생산 추이</h3>
+          <canvas id="mesKpiTrendChart" height="220"></canvas>
+        </div>
+        <div class="bg-white border rounded-xl p-4">
+          <h3 class="font-bold text-sm mb-3">제품별 실적 Top</h3>
+          <canvas id="mesKpiProductChart" height="220"></canvas>
+        </div>
+      </div>
+
+      <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+        <div class="bg-white border rounded-xl overflow-hidden">
+          <div class="px-4 py-3 border-b bg-slate-50 font-bold text-sm">제품별 상세</div>
+          <div class="overflow-x-auto max-h-80">
+            <table class="w-full text-sm">
+              <thead class="text-xs bg-white sticky top-0 border-b"><tr>
+                <th class="px-3 py-2 text-left">제품</th><th class="px-3 py-2 text-right">계획</th>
+                <th class="px-3 py-2 text-right">양품</th><th class="px-3 py-2 text-right">달성%</th><th class="px-3 py-2 text-right">수율%</th>
+              </tr></thead>
+              <tbody>${products.length ? products.map((p) => `
+                <tr class="border-t"><td class="px-3 py-2">${p.product_name}<div class="text-xs text-slate-400">${p.product_sku || ''}</div></td>
+                <td class="px-3 py-2 text-right">${p.planned_qty}</td><td class="px-3 py-2 text-right">${p.completed_qty}</td>
+                <td class="px-3 py-2 text-right">${p.plan_achievement_rate}</td><td class="px-3 py-2 text-right">${p.yield_rate}</td></tr>`).join('')
+                : '<tr><td colspan="5" class="px-3 py-8 text-center text-slate-400">데이터 없음</td></tr>'}
+              </tbody>
+            </table>
+          </div>
+        </div>
+        <div class="bg-white border rounded-xl overflow-hidden">
+          <div class="px-4 py-3 border-b bg-slate-50 font-bold text-sm">자재 소요 차이 (이론 vs 투입스캔)</div>
+          <div class="overflow-x-auto max-h-80">
+            <table class="w-full text-sm">
+              <thead class="text-xs bg-white sticky top-0 border-b"><tr>
+                <th class="px-3 py-2 text-left">자재</th><th class="px-3 py-2 text-right">이론</th>
+                <th class="px-3 py-2 text-right">실투입</th><th class="px-3 py-2 text-right">차이</th>
+              </tr></thead>
+              <tbody>${variance.length ? variance.map((v) => `
+                <tr class="border-t"><td class="px-3 py-2">${v.product_name}<div class="text-xs text-slate-400">${v.product_sku || ''}</div></td>
+                <td class="px-3 py-2 text-right">${v.theoretical_qty}</td><td class="px-3 py-2 text-right">${v.actual_qty}</td>
+                <td class="px-3 py-2 text-right ${v.variance_qty > 0 ? 'text-rose-600' : v.variance_qty < 0 ? 'text-blue-600' : ''}">${v.variance_qty}</td></tr>`).join('')
+                : '<tr><td colspan="4" class="px-3 py-8 text-center text-slate-400">데이터 없음 (실적·투입 후 표시)</td></tr>'}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <div class="bg-white border rounded-xl overflow-hidden">
+        <div class="px-4 py-3 border-b bg-slate-50 font-bold text-sm">공정별 완료 이벤트</div>
+        <div class="p-4 grid grid-cols-2 md:grid-cols-4 gap-3">
+          ${processes.length ? processes.map((p) => `
+            <div class="border rounded-lg p-3"><div class="text-xs text-slate-500">${p.process_name}</div>
+            <div class="font-bold text-lg">${p.event_count}</div>
+            <div class="text-xs text-slate-400">수량합 ${p.quantity}</div></div>`).join('')
+            : '<div class="text-slate-400 text-sm col-span-full">공정 완료 이벤트 없음</div>'}
+        </div>
+      </div>
+    `;
+
+    renderMesKpiCharts(trend, products);
+  } catch (e) {
+    body.innerHTML = `<div class="text-center py-10 text-rose-600">${e.response?.data?.error || e.message}</div>`;
+  }
+};
+
+function mesKpiCard(title, value, sub, valueClass = 'text-slate-800') {
+  return `<div class="bg-white border border-slate-200 rounded-xl p-4">
+    <div class="text-xs text-slate-500 mb-1">${title}</div>
+    <div class="text-2xl font-bold ${valueClass}">${value}</div>
+    <div class="text-xs text-slate-400 mt-1">${sub}</div>
+  </div>`;
+}
+
+function renderMesKpiCharts(trend, products) {
+  if (typeof Chart === 'undefined') return;
+
+  const trendCtx = document.getElementById('mesKpiTrendChart');
+  if (trendCtx) {
+    if (window._mesKpiTrendChart) window._mesKpiTrendChart.destroy();
+    window._mesKpiTrendChart = new Chart(trendCtx, {
+      type: 'line',
+      data: {
+        labels: trend.map((t) => t.date),
+        datasets: [
+          { label: '양품', data: trend.map((t) => t.good_qty), borderColor: '#059669', backgroundColor: 'rgba(5,150,105,0.1)', tension: 0.3, fill: true },
+          { label: '불량', data: trend.map((t) => t.scrap_qty), borderColor: '#e11d48', backgroundColor: 'rgba(225,29,72,0.08)', tension: 0.3, fill: true }
+        ]
+      },
+      options: { responsive: true, plugins: { legend: { position: 'bottom' } }, scales: { y: { beginAtZero: true } } }
+    });
+  }
+
+  const prodCtx = document.getElementById('mesKpiProductChart');
+  if (prodCtx) {
+    if (window._mesKpiProductChart) window._mesKpiProductChart.destroy();
+    const top = products.slice(0, 8);
+    window._mesKpiProductChart = new Chart(prodCtx, {
+      type: 'bar',
+      data: {
+        labels: top.map((p) => p.product_name),
+        datasets: [
+          { label: '계획', data: top.map((p) => p.planned_qty), backgroundColor: '#cbd5e1' },
+          { label: '양품', data: top.map((p) => p.completed_qty), backgroundColor: '#f97316' }
+        ]
+      },
+      options: { responsive: true, plugins: { legend: { position: 'bottom' } }, scales: { y: { beginAtZero: true } } }
+    });
+  }
+}
+
+window.printMesKpiReport = async function () {
+  const from = window._mesKpiRange?.from;
+  const to = window._mesKpiRange?.to;
+  try {
+    const res = await axios.get(`${API_BASE}/production/kpi/report`, { params: { from, to } });
+    const d = res.data.data;
+    const s = d.summary || {};
+    const w = window.open('', '_blank');
+    w.document.write(`<!DOCTYPE html><html><head><title>제조 KPI 리포트</title>
+      <style>body{font-family:sans-serif;padding:24px;color:#0f172a} h1{font-size:20px} table{width:100%;border-collapse:collapse;margin-top:12px;font-size:12px}
+      th,td{border:1px solid #e2e8f0;padding:6px 8px;text-align:left} th{background:#f8fafc} .grid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin:16px 0}
+      .card{border:1px solid #e2e8f0;padding:10px;border-radius:8px} .v{font-size:18px;font-weight:700}</style></head><body>
+      <h1>제조 KPI 성과 리포트</h1>
+      <div>기간: ${d.from} ~ ${d.to} · 생성: ${(d.generated_at || '').replace('T',' ').slice(0,19)}</div>
+      <div class="grid">
+        <div class="card">계획달성<div class="v">${s.plan_achievement_rate || 0}%</div></div>
+        <div class="card">수율<div class="v">${s.yield_rate || 0}%</div></div>
+        <div class="card">불량률<div class="v">${s.scrap_rate || 0}%</div></div>
+        <div class="card">완료 WO<div class="v">${s.completed_wo || 0}</div></div>
+      </div>
+      <h2>제품별</h2>
+      <table><thead><tr><th>제품</th><th>SKU</th><th>계획</th><th>양품</th><th>불량</th><th>WO수</th></tr></thead>
+      <tbody>${(d.by_product || []).map((p) => `<tr><td>${p.product_name}</td><td>${p.product_sku || ''}</td><td>${p.planned_qty}</td><td>${p.completed_qty}</td><td>${p.scrap_qty}</td><td>${p.wo_count}</td></tr>`).join('') || '<tr><td colspan="6">없음</td></tr>'}
+      </tbody></table>
+      <h2>최근 실적</h2>
+      <table><thead><tr><th>일시</th><th>WO</th><th>제품</th><th>양품</th><th>불량</th><th>작업자</th></tr></thead>
+      <tbody>${(d.recent_records || []).map((r) => `<tr><td>${(r.recorded_at || '').replace('T',' ').slice(0,19)}</td><td>${r.wo_number}</td><td>${r.product_name}</td><td>${r.good_qty}</td><td>${r.scrap_qty}</td><td>${r.worker_name || ''}</td></tr>`).join('') || '<tr><td colspan="6">없음</td></tr>'}
+      </tbody></table>
+      <script>window.onload=()=>window.print()</script></body></html>`);
+    w.document.close();
+  } catch (e) {
+    alert(e.response?.data?.error || e.message);
+  }
+};
+
+window.exportMesKpiExcel = async function () {
+  if (typeof XLSX === 'undefined') {
+    alert('엑셀 라이브러리를 불러올 수 없습니다.');
+    return;
+  }
+  const from = window._mesKpiRange?.from;
+  const to = window._mesKpiRange?.to;
+  try {
+    const res = await axios.get(`${API_BASE}/production/kpi/report`, { params: { from, to } });
+    const d = res.data.data;
+    const s = d.summary || {};
+    const wb = XLSX.utils.book_new();
+
+    const summarySheet = XLSX.utils.aoa_to_sheet([
+      ['제조 KPI 리포트'],
+      ['기간', `${d.from} ~ ${d.to}`],
+      [],
+      ['지표', '값'],
+      ['총 WO', s.total_wo],
+      ['완료 WO', s.completed_wo],
+      ['미완료 WO', s.open_wo],
+      ['계획수량', s.planned_qty],
+      ['양품수량', s.completed_qty],
+      ['불량수량', s.scrap_qty],
+      ['계획달성률(%)', s.plan_achievement_rate],
+      ['수율(%)', s.yield_rate],
+      ['불량률(%)', s.scrap_rate]
+    ]);
+    XLSX.utils.book_append_sheet(wb, summarySheet, '요약');
+
+    const prodRows = [['제품', 'SKU', '계획', '양품', '불량', 'WO수']].concat(
+      (d.by_product || []).map((p) => [p.product_name, p.product_sku, p.planned_qty, p.completed_qty, p.scrap_qty, p.wo_count])
+    );
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(prodRows), '제품별');
+
+    const recRows = [['일시', 'WO', '제품', '양품', '불량', '작업자']].concat(
+      (d.recent_records || []).map((r) => [r.recorded_at, r.wo_number, r.product_name, r.good_qty, r.scrap_qty, r.worker_name])
+    );
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(recRows), '실적이력');
+
+    XLSX.writeFile(wb, `mes-kpi-${d.from}_${d.to}.xlsx`);
   } catch (e) {
     alert(e.response?.data?.error || e.message);
   }
