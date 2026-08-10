@@ -3,6 +3,7 @@ import type { Bindings, Variables, Sale, CreateSaleRequest } from '../types'
 import { resolveLineUnitPrice } from '../utils/sale-price'
 import { linkSaleItemLot } from '../utils/mes-distribution'
 import { createOutboundFromSale } from '../utils/sale-outbound'
+import { releaseReservationsForSource } from '../utils/stock-reservation'
 
 const app = new Hono<{ Bindings: Bindings; Variables: Variables }>()
 
@@ -579,6 +580,12 @@ app.put('/:id/cancel', async (c) => {
   await DB.prepare(`
     UPDATE sales SET status = 'cancelled', updated_at = CURRENT_TIMESTAMP WHERE id = ? AND tenant_id = ?
   `).bind(id, tenantId).run()
+
+  try {
+    await releaseReservationsForSource(DB, tenantId, 'sale', Number(id))
+  } catch (e) {
+    console.warn('release sale reservations:', e)
+  }
 
   return c.json({ success: true, message: '판매가 취소되었습니다.' })
 })

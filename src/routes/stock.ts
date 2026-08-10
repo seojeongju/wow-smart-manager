@@ -1,5 +1,6 @@
 import { Hono } from 'hono'
 import type { Bindings, Variables, StockMovementRequest, StockTransferRequest } from '../types'
+import { getAvailableQty } from '../utils/stock-reservation'
 
 const app = new Hono<{ Bindings: Bindings; Variables: Variables }>()
 
@@ -1027,6 +1028,16 @@ app.get('/warehouse-stocks', async (c) => {
       totalPages: Math.ceil(total / limit)
     }
   })
+})
+
+// 가용재고 (물리재고 - 활성예약)
+app.get('/availability', async (c) => {
+  const { DB } = c.env
+  const tenantId = c.get('tenantId')
+  const productId = parseInt(c.req.query('product_id') || '0', 10)
+  if (!productId) return c.json({ success: false, error: 'product_id 필요' }, 400)
+  const data = await getAvailableQty(DB, tenantId, productId)
+  return c.json({ success: true, data: { product_id: productId, ...data } })
 })
 
 // 총재고 vs 창고합 불일치 목록

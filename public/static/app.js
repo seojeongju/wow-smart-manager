@@ -394,6 +394,11 @@ async function loadPage(page, subPage = null) {
       updatePageTitle('판매 관리', '판매 및 주문 내역 관리');
       await loadSales(content, subPage || 'pos');
       break;
+    case 'quotations':
+      updatePageTitle('견적 관리', '견적 작성 · 재고예약 · 수주 변환');
+      if (window.loadQuotationsPage) await window.loadQuotationsPage();
+      else content.innerHTML = '<div class="text-center py-10">견적 모듈 로딩 중...</div>';
+      break;
     case 'pricing-policy':
       updatePageTitle('가격 정책 관리', '등급별 및 고객별 특수 단가 현황');
       await loadPricingPolicy(content);

@@ -59,6 +59,14 @@ async function renderTransactionStatementPage(container) {
           <p>고객과 기간을 선택하여 내역을 조회해주세요.</p>
         </div>
       </div>
+
+      <div class="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+        <div class="px-5 py-3 border-b border-slate-100 bg-slate-50 flex items-center justify-between">
+          <h3 class="font-bold text-slate-800"><i class="fas fa-history mr-2 text-teal-600"></i>저장된 거래명세서</h3>
+          <button type="button" onclick="loadTSHistory()" class="text-sm text-slate-500 hover:text-teal-700"><i class="fas fa-sync-alt"></i></button>
+        </div>
+        <div id="tsHistoryList" class="p-4 text-sm text-slate-500">고객을 선택하면 이력이 표시됩니다.</div>
+      </div>
     </div>
 
     <!-- 인쇄용 숨겨진 영역 -->
@@ -105,6 +113,7 @@ function selectTSCustomer(id, name, phone) {
   document.getElementById('tsCustomerSearch').classList.add('hidden');
   document.getElementById('tsSelectedCustomer').classList.remove('hidden');
   document.getElementById('tsCustomerResults').classList.add('hidden');
+  loadTSHistory();
 }
 
 function clearTSCustomer() {
@@ -112,6 +121,8 @@ function clearTSCustomer() {
   document.getElementById('tsCustomerSearch').value = '';
   document.getElementById('tsCustomerSearch').classList.remove('hidden');
   document.getElementById('tsSelectedCustomer').classList.add('hidden');
+  const hist = document.getElementById('tsHistoryList');
+  if (hist) hist.textContent = '고객을 선택하면 이력이 표시됩니다.';
 }
 
 async function loadTSData() {
@@ -130,9 +141,11 @@ async function loadTSData() {
   try {
     // 판매 목록 조회 (해당 고객, 기간)
     const res = await axios.get(`${API_BASE}/sales`, {
-      params: { customerId, startDate, endDate, status: 'completed' }
+      params: { customerId, startDate, endDate, status: 'all', limit: 200 }
     });
-    const sales = res.data.data;
+    const sales = (res.data.data || []).filter(s =>
+      ['completed', 'pending_shipment', 'shipped', 'delivered'].includes(s.status)
+    );
 
     if (sales.length === 0) {
       container.innerHTML = `
@@ -198,7 +211,7 @@ async function fetchTSData(selectedIds = null) {
 
     // 선택된 ID가 있다면 필터링
     if (selectedIds) {
-      sales = sales.filter(s => selectedIds.includes(s.id.toString()));
+      sales = sales.filter(s => selectedIds.map(Number).includes(Number(s.id)));
     }
 
     if (sales.length === 0) {
@@ -551,7 +564,11 @@ function renderTSResults(sales) {
         </table>
       </div>
 
-      <div class="mt-8 flex justify-center border-t border-slate-100 pt-8 gap-4">
+      <div class="mt-8 flex flex-wrap justify-center border-t border-slate-100 pt-8 gap-4">
+        <button onclick="saveTSDocument()" class="px-8 py-4 bg-white text-teal-700 border-2 border-teal-600 rounded-2xl hover:bg-teal-50 transition-all font-bold flex items-center gap-3 shadow-sm">
+          <i class="fas fa-save text-xl"></i>
+          명세서 저장 (번호발급)
+        </button>
         <button onclick="downloadTSExcel()" class="px-8 py-4 bg-white text-emerald-600 border-2 border-emerald-600 rounded-2xl hover:bg-emerald-50 transition-all font-bold flex items-center gap-3 shadow-sm">
           <i class="fas fa-file-excel text-xl"></i>
           엑셀로 저장 (XLSX)
@@ -802,3 +819,97 @@ window.loadTSData = loadTSData;
 window.prepareTSPrint = prepareTSPrint;
 window.downloadTSExcel = downloadTSExcel;
 window.toggleAllTSItems = toggleAllTSItems;
+window.saveTSDocument = saveTSDocument;
+window.loadTSHistory = loadTSHistory;
+
+async function saveTSDocument() {
+  const customerId = document.getElementById('tsCustomerId').value;
+  const startDate = document.getElementById('tsStartDate').value;
+  const endDate = document.getElementById('tsEndDate').value;
+  const applyVat = document.getElementById('tsApplyVat')?.checked;
+  const note = document.getElementById('tsNote')?.value || '';
+  const ids = [...document.querySelectorAll('.ts-item-checkbox:checked')].map(cb => Number(cb.value));
+
+  if (!customerId) return showToast('고객을 선택하세요.', 'warning');
+  if (!ids.length) return showToast('저장할 판매를 선택하세요.', 'warning');
+
+  try {
+    let supply = 0;
+    const rows = document.querySelectorAll('.ts-item-checkbox:checked');
+    rows.forEach(cb => {
+      const tr = cb.closest('tr');
+      const amountText = tr?.querySelector('td:last-child')?.textContent?.replace(/[^\d.-]/g, '') || '0';
+      supply += Number(amountText) || 0;
+    });
+    const vat = applyVat ? Math.round(supply * 0.1) : 0;
+    const detail = await fetchTSData(ids);
+    const res = await axios.post(`${API_BASE}/transaction-statements`, {
+      customer_id: Number(customerId),
+      start_date: startDate,
+      end_date: endDate,
+      apply_vat: !!applyVat,
+      note,
+      sale_ids: ids,
+      supply_amount: detail?.items
+        ? detail.items.reduce((s, i) => s + (Number(i.subtotal) || 0), 0)
+        : supply,
+      vat_amount: vat,
+      total_amount: (detail?.items
+        ? detail.items.reduce((s, i) => s + (Number(i.subtotal) || 0), 0)
+        : supply) + vat,
+      snapshot: detail ? {
+        items: detail.items,
+        customer: detail.customer,
+        company: detail.company
+      } : null
+    });
+    showToast(`저장됨: ${res.data.data.doc_number}`, 'success');
+    loadTSHistory();
+  } catch (e) {
+    alert('저장 실패: ' + (e.response?.data?.error || e.message));
+  }
+}
+
+async function loadTSHistory() {
+  const el = document.getElementById('tsHistoryList');
+  const customerId = document.getElementById('tsCustomerId')?.value;
+  if (!el) return;
+  if (!customerId) {
+    el.textContent = '고객을 선택하면 이력이 표시됩니다.';
+    return;
+  }
+  el.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
+  try {
+    const res = await axios.get(`${API_BASE}/transaction-statements`, {
+      params: { customerId, limit: 30 }
+    });
+    const rows = res.data.data || [];
+    if (!rows.length) {
+      el.innerHTML = '<div class="text-slate-400 py-4 text-center">저장된 명세서가 없습니다.</div>';
+      return;
+    }
+    el.innerHTML = `
+      <table class="min-w-full text-sm">
+        <thead class="text-xs text-slate-500 bg-slate-50">
+          <tr>
+            <th class="px-3 py-2 text-left">문서번호</th>
+            <th class="px-3 py-2 text-left">기간</th>
+            <th class="px-3 py-2 text-right">합계</th>
+            <th class="px-3 py-2 text-left">작성</th>
+          </tr>
+        </thead>
+        <tbody class="divide-y">
+          ${rows.map(r => `
+            <tr>
+              <td class="px-3 py-2 font-mono text-xs font-semibold text-teal-800">${r.doc_number}</td>
+              <td class="px-3 py-2 text-slate-600">${r.start_date} ~ ${r.end_date}</td>
+              <td class="px-3 py-2 text-right font-bold">${Number(r.total_amount || 0).toLocaleString()}원</td>
+              <td class="px-3 py-2 text-slate-500 text-xs">${(r.created_at || '').slice(0, 16)} · ${r.created_by_name || '-'}</td>
+            </tr>
+          `).join('')}
+        </tbody>
+      </table>`;
+  } catch (e) {
+    el.innerHTML = `<div class="text-rose-500">${e.response?.data?.error || e.message}</div>`;
+  }
+}

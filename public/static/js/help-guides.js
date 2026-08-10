@@ -115,13 +115,29 @@ const HELP_GUIDES = {
     steps: [
       '상품을 검색·선택해 장바구니에 담습니다.',
       '(선택) 고객을 연결하면 등급/전용 단가가 반영될 수 있습니다.',
-      '수량·할인을 확인한 뒤 판매를 확정합니다.',
-      '최근 판매 목록에서 결과를 확인합니다.'
+      '결제수단을 고릅니다. 외상은 미수로 기록됩니다.',
+      '배송출고를 켜면 재고는 출고 확정 시 차감되고 출고지시가 만들어집니다.',
+      '판매를 확정합니다.'
     ],
-    tips: ['바코드건은 검색/스캔 입력칸에 포커스를 두고 사용하세요.'],
+    tips: ['견적→수주가 필요하면 견적 관리를 이용하세요.', '바코드건은 검색/스캔 입력칸에 포커스를 두고 사용하세요.'],
     related: [
+      { label: '견적 관리', page: 'quotations' },
       { label: '주문 관리', page: 'sales', tab: 'orders' },
       { label: '가격 정책', page: 'pricing-policy' }
+    ]
+  },
+  quotations: {
+    title: '견적 관리',
+    summary: '견적을 작성하고 재고를 예약한 뒤 수주(판매·출고지시)로 변환합니다.',
+    steps: [
+      '고객·유효일·품목·단가를 입력합니다.',
+      '재고 예약을 켜면 가용재고에서 soft allocation 됩니다.',
+      '[수주변환]으로 배송출고 판매와 출고지시를 만듭니다.'
+    ],
+    tips: ['예약은 물리 재고를 차감하지 않습니다. 출고 확정 시 실제 차감됩니다.'],
+    related: [
+      { label: '주문/배송', page: 'sales', tab: 'orders' },
+      { label: '출고 피킹', page: 'outbound', tab: 'picking' }
     ]
   },
   'sales:orders': {
@@ -310,13 +326,14 @@ const HELP_GUIDES = {
   },
   'transaction-statement': {
     title: '거래명세서',
-    summary: '고객·기간 기준으로 거래명세서를 조회·출력합니다.',
+    summary: '고객·기간 기준으로 거래명세서를 조회·저장·출력합니다.',
     steps: [
       '고객을 검색·선택합니다.',
-      '시작일·종료일을 지정합니다.',
-      '명세를 조회한 뒤 인쇄/PDF로 출력합니다.'
+      '시작일·종료일을 지정한 뒤 내역을 조회합니다.',
+      '[명세서 저장]으로 문서번호(TS-…)를 발급·보관합니다.',
+      '인쇄/엑셀로 출력합니다.'
     ],
-    tips: ['판매·출고 데이터가 반영되므로 기간을 정확히 맞추세요.'],
+    tips: ['저장 이력은 화면 하단에서 확인할 수 있습니다.'],
     related: [
       { label: '주문 관리', page: 'sales', tab: 'orders' },
       { label: '고객', page: 'customers' }
@@ -580,6 +597,7 @@ const HELP_HUB_SECTIONS = [
     items: [
       { key: 'dashboard', label: '대시보드' },
       { key: 'sales:pos', label: '판매(POS)' },
+      { key: 'quotations', label: '견적' },
       { key: 'sales:orders', label: '주문 관리' },
       { key: 'sales:claims', label: '클레임' },
       { key: 'outbound:reg', label: '간편 출고' },
