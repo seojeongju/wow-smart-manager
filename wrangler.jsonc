@@ -1,6 +1,6 @@
 {
   "$schema": "node_modules/wrangler/config-schema.json",
-  "name": "wow3d-stock-sales-manager",
+  "name": "smart-link-f",
   "compatibility_date": "2025-10-31",
   "pages_build_output_dir": "./dist",
   "compatibility_flags": [
@@ -9,8 +9,14 @@
   "d1_databases": [
     {
       "binding": "DB",
-      "database_name": "wow3d-stock-sales-manager-production",
-      "database_id": "463de385-2845-4930-b64e-c0c4e872e01a"
+      "database_name": "smart-link-f-db",
+      "database_id": "76a4e6c5-1877-40e9-b512-00597b2ab24f"
+    }
+  ],
+  "r2_buckets": [
+    {
+      "binding": "R2",
+      "bucket_name": "smart-link-f-assets"
     }
   ]
 }

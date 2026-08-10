@@ -19,10 +19,10 @@ CREATE TABLE IF NOT EXISTS product_option_values (
   FOREIGN KEY (group_id) REFERENCES product_option_groups(id) ON DELETE CASCADE
 );
 
--- 기존 상품 테이블 확장
--- ALTER TABLE products ADD COLUMN parent_id INTEGER;
--- ALTER TABLE products ADD COLUMN product_type TEXT DEFAULT 'simple'; -- simple, master, variant
--- ALTER TABLE products ADD COLUMN has_options BOOLEAN DEFAULT 0;
+-- 기존 상품 테이블 확장 (옵션/변체 지원)
+ALTER TABLE products ADD COLUMN parent_id INTEGER;
+ALTER TABLE products ADD COLUMN product_type TEXT DEFAULT 'simple'; -- simple, master, variant
+ALTER TABLE products ADD COLUMN has_options BOOLEAN DEFAULT 0;
 
 -- 상품 변체와 옵션 값 매핑
 CREATE TABLE IF NOT EXISTS product_variant_options (

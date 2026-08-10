@@ -1,6 +1,7 @@
 // Cloudflare Bindings 타입
 export type Bindings = {
   DB: D1Database;
+  R2: R2Bucket;
   JWT_SECRET: string;
   RESEND_API_KEY: string;
 }

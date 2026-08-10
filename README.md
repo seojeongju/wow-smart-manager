@@ -1,26 +1,26 @@
-# WOW-Smart Manager (통합 비즈니스 관리 시스템)
+# Smart Link-F (스마트제조 ERP/MES)
 
-상품 재고, 판매, 고객 정보를 통합 관리하는 웹 기반 시스템입니다.
-
-![WOW3D Logo](public/static/wow3d-logo.png)
+스마트제조 지원을 위한 통합 ERP/MES 웹 시스템입니다.  
+(재고·판매·출고·발주 ERP + QR MES 기반)
 
 ## 🎯 프로젝트 개요
 
-중소 규모 사업체를 위한 직관적이고 효율적인 재고관리 솔루션을 제공합니다.
+중소 제조·유통 사업체를 위한 재고·생산·물류 통합 관리 솔루션입니다.
 
 ### 주요 기능
 
 - ✅ **대시보드**: 실시간 매출 현황, 재고 통계, 베스트셀러 분석
 - ✅ **상품 관리**: 상품 등록/수정/삭제, 재고 추적, 카테고리 관리
 - ✅ **고객 관리**: 고객 정보 관리, 구매 이력 추적, VIP 등급 관리
-- ⏳ **재고 관리**: 입고/출고 처리, 재고 조정, 이동 내역 추적 (API 완료, UI 개발 중)
-- ⏳ **판매 관리**: 판매 등록, 내역 조회, 통계 분석 (API 완료, UI 개발 중)
+- ✅ **재고·출고·발주**: 입고/출고/조정, 창고별 재고, 발주·공급사
+- ✅ **MES (QR)**: QR 기반 입출고·판매·추적
+- ⏳ **스마트제조 고도화**: 작업지시, BOM, 생산실적 KPI 등
 
 ## 🌐 공개 URL
 
-- **프로덕션**: https://wow3d-stock-sales-manager.pages.dev
-- **GitHub**: https://github.com/seojeongju/wow3d-stock-sales-manager
-- **API Base**: https://wow3d-stock-sales-manager.pages.dev/api
+- **프로덕션**: https://smart-link-f.pages.dev
+- **GitHub**: https://github.com/seojeongju/Smart-Link-f
+- **API Base**: https://smart-link-f.pages.dev/api
 
 ## 🏗️ 기술 스택
 
@@ -241,8 +241,9 @@ npm run preview
 - **데이터베이스**: Cloudflare D1 (프로덕션)
   - Database ID: 463de385-2845-4930-b64e-c0c4e872e01a
   - Region: ENAM (유럽/북미)
-- **프로덕션 URL**: https://wow3d-stock-sales-manager.pages.dev
-- **백업**: https://page.gensparksite.com/project_backups/wow3d-stock-sales-manager-2025-10-31.tar.gz
+- **프로덕션 URL**: https://smart-link-f.pages.dev
+- **D1**: `smart-link-f-db`
+- **R2**: `smart-link-f-assets` (binding: `R2`)
 - **상태**: ✅ 프로덕션 배포 완료
 - **최종 업데이트**: 2025-10-31
 
