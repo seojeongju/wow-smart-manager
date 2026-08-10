@@ -84,6 +84,23 @@ window.switchMesTab = function (tabName) {
     }
   });
 
+  const mesTitles = {
+    shopfloor: ['현장 실행', '작업지시 · QR 스캔 · 투입/공정/실적'],
+    kpi: ['제조 현황', 'KPI · 원가 · 월간 성과'],
+    masters: ['기준정보', 'BOM · 공정 · 설비 마스터'],
+    'work-orders': ['작업지시', '생산계획 · 실적 · 재고연동'],
+    materials: ['자재·외주', '자재소요 · 외주공정 · 설비'],
+    trace: ['현장추적', 'Lot/QR · 투입 · 역추적'],
+    quality: ['품질검사', '검사 · 불량유형 · NCR']
+  };
+  if (typeof updatePageTitle === 'function') {
+    const [title, desc] = mesTitles[resolved] || mesTitles.kpi;
+    updatePageTitle(title, desc);
+  }
+  if (typeof window.syncSidebarNav === 'function') {
+    window.syncSidebarNav('production', resolved);
+  }
+
   // 현장 실행 탭 이탈 시 카메라 정리
   if (resolved !== 'shopfloor' && typeof window.sfStopScan === 'function') {
     window.sfStopScan();

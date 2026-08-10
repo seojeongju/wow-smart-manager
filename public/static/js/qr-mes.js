@@ -1631,12 +1631,16 @@ window.switchQrTab = async function (tabName) {
   });
 
   // 사이드바 active 동기화
-  document.querySelectorAll('.nav-link').forEach((link) => {
-    const page = link.getAttribute('data-page');
-    const tab = link.getAttribute('data-tab');
-    if (page === 'qr' && tab === tabName) link.classList.add('active');
-    else if (page === 'qr') link.classList.remove('active');
-  });
+  if (typeof window.syncSidebarNav === 'function') {
+    window.syncSidebarNav('qr', tabName);
+  } else {
+    document.querySelectorAll('.nav-link').forEach((link) => {
+      const page = link.getAttribute('data-page');
+      const tab = link.getAttribute('data-tab');
+      if (page === 'qr' && tab === tabName) link.classList.add('active');
+      else if (page === 'qr') link.classList.remove('active');
+    });
+  }
 
   const titles = {
     dashboard: ['QR 현황', '실시간 QR 작업 현황 및 통계'],

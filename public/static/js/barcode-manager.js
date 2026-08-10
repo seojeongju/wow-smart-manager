@@ -75,6 +75,9 @@ window.switchBarcodeTab = function (tabName) {
   };
   const [title, desc] = titles[tabName] || titles.dashboard;
   if (typeof updatePageTitle === 'function') updatePageTitle(title, desc);
+  if (typeof window.syncSidebarNav === 'function') {
+    window.syncSidebarNav('barcode', tabName);
+  }
 
   if (tabName === 'dashboard') renderBarcodeDashboard();
   else if (tabName === 'register') renderBarcodeRegister();

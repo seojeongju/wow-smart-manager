@@ -215,27 +215,73 @@ function setupNavigation() {
   document.querySelectorAll('.nav-link').forEach(link => {
     link.addEventListener('click', (e) => {
       e.preventDefault();
-      // 이벤트 위임 문제 방지를 위해 currentTarget 사용 (이미 되어 있음)
       const target = e.currentTarget;
       const page = target.dataset.page;
-      const tab = target.dataset.tab;
-
-      // 활성 상태 변경
-      document.querySelectorAll('.nav-link').forEach(l => {
-        l.classList.remove('active', 'text-white', 'bg-blue-500', 'shadow-md');
-        l.classList.add('text-blue-100');
-        // 서브메뉴 아이템 스타일링 리셋 (필요시)
-        if (l.dataset.page === page && l.dataset.tab === tab) {
-          // This will be handled below
-        }
-      });
-      target.classList.add('active', 'text-white', 'bg-blue-500', 'shadow-md');
-      target.classList.remove('text-blue-100');
-
+      const tab = target.dataset.tab || null;
+      syncSidebarNav(page, tab);
       loadPage(page, tab);
     });
   });
 }
+
+/**
+ * 본문 탭 ↔ 사이드바 서브메뉴 활성 상태 동기화
+ * @param {string} page data-page
+ * @param {string|null} tab data-tab
+ */
+window.syncSidebarNav = function syncSidebarNav(page, tab = null) {
+  if (!page) return;
+
+  document.querySelectorAll('.nav-link').forEach((l) => {
+    l.classList.remove('active', 'text-white', 'bg-blue-500', 'shadow-md');
+  });
+
+  const links = Array.from(document.querySelectorAll('.nav-link'));
+  const tabKey = tab != null && String(tab).length ? String(tab) : null;
+
+  let target = null;
+  if (tabKey) {
+    target = links.find((l) => l.dataset.page === page && l.dataset.tab === tabKey);
+  }
+  if (!target) {
+    target = links.find((l) => l.dataset.page === page && !l.dataset.tab);
+  }
+  if (!target) {
+    target = links.find((l) => l.dataset.page === page);
+  }
+  if (!target) return;
+
+  target.classList.add('active');
+
+  const parentSubmenu = target.closest('.nav-submenu');
+  if (!parentSubmenu) return;
+
+  // 같은 MES 그룹 내에서는 해당 서브메뉴만 열기
+  const mesGroup = document.getElementById('nav-mes-group');
+  if (mesGroup && mesGroup.contains(parentSubmenu)) {
+    mesGroup.querySelectorAll('.nav-submenu').forEach((sm) => {
+      const group = sm.closest('.nav-item-group');
+      const arrow = group?.querySelector('.submenu-arrow');
+      if (sm === parentSubmenu) {
+        sm.classList.add('open');
+        if (arrow) arrow.style.transform = 'rotate(180deg)';
+      } else {
+        sm.classList.remove('open');
+        if (arrow) arrow.style.transform = 'rotate(0deg)';
+      }
+    });
+  } else {
+    parentSubmenu.classList.add('open');
+    const group = parentSubmenu.closest('.nav-item-group');
+    const arrow = group?.querySelector('.submenu-arrow');
+    if (arrow) arrow.style.transform = 'rotate(180deg)';
+  }
+
+  // 활성 항목이 보이도록 스크롤
+  try {
+    target.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+  } catch (_) { /* ignore */ }
+};
 
 // 페이지 타이틀 업데이트
 function updatePageTitle(title, subtitle) {
@@ -253,6 +299,37 @@ function updatePageTitle(title, subtitle) {
 async function loadPage(page, subPage = null) {
   currentPage = page;
   const content = document.getElementById('content');
+
+  // 사이드바도 본문과 동일 메뉴로 맞춤 (탭형 페이지 포함)
+  if (typeof window.syncSidebarNav === 'function') {
+    let navPage = page;
+    let navTab = subPage;
+    if (page === 'shopfloor') {
+      navPage = 'production';
+      navTab = 'shopfloor';
+    } else if (String(page).startsWith('qr-') || page === 'qr') {
+      navPage = 'qr';
+      const qrAlias = {
+        'qr-dashboard': 'dashboard',
+        'qr-inbound': 'inbound',
+        'qr-outbound': 'outbound',
+        'qr-sale': 'sale',
+        'qr-management': 'management'
+      };
+      navTab = subPage || qrAlias[page] || 'dashboard';
+    } else if (String(page).startsWith('barcode-') || page === 'barcode') {
+      navPage = 'barcode';
+      const bcAlias = {
+        'barcode-dashboard': 'dashboard',
+        'barcode-register': 'register',
+        'barcode-labels': 'labels'
+      };
+      navTab = subPage || bcAlias[page] || 'dashboard';
+    } else if (page === 'production') {
+      navTab = subPage || 'kpi';
+    }
+    window.syncSidebarNav(navPage, navTab);
+  }
 
   switch (page) {
     case 'dashboard':
