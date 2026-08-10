@@ -462,11 +462,11 @@ const ERP_STUB_META = {
     icon: 'fa-filter',
     module: '영업 · CRM',
     phase: 'Phase 3',
-    summary: '리드·기회·파이프라인 추적 및 수주 전환을 관리합니다.',
+    summary: '구현됨 — 사이드바 ERP → 영업 · CRM → 영업 기회 메뉴를 이용하세요.',
     related: [
+      { label: '영업 기회 열기', page: 'crm-pipeline' },
       { label: '견적 관리', page: 'quotations' },
-      { label: '고객 관리', page: 'customers' },
-      { label: '주문/배송', page: 'sales', tab: 'orders' }
+      { label: '고객 관리', page: 'customers' }
     ]
   },
   'proc-receive': {
@@ -775,6 +775,11 @@ async function loadPage(page, subPage = null, opts = {}) {
       updatePageTitle('견적 관리', '견적 작성 · 재고예약 · 수주 변환');
       if (window.loadQuotationsPage) await window.loadQuotationsPage();
       else content.innerHTML = '<div class="text-center py-10">견적 모듈 로딩 중...</div>';
+      break;
+    case 'crm-pipeline':
+      updatePageTitle('영업 기회', 'CRM 파이프라인 · 단계 관리');
+      if (window.loadCrmPipelinePage) await window.loadCrmPipelinePage();
+      else content.innerHTML = '<div class="text-center py-10">CRM 모듈 로딩 중...</div>';
       break;
     case 'pricing-policy':
       updatePageTitle('가격 정책 관리', '등급별 및 고객별 특수 단가 현황');

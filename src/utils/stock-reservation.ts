@@ -140,10 +140,15 @@ export async function replaceReservations(
 export async function nextDocNumber(
   DB: D1,
   tenantId: number,
-  table: 'quotations' | 'transaction_statements',
+  table: 'quotations' | 'transaction_statements' | 'opportunities',
   prefix: string
 ): Promise<string> {
-  const col = table === 'quotations' ? 'quote_number' : 'doc_number'
+  const col =
+    table === 'quotations'
+      ? 'quote_number'
+      : table === 'opportunities'
+        ? 'opportunity_number'
+        : 'doc_number'
   const day = new Date().toISOString().slice(2, 10).replace(/-/g, '')
   const like = `${prefix}-${day}-%`
   const row = await DB.prepare(`

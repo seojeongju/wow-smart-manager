@@ -351,15 +351,28 @@ const HELP_GUIDES = {
     tips: ['구현 순서: 재무(Phase 1) → 구매·재고 → 영업 CRM → 인사.'],
     related: [{ label: '대시보드', page: 'dashboard' }]
   },
-  'erp-stub:crm-pipeline': {
-    title: '영업 기회 (준비중)',
-    summary: '리드·기회·파이프라인. Phase 3 예정.',
-    steps: ['견적·고객·주문 화면을 이용하세요.'],
-    tips: [],
+  'crm-pipeline': {
+    title: '영업 기회',
+    summary: '리드부터 수주까지 파이프라인 보드로 영업 기회를 관리합니다.',
+    steps: [
+      '기회명·고객·예상 금액을 등록합니다.',
+      '카드를 드래그해 단계(리드→검증→제안→협상→수주/실주)를 바꿉니다.',
+      '상세에서 견적을 연결하거나 견적 관리로 이동합니다.',
+      '수주 표시 후 견적 수주 변환으로 판매를 확정합니다.'
+    ],
+    tips: ['가중 예상 금액 = Σ(금액 × 확률) 입니다.'],
     related: [
-      { label: '견적', page: 'quotations' },
-      { label: '고객', page: 'customers' }
+      { label: '견적 관리', page: 'quotations' },
+      { label: '고객', page: 'customers' },
+      { label: '주문/배송', page: 'sales', tab: 'orders' }
     ]
+  },
+  'erp-stub:crm-pipeline': {
+    title: '영업 기회',
+    summary: '구현됨 — ERP → 영업 · CRM → 영업 기회 메뉴를 이용하세요.',
+    steps: [],
+    tips: [],
+    related: [{ label: '영업 기회 열기', page: 'crm-pipeline' }]
   },
   'erp-stub:proc-receive': {
     title: '입고 · 검수',
@@ -910,6 +923,7 @@ const HELP_HUB_SECTIONS = [
   {
     title: 'ERP',
     items: [
+      { key: 'crm-pipeline', label: '영업 기회' },
       { key: 'dashboard', label: '대시보드' },
       { key: 'sales:pos', label: '판매(POS)' },
       { key: 'quotations', label: '견적' },
