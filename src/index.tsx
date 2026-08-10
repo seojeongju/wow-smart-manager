@@ -1228,6 +1228,23 @@ app.get('/', (c: Context) => {
                                                                 MES
                                                             </p>
                                                             <div class="space-y-1">
+                                                                <!-- 성과 분석 -->
+                                                                <div class="nav-item-group">
+                                                                    <button onclick="toggleSubMenu(this, 'mes-kpi-submenu')" class="flex items-center justify-between w-full px-4 py-3 rounded-lg group hover:bg-white/5 transition-all text-slate-400 hover:text-white">
+                                                                        <div class="flex items-center">
+                                                                            <i class="fas fa-chart-pie w-6 text-center text-lg mr-3"></i>
+                                                                            <span class="font-medium">성과 분석</span>
+                                                                        </div>
+                                                                        <i class="fas fa-chevron-down text-[10px] submenu-arrow"></i>
+                                                                    </button>
+                                                                    <div id="mes-kpi-submenu" class="nav-submenu ml-4 space-y-1">
+                                                                        <a href="#" data-page="production" data-tab="kpi" class="nav-link flex items-center px-4 py-2 rounded-lg group text-sm" onclick="closeSidebarOnMobile()">
+                                                                            <i class="fas fa-tachometer-alt w-5 text-center mr-3 text-xs opacity-70"></i>
+                                                                            <span>제조 KPI · 원가</span>
+                                                                        </a>
+                                                                    </div>
+                                                                </div>
+
                                                                 <!-- 기준정보 -->
                                                                 <div class="nav-item-group">
                                                                     <button onclick="toggleSubMenu(this, 'mes-master-submenu')" class="flex items-center justify-between w-full px-4 py-3 rounded-lg group hover:bg-white/5 transition-all text-slate-400 hover:text-white">
@@ -1372,23 +1389,6 @@ app.get('/', (c: Context) => {
                                                                         <a href="#" data-page="production" data-tab="trace" class="nav-link flex items-center px-4 py-2 rounded-lg group text-sm" onclick="closeSidebarOnMobile()">
                                                                             <i class="fas fa-search-location w-5 text-center mr-3 text-xs opacity-70"></i>
                                                                             <span>Lot · 역추적</span>
-                                                                        </a>
-                                                                    </div>
-                                                                </div>
-
-                                                                <!-- 성과 분석 -->
-                                                                <div class="nav-item-group">
-                                                                    <button onclick="toggleSubMenu(this, 'mes-kpi-submenu')" class="flex items-center justify-between w-full px-4 py-3 rounded-lg group hover:bg-white/5 transition-all text-slate-400 hover:text-white">
-                                                                        <div class="flex items-center">
-                                                                            <i class="fas fa-chart-pie w-6 text-center text-lg mr-3"></i>
-                                                                            <span class="font-medium">성과 분석</span>
-                                                                        </div>
-                                                                        <i class="fas fa-chevron-down text-[10px] submenu-arrow"></i>
-                                                                    </button>
-                                                                    <div id="mes-kpi-submenu" class="nav-submenu ml-4 space-y-1">
-                                                                        <a href="#" data-page="production" data-tab="kpi" class="nav-link flex items-center px-4 py-2 rounded-lg group text-sm" onclick="closeSidebarOnMobile()">
-                                                                            <i class="fas fa-tachometer-alt w-5 text-center mr-3 text-xs opacity-70"></i>
-                                                                            <span>제조 KPI · 원가</span>
                                                                         </a>
                                                                     </div>
                                                                 </div>
