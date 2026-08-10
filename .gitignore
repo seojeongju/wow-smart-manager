@@ -33,3 +33,10 @@ lerna-debug.log*
 .DS_Store
 .agent/
 .gemini/
+
+# accidental OS/copy duplicates
+* (2).*
+* (2)
+build_log*.txt
+app_old.js
+*_temp.js
