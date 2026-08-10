@@ -288,8 +288,13 @@ async function loadPage(page, subPage = null) {
       if (window.renderTransactionStatementPage) await window.renderTransactionStatementPage(content);
       else content.innerHTML = '<div class="text-center py-10">모듈 로딩 중...</div>';
       break;
+    case 'production':
+      updatePageTitle('생산 MES', '작업지시 · BOM · 공정 · 생산실적');
+      if (window.loadProductionPage) await window.loadProductionPage(subPage || 'work-orders');
+      else content.innerHTML = '<div class="text-center py-10">모듈 로딩 중...</div>';
+      break;
     case 'qr-dashboard':
-      updatePageTitle('MES 대시보드', 'QR 작업 현황 및 실시간 통계');
+      updatePageTitle('QR 대시보드', 'QR 작업 현황 및 실시간 통계');
       await renderQRDashboardPage(content);
       break;
     case 'qr-inbound':
