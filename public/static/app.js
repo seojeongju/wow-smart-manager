@@ -312,7 +312,7 @@ async function loadPage(page, subPage = null) {
       break;
     case 'production': {
       const mesTitles = {
-        kpi: ['제조 현황', '계획달성·수율·불량·납기 KPI'],
+        kpi: ['제조 현황', 'KPI · 원가 · 월간 성과'],
         masters: ['기준정보', 'BOM · 공정 · 설비 마스터'],
         'work-orders': ['작업지시', '생산계획 · 실적 · 재고연동'],
         materials: ['자재·외주', '자재소요 · 외주공정 · 설비'],

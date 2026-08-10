@@ -4,7 +4,9 @@ import productionTraceRouter from './production-trace'
 import productionKpiRouter from './production-kpi'
 import productionQualityRouter from './production-quality'
 import productionOpsRouter from './production-ops'
+import productionCostRouter from './production-cost'
 import { denyIfNoPermission } from '../utils/rbac'
+import { createCostSnapshot } from '../utils/mes-cost'
 
 const app = new Hono<{ Bindings: Bindings; Variables: Variables }>()
 
@@ -30,7 +32,7 @@ app.use('*', async (c, next) => {
   } else if (path.includes('/quality')) {
     const denied = denyIfNoPermission(c, 'quality.write')
     if (denied) return denied
-  } else if (path.includes('/kpi')) {
+  } else if (path.includes('/kpi') || path.includes('/cost')) {
     return c.json({ success: false, error: '권한이 없습니다.' }, 403)
   } else {
     const denied = denyIfNoPermission(c, 'mes.write')
@@ -44,6 +46,7 @@ app.route('/trace', productionTraceRouter)
 app.route('/kpi', productionKpiRouter)
 app.route('/quality', productionQualityRouter)
 app.route('/ops', productionOpsRouter)
+app.route('/cost', productionCostRouter)
 
 type D1Like = Bindings['DB']
 
@@ -852,6 +855,20 @@ app.post('/work-orders/:id/records', async (c) => {
           actual_start_at = ?, actual_end_at = ?, updated_at = datetime('now')
       WHERE id = ? AND tenant_id = ?
     `).bind(newCompleted, newScrap, newStatus, actualStart, actualEnd, id, tenantId).run()
+
+    // Phase 9: 원가 스냅샷
+    try {
+      await createCostSnapshot(DB, tenantId, {
+        work_order_id: Number(id),
+        production_record_id: Number(insert.meta.last_row_id),
+        product_id: Number(wo.product_id),
+        bom_id: wo.bom_id,
+        good_qty: goodQty,
+        scrap_qty: scrapQty
+      })
+    } catch (costErr) {
+      console.error('cost snapshot failed:', costErr)
+    }
 
     return c.json({
       success: true,

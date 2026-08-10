@@ -1130,12 +1130,16 @@ window.refreshMesKpi = async function () {
 
   try {
     const params = { from, to };
-    const [summaryRes, trendRes, productRes, processRes, varianceRes] = await Promise.all([
+    const ym = (to || '').slice(0, 7);
+    const [summaryRes, trendRes, productRes, processRes, varianceRes, costSumRes, costProdRes, costMonthRes] = await Promise.all([
       axios.get(`${API_BASE}/production/kpi/summary`, { params }),
       axios.get(`${API_BASE}/production/kpi/trend`, { params }),
       axios.get(`${API_BASE}/production/kpi/by-product`, { params }),
       axios.get(`${API_BASE}/production/kpi/by-process`, { params }),
-      axios.get(`${API_BASE}/production/kpi/material-variance`, { params })
+      axios.get(`${API_BASE}/production/kpi/material-variance`, { params }),
+      axios.get(`${API_BASE}/production/cost/summary`, { params }),
+      axios.get(`${API_BASE}/production/cost/by-product`, { params }),
+      axios.get(`${API_BASE}/production/cost/monthly`, { params: { year_month: ym } })
     ]);
 
     const s = summaryRes.data.data || {};
@@ -1143,7 +1147,10 @@ window.refreshMesKpi = async function () {
     const products = productRes.data.data?.items || [];
     const processes = processRes.data.data?.items || [];
     const variance = varianceRes.data.data?.items || [];
-    window._mesKpiCache = { s, trend, products, processes, variance, from, to };
+    const cost = costSumRes.data.data || {};
+    const costProducts = costProdRes.data.data?.items || [];
+    const monthly = costMonthRes.data.data || {};
+    window._mesKpiCache = { s, trend, products, processes, variance, cost, costProducts, monthly, from, to };
 
     body.innerHTML = `
       <div class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
@@ -1207,7 +1214,7 @@ window.refreshMesKpi = async function () {
         </div>
       </div>
 
-      <div class="bg-white border rounded-xl overflow-hidden">
+      <div class="bg-white border rounded-xl overflow-hidden mb-6">
         <div class="px-4 py-3 border-b bg-slate-50 font-bold text-sm">공정별 완료 이벤트</div>
         <div class="p-4 grid grid-cols-2 md:grid-cols-4 gap-3">
           ${processes.length ? processes.map((p) => `
@@ -1217,6 +1224,8 @@ window.refreshMesKpi = async function () {
             : '<div class="text-slate-400 text-sm col-span-full">공정 완료 이벤트 없음</div>'}
         </div>
       </div>
+
+      ${renderMesCostSection(cost, costProducts, monthly)}
     `;
 
     renderMesKpiCharts(trend, products);
@@ -1232,6 +1241,110 @@ function mesKpiCard(title, value, sub, valueClass = 'text-slate-800') {
     <div class="text-xs text-slate-400 mt-1">${sub}</div>
   </div>`;
 }
+
+function formatWon(n) {
+  const v = Number(n) || 0;
+  return v.toLocaleString('ko-KR') + '원';
+}
+
+function renderMesCostSection(cost, costProducts, monthly) {
+  const mCost = monthly.cost || {};
+  const mProd = monthly.production || {};
+  return `
+    <div class="border-t border-orange-200 pt-6 mt-2">
+      <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-2 mb-4">
+        <div>
+          <h3 class="text-lg font-bold text-slate-800"><i class="fas fa-coins mr-2 text-amber-600"></i>원가 · 월간 성과</h3>
+          <p class="text-xs text-slate-500 mt-0.5">표준원가(BOM×매입가) · 실적원가 · 불량원가 · ${monthly.year_month || ''} 월간</p>
+        </div>
+        <div class="text-xs text-slate-400">출처: ${cost.source === 'snapshot' ? '실적 스냅샷' : '기간 계산'} · 스냅샷 ${cost.snapshot_count || 0}건</div>
+      </div>
+
+      <div class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
+        ${mesKpiCard('표준원가', formatWon(cost.total_std_cost), `자재표준 ${formatWon(cost.material_std_cost)}`, 'text-slate-800')}
+        ${mesKpiCard('실적원가', formatWon(cost.total_act_cost), `자재실적 ${formatWon(cost.material_act_cost)}`, 'text-orange-700')}
+        ${mesKpiCard('불량원가', formatWon(cost.scrap_cost), `불량 ${cost.scrap_qty || 0} · NCR폐기 ${cost.ncr_scrap_qty || 0}`, 'text-rose-600')}
+        ${mesKpiCard('원가차이', formatWon(cost.variance_cost), Number(cost.variance_cost) > 0 ? '실적 > 표준' : '표준 이내', Number(cost.variance_cost) > 0 ? 'text-rose-600' : 'text-emerald-700')}
+      </div>
+
+      <div class="bg-amber-50 border border-amber-100 rounded-xl p-4 mb-4">
+        <div class="text-sm font-bold text-amber-900 mb-2">${monthly.year_month || '-'} 월간 성과 요약</div>
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
+          <div><div class="text-xs text-amber-700/80">계획달성</div><div class="font-bold">${mProd.plan_achievement_rate || 0}%</div></div>
+          <div><div class="text-xs text-amber-700/80">수율</div><div class="font-bold">${mProd.yield_rate || 0}%</div></div>
+          <div><div class="text-xs text-amber-700/80">월 표준원가</div><div class="font-bold">${formatWon(mCost.total_std_cost)}</div></div>
+          <div><div class="text-xs text-amber-700/80">월 실적원가</div><div class="font-bold">${formatWon(mCost.total_act_cost)}</div></div>
+        </div>
+      </div>
+
+      <div class="bg-white border rounded-xl overflow-hidden">
+        <div class="px-4 py-3 border-b bg-slate-50 font-bold text-sm flex justify-between">
+          <span>제품별 원가</span>
+          <button onclick="exportMesCostExcel()" class="text-xs text-orange-600 font-medium hover:underline">원가 엑셀</button>
+        </div>
+        <div class="overflow-x-auto max-h-80">
+          <table class="w-full text-sm">
+            <thead class="text-xs bg-white sticky top-0 border-b"><tr>
+              <th class="px-3 py-2 text-left">제품</th>
+              <th class="px-3 py-2 text-right">양품</th>
+              <th class="px-3 py-2 text-right">표준원가</th>
+              <th class="px-3 py-2 text-right">실적원가</th>
+              <th class="px-3 py-2 text-right">불량원가</th>
+              <th class="px-3 py-2 text-right">차이</th>
+            </tr></thead>
+            <tbody>${costProducts.length ? costProducts.map((p) => `
+              <tr class="border-t">
+                <td class="px-3 py-2">${p.product_name}<div class="text-xs text-slate-400">${p.product_sku || ''}</div></td>
+                <td class="px-3 py-2 text-right">${p.good_qty}</td>
+                <td class="px-3 py-2 text-right">${formatWon(p.total_std_cost)}</td>
+                <td class="px-3 py-2 text-right">${formatWon(p.total_act_cost)}</td>
+                <td class="px-3 py-2 text-right text-rose-600">${formatWon(p.scrap_cost)}</td>
+                <td class="px-3 py-2 text-right ${Number(p.variance_cost) > 0 ? 'text-rose-600' : ''}">${formatWon(p.variance_cost)}</td>
+              </tr>`).join('')
+              : '<tr><td colspan="6" class="px-3 py-8 text-center text-slate-400">실적 등록 후 원가 스냅샷이 표시됩니다</td></tr>'}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>`;
+}
+
+window.exportMesCostExcel = async function () {
+  if (typeof XLSX === 'undefined') {
+    alert('엑셀 라이브러리를 불러올 수 없습니다.');
+    return;
+  }
+  const from = window._mesKpiRange?.from;
+  const to = window._mesKpiRange?.to;
+  try {
+    const res = await axios.get(`${API_BASE}/production/cost/report`, { params: { from, to } });
+    const d = res.data.data;
+    const s = d.summary || {};
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([
+      ['제조 원가 리포트'],
+      ['기간', `${d.from} ~ ${d.to}`],
+      [],
+      ['표준원가', s.total_std_cost],
+      ['실적원가', s.total_act_cost],
+      ['불량원가', s.scrap_cost],
+      ['외주비', s.outsourcing_cost],
+      ['원가차이', s.variance_cost]
+    ]), '요약');
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet((d.by_product || []).map((p) => ({
+      제품: p.product_name,
+      SKU: p.product_sku,
+      양품: p.good_qty,
+      불량: p.scrap_qty,
+      표준원가: p.total_std_cost,
+      실적원가: p.total_act_cost,
+      불량원가: p.scrap_cost
+    }))), '제품별');
+    XLSX.writeFile(wb, `mes-cost-${from}_${to}.xlsx`);
+  } catch (e) {
+    alert(e.response?.data?.error || e.message);
+  }
+};
 
 function renderMesKpiCharts(trend, products) {
   if (typeof Chart === 'undefined') return;
