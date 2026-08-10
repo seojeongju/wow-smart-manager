@@ -594,8 +594,12 @@ const ERP_STUB_META = {
     icon: 'fa-money-check-alt',
     module: '인사 · 급여',
     phase: 'Phase 5',
-    summary: '급여 계산·공제·이체 명세를 처리합니다.',
-    related: [{ label: '근태', page: 'hr-attendance' }]
+    summary: '구현됨 — 사이드바 ERP → 인사 · 급여 → 급여 메뉴를 이용하세요.',
+    related: [
+      { label: '급여 열기', page: 'hr-payroll' },
+      { label: '근태', page: 'hr-attendance' },
+      { label: '조직 · 사원', page: 'hr-org' }
+    ]
   },
   'hr-talent': {
     title: '채용 · 평가 · 교육',
@@ -885,6 +889,11 @@ async function loadPage(page, subPage = null, opts = {}) {
     case 'hr-attendance':
       updatePageTitle('근태', '출퇴근 · 휴가 · 연장근로');
       if (window.loadHrAttendancePage) await window.loadHrAttendancePage();
+      else content.innerHTML = '<div class="text-center py-10">인사 모듈 로딩 중...</div>';
+      break;
+    case 'hr-payroll':
+      updatePageTitle('급여', '월별 급여대장 · 항목 · 확정');
+      if (window.loadHrPayrollPage) await window.loadHrPayrollPage();
       else content.innerHTML = '<div class="text-center py-10">인사 모듈 로딩 중...</div>';
       break;
     case 'proc-receive':

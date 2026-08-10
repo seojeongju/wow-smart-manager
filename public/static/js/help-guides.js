@@ -563,6 +563,7 @@ const HELP_GUIDES = {
     tips: ['사번은 자동 채번(EMP-…)됩니다.', '근태 이력이 있는 사원 삭제는 퇴직 처리됩니다.'],
     related: [
       { label: '근태', page: 'hr-attendance' },
+      { label: '급여', page: 'hr-payroll' },
       { label: '설정(사용자)', page: 'settings' }
     ]
   },
@@ -575,9 +576,28 @@ const HELP_GUIDES = {
       '동일 사원·날짜 재저장 시 기존 기록이 갱신됩니다.',
       '기간·부서로 조회해 연장 합계를 확인합니다.'
     ],
-    tips: ['급여 정산(다음 단계)에 사용할 기초 데이터입니다.'],
+    tips: ['급여 메뉴에서 월별 근태·연장을 반영한 급여대장을 생성할 수 있습니다.'],
     related: [
-      { label: '조직 · 사원', page: 'hr-org' }
+      { label: '조직 · 사원', page: 'hr-org' },
+      { label: '급여', page: 'hr-payroll' }
+    ]
+  },
+  'hr-payroll': {
+    title: '급여',
+    summary: '월별 급여대장 초안 생성·항목 수정·확정을 처리합니다.',
+    steps: [
+      '조직·사원에서 기본급을 입력합니다.',
+      '해당 월 근태(연장 포함)를 먼저 정리합니다.',
+      '급여에서 연월을 고르고 초안을 생성합니다.',
+      '항목을 수정한 뒤 확정합니다. 확정 후 수정·삭제 불가입니다.'
+    ],
+    tips: [
+      '공제 요율은 간이 값이며 실제 세무 대체가 아닙니다.',
+      '재계산하면 수동 수정분이 덮어씌워집니다.'
+    ],
+    related: [
+      { label: '조직 · 사원', page: 'hr-org' },
+      { label: '근태', page: 'hr-attendance' }
     ]
   },
   'erp-stub:hr-org': {
@@ -595,11 +615,11 @@ const HELP_GUIDES = {
     related: [{ label: '근태 열기', page: 'hr-attendance' }]
   },
   'erp-stub:hr-payroll': {
-    title: '급여 (준비중)',
-    summary: '급여 계산. Phase 5 2차 예정.',
+    title: '급여',
+    summary: '구현됨 — 급여 메뉴를 이용하세요.',
     steps: [],
     tips: [],
-    related: [{ label: '근태', page: 'hr-attendance' }]
+    related: [{ label: '급여 열기', page: 'hr-payroll' }]
   },
   'erp-stub:hr-talent': {
     title: '채용 · 평가 · 교육 (준비중)',
@@ -955,6 +975,7 @@ const HELP_HUB_SECTIONS = [
       { key: 'crm-pipeline', label: '영업 기회' },
       { key: 'hr-org', label: '조직 · 사원' },
       { key: 'hr-attendance', label: '근태' },
+      { key: 'hr-payroll', label: '급여' },
       { key: 'dashboard', label: '대시보드' },
       { key: 'sales:pos', label: '판매(POS)' },
       { key: 'quotations', label: '견적' },

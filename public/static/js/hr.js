@@ -33,6 +33,10 @@ const HR_LEAVE_LABEL = {
 
 let hrMetaCache = null;
 
+function hrWon(n) {
+  return (Number(n) || 0).toLocaleString('ko-KR') + '원';
+}
+
 function hrEsc(s) {
   return String(s ?? '')
     .replace(/&/g, '&amp;')
@@ -102,6 +106,7 @@ window.loadHrOrgPage = async function loadHrOrgPage() {
         icon: 'fa-sitemap',
         actionsHtml: `
           <button type="button" onclick="loadPage('hr-attendance')" class="px-3 py-2 text-sm border border-slate-300 rounded-lg hover:bg-slate-50">근태</button>
+          <button type="button" onclick="loadPage('hr-payroll')" class="px-3 py-2 text-sm border border-slate-300 rounded-lg hover:bg-slate-50">급여</button>
           <button type="button" onclick="reloadHrOrg()" class="px-3 py-2 text-sm border border-slate-300 rounded-lg hover:bg-slate-50"><i class="fas fa-sync-alt"></i></button>`
       })}
 
@@ -185,6 +190,10 @@ window.loadHrOrgPage = async function loadHrOrgPage() {
               <div>
                 <label class="text-xs font-bold text-slate-500">연락처</label>
                 <input id="hrEmpPhone" type="text" class="w-full mt-1 border border-slate-300 rounded-lg px-3 py-2 text-sm">
+              </div>
+              <div>
+                <label class="text-xs font-bold text-slate-500">기본급(원)</label>
+                <input id="hrEmpSalary" type="number" min="0" value="0" class="w-full mt-1 border border-slate-300 rounded-lg px-3 py-2 text-sm">
               </div>
               <div class="flex items-end">
                 <button type="button" onclick="submitHrEmployee()" class="w-full bg-teal-600 hover:bg-teal-700 text-white font-bold py-2 rounded-lg">사원 등록</button>
@@ -274,7 +283,7 @@ window.reloadHrOrg = async function reloadHrOrg() {
             <th class="px-3 py-2">이름</th>
             <th class="px-3 py-2">부서</th>
             <th class="px-3 py-2">직위</th>
-            <th class="px-3 py-2">고용</th>
+            <th class="px-3 py-2">기본급</th>
             <th class="px-3 py-2">상태</th>
             <th class="px-3 py-2">계정</th>
             <th class="px-3 py-2"></th>
@@ -287,7 +296,7 @@ window.reloadHrOrg = async function reloadHrOrg() {
               <td class="px-3 py-2 font-semibold text-slate-800">${hrEsc(e.name)}</td>
               <td class="px-3 py-2">${hrEsc(e.department_name || '-')}</td>
               <td class="px-3 py-2">${hrEsc(e.position || '-')}</td>
-              <td class="px-3 py-2">${HR_EMP_TYPE_LABEL[e.employment_type] || e.employment_type}</td>
+              <td class="px-3 py-2 text-right">${hrWon(e.base_salary)}</td>
               <td class="px-3 py-2">${HR_EMP_STATUS_LABEL[e.status] || e.status}</td>
               <td class="px-3 py-2 text-xs text-slate-500">${hrEsc(e.user_name || '-')}</td>
               <td class="px-3 py-2 text-right whitespace-nowrap">
@@ -344,12 +353,15 @@ window.submitHrEmployee = async function submitHrEmployee() {
       hire_date: document.getElementById('hrEmpHire')?.value || null,
       user_id: document.getElementById('hrEmpUser')?.value || null,
       email: document.getElementById('hrEmpEmail')?.value || null,
-      phone: document.getElementById('hrEmpPhone')?.value || null
+      phone: document.getElementById('hrEmpPhone')?.value || null,
+      base_salary: Number(document.getElementById('hrEmpSalary')?.value) || 0
     });
     ['hrEmpName', 'hrEmpPosition', 'hrEmpEmail', 'hrEmpPhone'].forEach((id) => {
       const el = document.getElementById(id);
       if (el) el.value = '';
     });
+    const sal = document.getElementById('hrEmpSalary');
+    if (sal) sal.value = '0';
     await reloadHrOrg();
   } catch (err) {
     alert(err.response?.data?.error || err.message);
@@ -366,6 +378,8 @@ window.editHrEmployee = async function editHrEmployee(id) {
     if (name == null) return;
     const position = prompt('직위', e.position || '');
     if (position == null) return;
+    const baseSalary = prompt('기본급(원)', String(e.base_salary || 0));
+    if (baseSalary == null) return;
     const status = prompt('상태 (active/leave/resigned)', e.status);
     if (status == null) return;
 
@@ -373,6 +387,7 @@ window.editHrEmployee = async function editHrEmployee(id) {
       name: name.trim(),
       position,
       status,
+      base_salary: Number(baseSalary) || 0,
       department_id: e.department_id,
       employment_type: e.employment_type,
       hire_date: e.hire_date,
@@ -414,6 +429,7 @@ window.loadHrAttendancePage = async function loadHrAttendancePage() {
         icon: 'fa-user-clock',
         actionsHtml: `
           <button type="button" onclick="loadPage('hr-org')" class="px-3 py-2 text-sm border border-slate-300 rounded-lg hover:bg-slate-50">조직 · 사원</button>
+          <button type="button" onclick="loadPage('hr-payroll')" class="px-3 py-2 text-sm border border-slate-300 rounded-lg hover:bg-slate-50">급여</button>
           <button type="button" onclick="reloadHrAttendance()" class="px-3 py-2 text-sm border border-slate-300 rounded-lg hover:bg-slate-50"><i class="fas fa-sync-alt"></i></button>`
       })}
 
@@ -631,6 +647,288 @@ window.deleteHrAttendance = async function deleteHrAttendance(id) {
   try {
     await axios.delete(`${API_BASE}/hr/attendance/${id}`);
     await reloadHrAttendance();
+  } catch (err) {
+    alert(err.response?.data?.error || err.message);
+  }
+};
+
+// ---------- 급여 ----------
+
+function hrCurrentYm() {
+  return new Date().toISOString().slice(0, 7);
+}
+
+let hrPayrollSelectedId = null;
+
+window.loadHrPayrollPage = async function loadHrPayrollPage() {
+  const content = document.getElementById('content');
+  if (!content) return;
+  if (typeof window.setHelpContext === 'function') window.setHelpContext('hr-payroll');
+  hrPayrollSelectedId = null;
+
+  content.innerHTML = `
+    <div class="flex flex-col h-full">
+      ${window.renderPageHeader({
+        title: '급여',
+        subtitle: '월별 급여대장 생성 · 항목 편집 · 확정',
+        icon: 'fa-money-check-alt',
+        actionsHtml: `
+          <button type="button" onclick="loadPage('hr-org')" class="px-3 py-2 text-sm border border-slate-300 rounded-lg hover:bg-slate-50">조직 · 사원</button>
+          <button type="button" onclick="loadPage('hr-attendance')" class="px-3 py-2 text-sm border border-slate-300 rounded-lg hover:bg-slate-50">근태</button>
+          <button type="button" onclick="reloadHrPayroll()" class="px-3 py-2 text-sm border border-slate-300 rounded-lg hover:bg-slate-50"><i class="fas fa-sync-alt"></i></button>`
+      })}
+
+      <div class="grid lg:grid-cols-12 gap-4 flex-1 min-h-0">
+        <div class="lg:col-span-4 space-y-4">
+          <div class="bg-white border border-slate-200 rounded-xl p-4 space-y-3">
+            <h3 class="text-sm font-bold text-slate-800">급여대장 생성</h3>
+            <div>
+              <label class="text-xs font-bold text-slate-500">연월 *</label>
+              <input id="hrPayYm" type="month" value="${hrCurrentYm()}" class="w-full mt-1 border border-slate-300 rounded-lg px-3 py-2 text-sm">
+            </div>
+            <p class="text-xs text-slate-500">재직/휴직 사원의 기본급·해당 월 근태(연장)로 초안을 만듭니다. 공제는 간이 요율(국민 4.5%·건강 3.545%·고용 0.9%·소득세 3%)이며 확정 전 수정 가능합니다.</p>
+            <button type="button" onclick="createHrPayrollRun()" class="w-full bg-teal-600 hover:bg-teal-700 text-white font-bold py-2 rounded-lg">초안 생성</button>
+          </div>
+          <div class="bg-white border border-slate-200 rounded-xl overflow-hidden">
+            <div class="px-4 py-3 border-b border-slate-100 text-sm font-bold text-slate-700">급여대장 목록</div>
+            <div id="hrPayRunList" class="p-3 text-sm text-slate-400">로딩...</div>
+          </div>
+        </div>
+
+        <div class="lg:col-span-8 space-y-4">
+          <div id="hrPaySummary" class="grid grid-cols-2 lg:grid-cols-4 gap-3"></div>
+          <div id="hrPayActions" class="hidden flex flex-wrap gap-2"></div>
+          <div class="bg-white border border-slate-200 rounded-xl overflow-hidden">
+            <div id="hrPayItems" class="overflow-x-auto p-4 text-center text-slate-400">
+              왼쪽에서 급여대장을 선택하세요.
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  `;
+
+  await reloadHrPayroll();
+};
+
+window.reloadHrPayroll = async function reloadHrPayroll() {
+  const listEl = document.getElementById('hrPayRunList');
+  if (!listEl) return;
+  try {
+    const res = await axios.get(`${API_BASE}/hr/payroll/runs`);
+    const runs = res.data?.data || [];
+    if (!runs.length) {
+      listEl.innerHTML = '<p class="text-slate-400 px-1">생성된 급여대장이 없습니다.</p>';
+    } else {
+      listEl.innerHTML = `<ul class="divide-y divide-slate-100">${runs.map((r) => {
+        const active = String(hrPayrollSelectedId) === String(r.id);
+        const badge = r.status === 'confirmed'
+          ? '<span class="text-[10px] px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-700">확정</span>'
+          : '<span class="text-[10px] px-1.5 py-0.5 rounded bg-amber-100 text-amber-700">초안</span>';
+        return `
+          <li class="py-2.5 px-2 rounded-lg cursor-pointer ${active ? 'bg-teal-50' : 'hover:bg-slate-50'}"
+              onclick="openHrPayrollRun(${r.id})">
+            <div class="flex items-center justify-between gap-2">
+              <div class="font-semibold text-slate-800 text-sm">${hrEsc(r.period_ym)} ${badge}</div>
+              <div class="text-xs text-slate-500">${r.item_count || 0}명</div>
+            </div>
+            <div class="text-xs text-slate-500 mt-0.5">실지급 ${hrWon(r.total_net)}</div>
+          </li>`;
+      }).join('')}</ul>`;
+    }
+    if (hrPayrollSelectedId) await openHrPayrollRun(hrPayrollSelectedId, false);
+  } catch (err) {
+    listEl.innerHTML = `<p class="text-rose-600">${hrEsc(err.response?.data?.error || err.message)}</p>`;
+  }
+};
+
+window.createHrPayrollRun = async function createHrPayrollRun() {
+  const period_ym = document.getElementById('hrPayYm')?.value;
+  if (!period_ym) return alert('연월을 선택하세요.');
+  try {
+    const res = await axios.post(`${API_BASE}/hr/payroll/runs`, { period_ym });
+    hrPayrollSelectedId = res.data?.data?.id || null;
+    await reloadHrPayroll();
+  } catch (err) {
+    alert(err.response?.data?.error || err.message);
+  }
+};
+
+window.openHrPayrollRun = async function openHrPayrollRun(id, refreshList = true) {
+  hrPayrollSelectedId = id;
+  const itemsEl = document.getElementById('hrPayItems');
+  const summaryEl = document.getElementById('hrPaySummary');
+  const actionsEl = document.getElementById('hrPayActions');
+  if (!itemsEl) return;
+
+  try {
+    const res = await axios.get(`${API_BASE}/hr/payroll/runs/${id}`);
+    if (!res.data?.success) throw new Error(res.data?.error || '조회 실패');
+    const { run, items } = res.data.data;
+    const draft = run.status !== 'confirmed';
+
+    if (summaryEl) {
+      summaryEl.innerHTML = [
+        { label: '연월', value: run.period_ym },
+        { label: '지급총액', value: hrWon(run.total_gross) },
+        { label: '공제합계', value: hrWon(run.total_deduction) },
+        { label: '실지급', value: hrWon(run.total_net) }
+      ].map((it) => `
+        <div class="rounded-xl border border-slate-200 bg-white p-4">
+          <div class="text-xs font-bold text-slate-500">${it.label}</div>
+          <div class="text-lg font-bold text-slate-900 mt-1">${it.value}</div>
+        </div>
+      `).join('');
+    }
+
+    if (actionsEl) {
+      actionsEl.classList.remove('hidden');
+      actionsEl.className = 'flex flex-wrap gap-2';
+      actionsEl.innerHTML = draft ? `
+        <button type="button" onclick="recalcHrPayrollRun(${run.id})" class="px-3 py-2 text-sm border border-slate-300 rounded-lg hover:bg-slate-50">근태 기준 재계산</button>
+        <button type="button" onclick="confirmHrPayrollRun(${run.id})" class="px-3 py-2 text-sm bg-emerald-600 text-white rounded-lg hover:bg-emerald-700">확정</button>
+        <button type="button" onclick="deleteHrPayrollRun(${run.id})" class="px-3 py-2 text-sm text-rose-600 border border-rose-200 rounded-lg hover:bg-rose-50">삭제</button>
+      ` : `
+        <span class="text-sm text-emerald-700 font-semibold py-2">확정됨${run.confirmed_at ? ` · ${hrEsc(run.confirmed_at)}` : ''}</span>
+      `;
+    }
+
+    if (!items?.length) {
+      itemsEl.innerHTML = '<p class="text-slate-400 py-6">항목이 없습니다.</p>';
+    } else {
+      itemsEl.innerHTML = `
+        <table class="min-w-full text-sm text-left">
+          <thead class="bg-slate-50 text-slate-600 text-xs uppercase">
+            <tr>
+              <th class="px-3 py-2">사원</th>
+              <th class="px-3 py-2">근태</th>
+              <th class="px-3 py-2 text-right">기본급</th>
+              <th class="px-3 py-2 text-right">연장</th>
+              <th class="px-3 py-2 text-right">수당/상여</th>
+              <th class="px-3 py-2 text-right">공제</th>
+              <th class="px-3 py-2 text-right">실지급</th>
+              <th class="px-3 py-2"></th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-slate-100">
+            ${items.map((it) => `
+              <tr class="hover:bg-slate-50">
+                <td class="px-3 py-2 font-semibold">${hrEsc(it.employee_name)}
+                  <span class="block text-xs font-normal text-slate-400">${hrEsc(it.employee_number)} · ${hrEsc(it.department_name || '-')}</span>
+                </td>
+                <td class="px-3 py-2 text-xs text-slate-600 whitespace-nowrap">
+                  출근 ${it.work_days} · 지각 ${it.late_days}<br>
+                  결근 ${it.absent_days} · 휴가 ${it.leave_days}<br>
+                  연장 ${it.overtime_minutes}분
+                </td>
+                <td class="px-3 py-2 text-right">${hrWon(it.base_pay)}</td>
+                <td class="px-3 py-2 text-right">${hrWon(it.overtime_pay)}</td>
+                <td class="px-3 py-2 text-right">${hrWon((Number(it.allowance)||0)+(Number(it.bonus)||0))}</td>
+                <td class="px-3 py-2 text-right">${hrWon(it.deduction_total)}</td>
+                <td class="px-3 py-2 text-right font-bold">${hrWon(it.net_pay)}</td>
+                <td class="px-3 py-2 text-right">
+                  ${draft ? `<button type="button" onclick='editHrPayrollItem(${JSON.stringify({
+                    id: it.id,
+                    base_pay: it.base_pay,
+                    overtime_pay: it.overtime_pay,
+                    allowance: it.allowance,
+                    bonus: it.bonus,
+                    national_pension: it.national_pension,
+                    health_insurance: it.health_insurance,
+                    employment_insurance: it.employment_insurance,
+                    income_tax: it.income_tax,
+                    other_deduction: it.other_deduction
+                  })})' class="text-teal-600 hover:underline text-xs">수정</button>` : ''}
+                </td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
+      `;
+    }
+
+    if (refreshList) {
+      const listRes = await axios.get(`${API_BASE}/hr/payroll/runs`);
+      const runs = listRes.data?.data || [];
+      const listEl = document.getElementById('hrPayRunList');
+      if (listEl && runs.length) {
+        listEl.innerHTML = `<ul class="divide-y divide-slate-100">${runs.map((r) => {
+          const active = String(hrPayrollSelectedId) === String(r.id);
+          const badge = r.status === 'confirmed'
+            ? '<span class="text-[10px] px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-700">확정</span>'
+            : '<span class="text-[10px] px-1.5 py-0.5 rounded bg-amber-100 text-amber-700">초안</span>';
+          return `
+            <li class="py-2.5 px-2 rounded-lg cursor-pointer ${active ? 'bg-teal-50' : 'hover:bg-slate-50'}"
+                onclick="openHrPayrollRun(${r.id})">
+              <div class="flex items-center justify-between gap-2">
+                <div class="font-semibold text-slate-800 text-sm">${hrEsc(r.period_ym)} ${badge}</div>
+                <div class="text-xs text-slate-500">${r.item_count || 0}명</div>
+              </div>
+              <div class="text-xs text-slate-500 mt-0.5">실지급 ${hrWon(r.total_net)}</div>
+            </li>`;
+        }).join('')}</ul>`;
+      }
+    }
+  } catch (err) {
+    itemsEl.innerHTML = `<p class="text-rose-600 py-4">${hrEsc(err.response?.data?.error || err.message)}</p>`;
+  }
+};
+
+window.editHrPayrollItem = async function editHrPayrollItem(item) {
+  const fields = [
+    ['base_pay', '기본급'],
+    ['overtime_pay', '연장수당'],
+    ['allowance', '수당'],
+    ['bonus', '상여'],
+    ['national_pension', '국민연금'],
+    ['health_insurance', '건강보험'],
+    ['employment_insurance', '고용보험'],
+    ['income_tax', '소득세'],
+    ['other_deduction', '기타공제']
+  ];
+  const payload = {};
+  for (const [key, label] of fields) {
+    const v = prompt(label, String(item[key] ?? 0));
+    if (v == null) return;
+    payload[key] = Number(v) || 0;
+  }
+  try {
+    await axios.put(`${API_BASE}/hr/payroll/items/${item.id}`, payload);
+    await openHrPayrollRun(hrPayrollSelectedId);
+  } catch (err) {
+    alert(err.response?.data?.error || err.message);
+  }
+};
+
+window.recalcHrPayrollRun = async function recalcHrPayrollRun(id) {
+  if (!confirm('근태·기본급 기준으로 항목을 다시 계산할까요? 수동 수정분은 덮어씁니다.')) return;
+  try {
+    await axios.post(`${API_BASE}/hr/payroll/runs/${id}/recalculate`);
+    await openHrPayrollRun(id);
+  } catch (err) {
+    alert(err.response?.data?.error || err.message);
+  }
+};
+
+window.confirmHrPayrollRun = async function confirmHrPayrollRun(id) {
+  if (!confirm('이 급여대장을 확정할까요? 이후 수정·삭제가 불가합니다.')) return;
+  try {
+    await axios.post(`${API_BASE}/hr/payroll/runs/${id}/confirm`);
+    await openHrPayrollRun(id);
+  } catch (err) {
+    alert(err.response?.data?.error || err.message);
+  }
+};
+
+window.deleteHrPayrollRun = async function deleteHrPayrollRun(id) {
+  if (!confirm('초안 급여대장을 삭제할까요?')) return;
+  try {
+    await axios.delete(`${API_BASE}/hr/payroll/runs/${id}`);
+    hrPayrollSelectedId = null;
+    document.getElementById('hrPayItems').innerHTML = '왼쪽에서 급여대장을 선택하세요.';
+    document.getElementById('hrPaySummary').innerHTML = '';
+    document.getElementById('hrPayActions').classList.add('hidden');
+    await reloadHrPayroll();
   } catch (err) {
     alert(err.response?.data?.error || err.message);
   }
