@@ -1116,6 +1116,10 @@ app.get('/', (c: Context) => {
                                                                     <i class="fas fa-chart-pie w-6 text-center text-lg mr-3"></i>
                                                                     <span class="font-medium">제조 KPI</span>
                                                                 </a>
+                                                                <a href="#" data-page="production" data-tab="quality" class="nav-link flex items-center px-4 py-3 rounded-lg group" onclick="closeSidebarOnMobile()">
+                                                                    <i class="fas fa-clipboard-check w-6 text-center text-lg mr-3"></i>
+                                                                    <span class="font-medium">품질관리</span>
+                                                                </a>
                                                                 <a href="#" data-page="qr-dashboard" class="nav-link flex items-center px-4 py-3 rounded-lg group" onclick="closeSidebarOnMobile()">
                                                                     <i class="fas fa-chart-line w-6 text-center text-lg mr-3"></i>
                                                                     <span class="font-medium">QR 대시보드</span>
@@ -1293,7 +1297,7 @@ app.get('/', (c: Context) => {
                                             <script src="/static/js/tracking.js?v=1"></script>
                                             <script src="/static/js/transaction-statement.js?v=1"></script>
                                             <script src="/static/js/qr-mes.js?v=1"></script>
-                                            <script src="/static/js/production.js?v=3"></script>
+                                            <script src="/static/js/production.js?v=4"></script>
                                         </body>
                                     </html>
                                     `)

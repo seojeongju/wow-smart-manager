@@ -24,7 +24,7 @@ window.loadProductionPage = async function (initialTab = 'work-orders') {
         <h1 class="text-2xl font-bold text-slate-800">
           <i class="fas fa-industry mr-2 text-orange-600"></i>생산 MES
         </h1>
-        <p class="text-sm text-slate-500 mt-1">작업지시 · BOM · 공정 · 실적 · 추적 · KPI</p>
+        <p class="text-sm text-slate-500 mt-1">작업지시 · BOM · 공정 · 실적 · 추적 · KPI · 품질</p>
       </div>
       <div id="mes-stats" class="grid grid-cols-2 md:grid-cols-4 gap-2 text-sm"></div>
     </div>
@@ -35,6 +35,7 @@ window.loadProductionPage = async function (initialTab = 'work-orders') {
       <button onclick="switchMesTab('processes')" id="mes-tab-processes" class="px-5 py-3 text-sm font-medium border-b-2 whitespace-nowrap">공정</button>
       <button onclick="switchMesTab('trace')" id="mes-tab-trace" class="px-5 py-3 text-sm font-medium border-b-2 whitespace-nowrap">생산 추적</button>
       <button onclick="switchMesTab('kpi')" id="mes-tab-kpi" class="px-5 py-3 text-sm font-medium border-b-2 whitespace-nowrap">KPI/리포트</button>
+      <button onclick="switchMesTab('quality')" id="mes-tab-quality" class="px-5 py-3 text-sm font-medium border-b-2 whitespace-nowrap">품질</button>
     </div>
 
     <div id="mes-tab-content"></div>
@@ -63,7 +64,7 @@ async function refreshMesStats() {
 }
 
 window.switchMesTab = function (tabName) {
-  ['work-orders', 'boms', 'processes', 'trace', 'kpi'].forEach((t) => {
+  ['work-orders', 'boms', 'processes', 'trace', 'kpi', 'quality'].forEach((t) => {
     const btn = document.getElementById(`mes-tab-${t}`);
     if (!btn) return;
     if (t === tabName) {
@@ -79,7 +80,8 @@ window.switchMesTab = function (tabName) {
   else if (tabName === 'boms') loadMesBoms();
   else if (tabName === 'processes') loadMesProcesses();
   else if (tabName === 'trace') loadMesTrace();
-  else loadMesKpi();
+  else if (tabName === 'kpi') loadMesKpi();
+  else loadMesQuality();
 };
 
 // ---------- 작업지시 ----------
@@ -1283,3 +1285,431 @@ window.exportMesKpiExcel = async function () {
     alert(e.response?.data?.error || e.message);
   }
 };
+
+// ---------- 품질관리 (Phase 4) ----------
+const MES_NCR_STATUS = {
+  open: '접수',
+  rework: '재작업',
+  scrap: '폐기',
+  closed: '종결'
+};
+const MES_NCR_CLASS = {
+  open: 'bg-rose-100 text-rose-700',
+  rework: 'bg-amber-100 text-amber-800',
+  scrap: 'bg-slate-200 text-slate-700',
+  closed: 'bg-emerald-100 text-emerald-700'
+};
+
+async function loadMesQuality() {
+  const container = document.getElementById('mes-tab-content');
+  container.innerHTML = '<div class="text-center py-10"><i class="fas fa-spinner fa-spin text-3xl text-orange-500"></i></div>';
+
+  try {
+    const [statsRes, inspRes, ncrRes, defectRes] = await Promise.all([
+      axios.get(`${API_BASE}/production/quality/stats`),
+      axios.get(`${API_BASE}/production/quality/inspections`),
+      axios.get(`${API_BASE}/production/quality/ncrs`),
+      axios.get(`${API_BASE}/production/quality/defect-types`)
+    ]);
+    const stats = statsRes.data.data || {};
+    const inspections = inspRes.data.data || [];
+    const ncrs = ncrRes.data.data || [];
+    const defects = defectRes.data.data || [];
+    window._mesDefectTypes = defects;
+
+    container.innerHTML = `
+      <div class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
+        <div class="bg-white border rounded-xl p-4"><div class="text-xs text-slate-500">오늘 검사</div><div class="text-2xl font-bold">${stats.inspections_today || 0}</div></div>
+        <div class="bg-white border rounded-xl p-4"><div class="text-xs text-slate-500">오늘 불합격</div><div class="text-2xl font-bold text-rose-600">${stats.fails_today || 0}</div></div>
+        <div class="bg-white border rounded-xl p-4"><div class="text-xs text-slate-500">열린 NCR</div><div class="text-2xl font-bold text-amber-700">${stats.open_ncrs || 0}</div></div>
+        <div class="bg-white border rounded-xl p-4"><div class="text-xs text-slate-500">30일 합격률</div><div class="text-2xl font-bold text-emerald-700">${stats.pass_rate_30d || 0}%</div></div>
+      </div>
+
+      <div class="flex flex-wrap gap-2 mb-4">
+        <button onclick="showMesInspectionModal()" class="bg-orange-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-orange-700"><i class="fas fa-plus mr-1"></i>검사 등록</button>
+        <button onclick="showMesNcrModal()" class="bg-slate-800 text-white px-4 py-2 rounded-lg text-sm hover:bg-slate-900"><i class="fas fa-exclamation-triangle mr-1"></i>NCR 등록</button>
+        <button onclick="showMesDefectTypeModal()" class="border px-4 py-2 rounded-lg text-sm hover:bg-slate-50">불량유형 관리</button>
+      </div>
+
+      <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <div class="bg-white border rounded-xl overflow-hidden">
+          <div class="px-4 py-3 border-b bg-slate-50 font-bold text-sm">최근 검사</div>
+          <div class="overflow-x-auto max-h-96">
+            <table class="w-full text-sm">
+              <thead class="text-xs border-b sticky top-0 bg-white"><tr>
+                <th class="px-3 py-2 text-left">일시</th><th class="px-3 py-2 text-left">제품/WO</th>
+                <th class="px-3 py-2 text-left">결과</th><th class="px-3 py-2 text-right">수량</th>
+              </tr></thead>
+              <tbody>
+                ${inspections.length ? inspections.slice(0, 50).map((i) => `
+                  <tr class="border-t hover:bg-slate-50 cursor-pointer" onclick="showMesInspectionDetail(${i.id})">
+                    <td class="px-3 py-2 text-xs">${(i.inspected_at || '').replace('T', ' ').slice(0, 16)}</td>
+                    <td class="px-3 py-2">${i.product_name}<div class="text-xs text-slate-400">${i.wo_number || i.lot_number || ''}</div></td>
+                    <td class="px-3 py-2">${i.result === 'pass' ? '<span class="text-emerald-600 font-medium">합격</span>' : '<span class="text-rose-600 font-medium">불합격</span>'}</td>
+                    <td class="px-3 py-2 text-right">${i.inspected_qty}${i.defect_qty ? ` / 불량 ${i.defect_qty}` : ''}</td>
+                  </tr>`).join('') : '<tr><td colspan="4" class="px-3 py-8 text-center text-slate-400">검사 기록 없음</td></tr>'}
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="bg-white border rounded-xl overflow-hidden">
+          <div class="px-4 py-3 border-b bg-slate-50 font-bold text-sm flex justify-between">
+            <span>부적합(NCR)</span>
+            <select id="mes-ncr-filter" onchange="filterMesNcrs()" class="text-xs border rounded px-2 py-1 font-normal">
+              <option value="">전체</option><option value="open">접수</option><option value="rework">재작업</option><option value="closed">종결</option>
+            </select>
+          </div>
+          <div class="overflow-x-auto max-h-96">
+            <table class="w-full text-sm">
+              <thead class="text-xs border-b sticky top-0 bg-white"><tr>
+                <th class="px-3 py-2 text-left">NCR</th><th class="px-3 py-2 text-left">제목</th>
+                <th class="px-3 py-2 text-left">상태</th><th class="px-3 py-2 text-right">처리</th>
+              </tr></thead>
+              <tbody id="mes-ncr-tbody">
+                ${renderMesNcrRows(ncrs)}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    `;
+    window._mesNcrsCache = ncrs;
+  } catch (e) {
+    container.innerHTML = `<div class="text-center py-10 text-rose-600">${e.response?.data?.error || e.message}</div>`;
+  }
+}
+
+function renderMesNcrRows(ncrs) {
+  if (!ncrs.length) return '<tr><td colspan="4" class="px-3 py-8 text-center text-slate-400">NCR 없음</td></tr>';
+  return ncrs.map((n) => `
+    <tr class="border-t hover:bg-slate-50">
+      <td class="px-3 py-2 font-mono text-xs">${n.ncr_number}<div class="text-slate-400">${n.lot_number || n.wo_number || ''}</div></td>
+      <td class="px-3 py-2">${n.title}<div class="text-xs text-slate-400">${n.product_name || ''} ${n.defect_name ? '· ' + n.defect_name : ''}</div></td>
+      <td class="px-3 py-2"><span class="px-2 py-0.5 rounded-full text-xs ${MES_NCR_CLASS[n.status] || ''}">${MES_NCR_STATUS[n.status] || n.status}</span></td>
+      <td class="px-3 py-2 text-right">
+        ${n.status !== 'closed' ? `<button onclick="showMesNcrDispose(${n.id})" class="text-orange-600 hover:underline text-xs">처리</button>` : `<button onclick="showMesNcrDetail(${n.id})" class="text-slate-500 hover:underline text-xs">상세</button>`}
+      </td>
+    </tr>`).join('');
+}
+
+window.filterMesNcrs = async function () {
+  const status = document.getElementById('mes-ncr-filter')?.value || '';
+  try {
+    const res = await axios.get(`${API_BASE}/production/quality/ncrs`, { params: { status } });
+    document.getElementById('mes-ncr-tbody').innerHTML = renderMesNcrRows(res.data.data || []);
+  } catch (e) {
+    alert(e.response?.data?.error || e.message);
+  }
+};
+
+window.showMesInspectionModal = async function () {
+  const [woRes, productsRes] = await Promise.all([
+    axios.get(`${API_BASE}/production/work-orders`),
+    axios.get(`${API_BASE}/products`, { params: { limit: 300 } })
+  ]);
+  const wos = (woRes.data.data || []).filter((w) => !['cancelled'].includes(w.status));
+  const products = productsRes.data.data || productsRes.data || [];
+  const defects = window._mesDefectTypes || [];
+
+  document.getElementById('mes-modals').innerHTML = `
+    <div class="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4" onclick="if(event.target===this)closeMesModal()">
+      <div class="bg-white rounded-xl shadow-xl w-full max-w-lg max-h-[90vh] overflow-y-auto p-6">
+        <h3 class="text-lg font-bold mb-4">검사 등록</h3>
+        <div class="space-y-3 text-sm">
+          <div>
+            <label class="text-slate-600">작업지시</label>
+            <select id="mes-insp-wo" class="w-full border rounded-lg px-3 py-2 mt-1">
+              <option value="">선택 안 함</option>
+              ${wos.map((w) => `<option value="${w.id}" data-product="${w.product_id}">${w.wo_number} — ${w.product_name}</option>`).join('')}
+            </select>
+          </div>
+          <div>
+            <label class="text-slate-600">상품</label>
+            <select id="mes-insp-product" class="w-full border rounded-lg px-3 py-2 mt-1">
+              <option value="">선택</option>
+              ${products.map((p) => `<option value="${p.id}">${p.name} (${p.sku})</option>`).join('')}
+            </select>
+          </div>
+          <div class="grid grid-cols-2 gap-3">
+            <div><label class="text-slate-600">검사수량</label><input id="mes-insp-qty" type="number" min="0.01" step="any" value="1" class="w-full border rounded-lg px-3 py-2 mt-1"></div>
+            <div><label class="text-slate-600">불량수량</label><input id="mes-insp-defect-qty" type="number" min="0" step="any" value="0" class="w-full border rounded-lg px-3 py-2 mt-1"></div>
+          </div>
+          <div>
+            <label class="text-slate-600">결과</label>
+            <select id="mes-insp-result" class="w-full border rounded-lg px-3 py-2 mt-1" onchange="document.getElementById('mes-insp-defect-block').classList.toggle('hidden', this.value!=='fail')">
+              <option value="pass">합격</option><option value="fail">불합격</option>
+            </select>
+          </div>
+          <div id="mes-insp-defect-block" class="hidden space-y-2">
+            <label class="text-slate-600">불량 유형</label>
+            <select id="mes-insp-defect-type" class="w-full border rounded-lg px-3 py-2">
+              <option value="">선택</option>
+              ${defects.map((d) => `<option value="${d.id}">${d.code} — ${d.name}</option>`).join('')}
+            </select>
+            <label class="flex items-center gap-2 text-xs text-slate-600"><input id="mes-insp-create-ncr" type="checkbox" checked> 불합격 시 NCR 자동 생성</label>
+          </div>
+          <div><label class="text-slate-600">Lot / QR</label>
+            <div class="grid grid-cols-2 gap-2 mt-1">
+              <input id="mes-insp-lot" class="border rounded-lg px-3 py-2" placeholder="Lot">
+              <input id="mes-insp-qr" class="border rounded-lg px-3 py-2" placeholder="QR 코드">
+            </div>
+          </div>
+          <div>
+            <label class="text-slate-600">클레임 ID (선택)</label>
+            <input id="mes-insp-claim" type="number" class="w-full border rounded-lg px-3 py-2 mt-1" placeholder="claims.id">
+          </div>
+          <div><label class="text-slate-600">메모</label><textarea id="mes-insp-notes" class="w-full border rounded-lg px-3 py-2 mt-1" rows="2"></textarea></div>
+        </div>
+        <div class="flex justify-end gap-2 mt-6">
+          <button onclick="closeMesModal()" class="px-4 py-2 rounded-lg border">취소</button>
+          <button onclick="submitMesInspection()" class="px-4 py-2 rounded-lg bg-orange-600 text-white">등록</button>
+        </div>
+      </div>
+    </div>
+  `;
+
+  document.getElementById('mes-insp-wo').addEventListener('change', function () {
+    const opt = this.selectedOptions[0];
+    const pid = opt?.getAttribute('data-product');
+    if (pid) document.getElementById('mes-insp-product').value = pid;
+  });
+};
+
+window.submitMesInspection = async function () {
+  const result = document.getElementById('mes-insp-result').value;
+  const defectTypeId = document.getElementById('mes-insp-defect-type')?.value;
+  const payload = {
+    work_order_id: document.getElementById('mes-insp-wo').value || null,
+    product_id: document.getElementById('mes-insp-product').value || null,
+    inspected_qty: Number(document.getElementById('mes-insp-qty').value) || 1,
+    defect_qty: Number(document.getElementById('mes-insp-defect-qty').value) || 0,
+    result,
+    lot_number: document.getElementById('mes-insp-lot').value || null,
+    qr_code: document.getElementById('mes-insp-qr').value || null,
+    claim_id: document.getElementById('mes-insp-claim').value || null,
+    notes: document.getElementById('mes-insp-notes').value || null,
+    create_ncr: document.getElementById('mes-insp-create-ncr')?.checked !== false,
+    defects: result === 'fail' && defectTypeId ? [{ defect_type_id: Number(defectTypeId), quantity: Number(document.getElementById('mes-insp-defect-qty').value) || 1 }] : []
+  };
+  if (!payload.product_id && !payload.work_order_id) {
+    alert('작업지시 또는 상품을 선택해주세요.');
+    return;
+  }
+  try {
+    const res = await axios.post(`${API_BASE}/production/quality/inspections`, payload);
+    alert(res.data.message + (res.data.data?.ncr ? `\nNCR: ${res.data.data.ncr.ncr_number}` : ''));
+    closeMesModal();
+    loadMesQuality();
+  } catch (e) {
+    alert(e.response?.data?.error || e.message);
+  }
+};
+
+window.showMesInspectionDetail = async function (id) {
+  try {
+    const res = await axios.get(`${API_BASE}/production/quality/inspections/${id}`);
+    const i = res.data.data;
+    alert(`검사 #${i.id}\n결과: ${i.result === 'pass' ? '합격' : '불합격'}\n제품: ${i.product_name}\nWO: ${i.wo_number || '-'}\nLot: ${i.lot_number || '-'}\n검사/불량: ${i.inspected_qty} / ${i.defect_qty}\n불량유형: ${(i.defects || []).map((d) => d.defect_name).join(', ') || '-'}\n메모: ${i.notes || '-'}`);
+  } catch (e) {
+    alert(e.response?.data?.error || e.message);
+  }
+};
+
+window.showMesNcrModal = async function () {
+  const [woRes, productsRes, defectRes] = await Promise.all([
+    axios.get(`${API_BASE}/production/work-orders`),
+    axios.get(`${API_BASE}/products`, { params: { limit: 300 } }),
+    axios.get(`${API_BASE}/production/quality/defect-types`)
+  ]);
+  const wos = woRes.data.data || [];
+  const products = productsRes.data.data || productsRes.data || [];
+  const defects = defectRes.data.data || [];
+
+  document.getElementById('mes-modals').innerHTML = `
+    <div class="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4" onclick="if(event.target===this)closeMesModal()">
+      <div class="bg-white rounded-xl shadow-xl w-full max-w-lg max-h-[90vh] overflow-y-auto p-6">
+        <h3 class="text-lg font-bold mb-4">NCR 등록</h3>
+        <div class="space-y-3 text-sm">
+          <div><label>제목 *</label><input id="mes-ncr-title" class="w-full border rounded-lg px-3 py-2 mt-1"></div>
+          <div>
+            <label>작업지시</label>
+            <select id="mes-ncr-wo" class="w-full border rounded-lg px-3 py-2 mt-1">
+              <option value="">선택 안 함</option>
+              ${wos.map((w) => `<option value="${w.id}" data-product="${w.product_id}">${w.wo_number} — ${w.product_name}</option>`).join('')}
+            </select>
+          </div>
+          <div>
+            <label>상품</label>
+            <select id="mes-ncr-product" class="w-full border rounded-lg px-3 py-2 mt-1">
+              <option value="">선택</option>
+              ${products.map((p) => `<option value="${p.id}">${p.name} (${p.sku})</option>`).join('')}
+            </select>
+          </div>
+          <div class="grid grid-cols-2 gap-3">
+            <div><label>수량</label><input id="mes-ncr-qty" type="number" min="0.01" value="1" class="w-full border rounded-lg px-3 py-2 mt-1"></div>
+            <div><label>Lot</label><input id="mes-ncr-lot" class="w-full border rounded-lg px-3 py-2 mt-1"></div>
+          </div>
+          <div>
+            <label>불량 유형</label>
+            <select id="mes-ncr-defect" class="w-full border rounded-lg px-3 py-2 mt-1">
+              <option value="">선택</option>
+              ${defects.map((d) => `<option value="${d.id}">${d.code} — ${d.name}</option>`).join('')}
+            </select>
+          </div>
+          <div><label>클레임 ID</label><input id="mes-ncr-claim" type="number" class="w-full border rounded-lg px-3 py-2 mt-1" placeholder="선택"></div>
+          <div><label>설명</label><textarea id="mes-ncr-desc" class="w-full border rounded-lg px-3 py-2 mt-1" rows="3"></textarea></div>
+        </div>
+        <div class="flex justify-end gap-2 mt-6">
+          <button onclick="closeMesModal()" class="px-4 py-2 rounded-lg border">취소</button>
+          <button onclick="submitMesNcr()" class="px-4 py-2 rounded-lg bg-slate-800 text-white">등록</button>
+        </div>
+      </div>
+    </div>
+  `;
+};
+
+window.submitMesNcr = async function () {
+  const payload = {
+    title: document.getElementById('mes-ncr-title').value.trim(),
+    work_order_id: document.getElementById('mes-ncr-wo').value || null,
+    product_id: document.getElementById('mes-ncr-product').value || null,
+    quantity: Number(document.getElementById('mes-ncr-qty').value) || 1,
+    lot_number: document.getElementById('mes-ncr-lot').value || null,
+    defect_type_id: document.getElementById('mes-ncr-defect').value || null,
+    claim_id: document.getElementById('mes-ncr-claim').value || null,
+    description: document.getElementById('mes-ncr-desc').value || null
+  };
+  if (!payload.title) {
+    alert('제목을 입력해주세요.');
+    return;
+  }
+  try {
+    const res = await axios.post(`${API_BASE}/production/quality/ncrs`, payload);
+    alert(`NCR 등록: ${res.data.data.ncr_number}`);
+    closeMesModal();
+    loadMesQuality();
+  } catch (e) {
+    alert(e.response?.data?.error || e.message);
+  }
+};
+
+window.showMesNcrDetail = async function (id) {
+  try {
+    const res = await axios.get(`${API_BASE}/production/quality/ncrs/${id}`);
+    const n = res.data.data;
+    alert(`${n.ncr_number}\n${n.title}\n상태: ${MES_NCR_STATUS[n.status] || n.status}\n처리: ${n.disposition || '-'}\nLot: ${n.lot_number || '-'}\n클레임: ${n.claim_id || '-'}\n조치: ${n.action_notes || '-'}`);
+  } catch (e) {
+    alert(e.response?.data?.error || e.message);
+  }
+};
+
+window.showMesNcrDispose = async function (id) {
+  const whRes = await axios.get(`${API_BASE}/warehouses`);
+  const warehouses = whRes.data.data || whRes.data || [];
+
+  document.getElementById('mes-modals').innerHTML = `
+    <div class="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4" onclick="if(event.target===this)closeMesModal()">
+      <div class="bg-white rounded-xl shadow-xl w-full max-w-md p-6">
+        <h3 class="text-lg font-bold mb-4">NCR 처리</h3>
+        <div class="space-y-3 text-sm">
+          <div>
+            <label>처리 구분</label>
+            <select id="mes-ncr-disp" class="w-full border rounded-lg px-3 py-2 mt-1" onchange="document.getElementById('mes-ncr-scrap-block').classList.toggle('hidden', this.value!=='scrap')">
+              <option value="rework">재작업</option>
+              <option value="scrap">폐기</option>
+              <option value="use_as_is">특채(그대로 사용)</option>
+              <option value="return_supplier">공급사 반품</option>
+              <option value="closed">종결</option>
+            </select>
+          </div>
+          <div id="mes-ncr-scrap-block" class="hidden space-y-2 border rounded-lg p-3 bg-slate-50">
+            <label class="flex items-center gap-2"><input id="mes-ncr-apply-stock" type="checkbox"> 재고에서 폐기 차감</label>
+            <select id="mes-ncr-warehouse" class="w-full border rounded-lg px-3 py-2">
+              <option value="">창고 선택</option>
+              ${warehouses.map((w) => `<option value="${w.id}">${w.name}</option>`).join('')}
+            </select>
+            <input id="mes-ncr-scrap-qty" type="number" min="0.01" step="any" class="w-full border rounded-lg px-3 py-2" placeholder="폐기 수량(선택)">
+          </div>
+          <div><label>클레임 ID 연결</label><input id="mes-ncr-disp-claim" type="number" class="w-full border rounded-lg px-3 py-2 mt-1"></div>
+          <div><label>조치 내용</label><textarea id="mes-ncr-action" class="w-full border rounded-lg px-3 py-2 mt-1" rows="3"></textarea></div>
+        </div>
+        <div class="flex justify-end gap-2 mt-6">
+          <button onclick="closeMesModal()" class="px-4 py-2 rounded-lg border">취소</button>
+          <button onclick="submitMesNcrDispose(${id})" class="px-4 py-2 rounded-lg bg-orange-600 text-white">반영</button>
+        </div>
+      </div>
+    </div>
+  `;
+};
+
+window.submitMesNcrDispose = async function (id) {
+  const disposition = document.getElementById('mes-ncr-disp').value;
+  const payload = {
+    disposition,
+    action_notes: document.getElementById('mes-ncr-action').value || null,
+    claim_id: document.getElementById('mes-ncr-disp-claim').value || null,
+    apply_stock: document.getElementById('mes-ncr-apply-stock')?.checked || false,
+    warehouse_id: document.getElementById('mes-ncr-warehouse')?.value || null,
+    quantity: document.getElementById('mes-ncr-scrap-qty')?.value || null
+  };
+  try {
+    const res = await axios.put(`${API_BASE}/production/quality/ncrs/${id}/dispose`, payload);
+    alert(res.data.message);
+    closeMesModal();
+    loadMesQuality();
+  } catch (e) {
+    alert(e.response?.data?.error || e.message);
+  }
+};
+
+window.showMesDefectTypeModal = async function () {
+  const res = await axios.get(`${API_BASE}/production/quality/defect-types`, { params: { active: 0 } });
+  const rows = res.data.data || [];
+  document.getElementById('mes-modals').innerHTML = `
+    <div class="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4" onclick="if(event.target===this)closeMesModal()">
+      <div class="bg-white rounded-xl shadow-xl w-full max-w-xl max-h-[90vh] overflow-y-auto p-6">
+        <h3 class="text-lg font-bold mb-4">불량 유형</h3>
+        <div class="grid grid-cols-3 gap-2 mb-4 text-sm">
+          <input id="mes-dt-code" class="border rounded-lg px-2 py-2" placeholder="코드">
+          <input id="mes-dt-name" class="border rounded-lg px-2 py-2 col-span-2" placeholder="명칭">
+        </div>
+        <button onclick="submitMesDefectType()" class="mb-4 bg-orange-600 text-white px-3 py-2 rounded-lg text-sm">추가</button>
+        <table class="w-full text-sm">
+          <thead class="text-xs border-b"><tr><th class="py-2 text-left">코드</th><th class="text-left">명칭</th><th class="text-left">상태</th><th></th></tr></thead>
+          <tbody>
+            ${rows.map((d) => `<tr class="border-t"><td class="py-2">${d.code}</td><td>${d.name}</td><td>${d.is_active ? '사용' : '비활성'}</td>
+              <td class="text-right">${d.is_active ? `<button onclick="deactivateMesDefectType(${d.id})" class="text-rose-500 text-xs">비활성</button>` : ''}</td></tr>`).join('')}
+          </tbody>
+        </table>
+        <div class="flex justify-end mt-4"><button onclick="closeMesModal()" class="px-4 py-2 rounded-lg border">닫기</button></div>
+      </div>
+    </div>
+  `;
+};
+
+window.submitMesDefectType = async function () {
+  const code = document.getElementById('mes-dt-code').value.trim();
+  const name = document.getElementById('mes-dt-name').value.trim();
+  if (!code || !name) {
+    alert('코드와 명칭을 입력해주세요.');
+    return;
+  }
+  try {
+    await axios.post(`${API_BASE}/production/quality/defect-types`, { code, name });
+    showMesDefectTypeModal();
+  } catch (e) {
+    alert(e.response?.data?.error || e.message);
+  }
+};
+
+window.deactivateMesDefectType = async function (id) {
+  if (!confirm('비활성화할까요?')) return;
+  try {
+    await axios.delete(`${API_BASE}/production/quality/defect-types/${id}`);
+    showMesDefectTypeModal();
+  } catch (e) {
+    alert(e.response?.data?.error || e.message);
+  }
+};
+
