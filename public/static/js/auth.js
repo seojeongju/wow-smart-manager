@@ -4,7 +4,7 @@ function logout() {
     localStorage.removeItem('token');
     localStorage.removeItem('user');
     localStorage.removeItem('tenant');
-    window.location.href = '/login';
+    window.location.replace('/login');
 }
 
 function updateCompanyName() {

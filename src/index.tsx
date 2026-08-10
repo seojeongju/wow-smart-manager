@@ -624,6 +624,10 @@ app.get('/login', (c: Context) => {
 
                             <script>
                                 const API_BASE = '/api';
+                                // 이미 로그인된 상태에서 로그인 페이지로 오면 앱으로 복귀 (히스토리 제거)
+                                if (localStorage.getItem('token')) {
+                                    window.location.replace('/');
+                                }
 
                                 function switchTab(tab) {
             const loginForm = document.getElementById('loginForm');
@@ -678,7 +682,7 @@ app.get('/login', (c: Context) => {
                                     localStorage.setItem('token', res.data.data.token);
                                 localStorage.setItem('refreshToken', res.data.data.refreshToken);
                                 localStorage.setItem('user', JSON.stringify(res.data.data.user));
-                                window.location.href = '/';
+                                window.location.replace('/');
                 }
             } catch (err) {
                                     alert(err.response?.data?.error || '로그인 실패');
@@ -704,7 +708,7 @@ app.get('/login', (c: Context) => {
                                 localStorage.setItem('token', res.data.data.token);
                                 localStorage.setItem('refreshToken', res.data.data.refreshToken);
                                 localStorage.setItem('user', JSON.stringify(res.data.data.user));
-                                window.location.href = '/';
+                                window.location.replace('/');
                     } else {
                         const msg = res.data.message || '회원가입이 완료되었습니다.\\n관리자 승인 후 이용 가능합니다.';
                                 alert(msg);
@@ -1602,29 +1606,29 @@ app.get('/', (c: Context) => {
                                                 updateTime();
                                                 setInterval(updateTime, 1000);
                                             </script>
-                                            <script src="/static/js/config.js?v=1"></script>
+                                            <script src="/static/js/config.js?v=2"></script>
                                             <script src="/static/js/utils.js?v=2"></script>
                                             <script src="/static/js/utils_address.js?v=1"></script>
-                                            <script src="/static/js/auth.js?v=1"></script>
-                                            <script src="/static/app.js?v=50"></script>
-                                            <script src="/static/js/outbound.js?v=12"></script>
-                                            <script src="/static/js/purchases.js?v=3"></script>
+                                            <script src="/static/js/auth.js?v=2"></script>
+                                            <script src="/static/app.js?v=53"></script>
+                                            <script src="/static/js/outbound.js?v=13"></script>
+                                            <script src="/static/js/purchases.js?v=5"></script>
                                             <script src="/static/js/options.js?v=1"></script>
                                             <script src="/static/js/products.js?v=8"></script>
                                             <script src="/static/js/prices.js?v=2"></script>
                                             <script src="/static/js/system-settings.js?v=2"></script>
                                             <script src="/static/js/tracking.js?v=1"></script>
-                                            <script src="/static/js/transaction-statement.js?v=2"></script>
-                                            <script src="/static/js/quotations.js?v=1"></script>
-                                            <script src="/static/js/finance.js?v=1"></script>
-                                            <script src="/static/js/erp-procurement.js?v=1"></script>
-                                            <script src="/static/js/mes-oee.js?v=1"></script>
+                                            <script src="/static/js/transaction-statement.js?v=3"></script>
+                                            <script src="/static/js/quotations.js?v=2"></script>
+                                            <script src="/static/js/finance.js?v=2"></script>
+                                            <script src="/static/js/erp-procurement.js?v=2"></script>
+                                            <script src="/static/js/mes-oee.js?v=2"></script>
                                             <script src="/static/js/qr-mes.js?v=6"></script>
                                             <script src="/static/js/production.js?v=15"></script>
                                             <script src="/static/js/shopfloor.js?v=2"></script>
                                             <script src="/static/js/mes-schedule.js?v=1"></script>
                                             <script src="/static/js/barcode-manager.js?v=3"></script>
-                                            <script src="/static/js/help-guides.js?v=9"></script>
+                                            <script src="/static/js/help-guides.js?v=10"></script>
                                         </body>
                                     </html>
                                     `)

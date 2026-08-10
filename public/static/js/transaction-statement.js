@@ -4,9 +4,15 @@
 
 async function renderTransactionStatementPage(container) {
   container.innerHTML = `
-    <div class="max-w-6xl mx-auto space-y-6 no-print">
+    <div class="flex flex-col h-full">
+      ${window.renderPageHeader({
+        title: '거래명세서',
+        subtitle: '고객별 거래 내역 통합 및 출력',
+        icon: 'fa-file-invoice'
+      })}
+    <div class="max-w-6xl mx-auto space-y-6 no-print w-full">
       <!-- 상단 액션 바 -->
-      <div class="flex flex-col md:flex-row gap-4 items-end bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
+      <div class="flex flex-col md:flex-row gap-4 items-end bg-white p-6 rounded-xl shadow-sm border border-slate-200">
         <div class="flex-1 w-full space-y-2">
           <label class="text-xs font-bold text-slate-500 uppercase ml-1">고객 선택</label>
           <div class="relative">
@@ -71,6 +77,7 @@ async function renderTransactionStatementPage(container) {
 
     <!-- 인쇄용 숨겨진 영역 -->
     <div id="tsPrintArea" class="print-only bg-white text-black p-0"></div>
+    </div>
   `;
 
   // 기본 날짜 설정 (최근 1개월)

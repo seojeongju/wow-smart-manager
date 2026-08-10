@@ -7,7 +7,7 @@ const token = localStorage.getItem('token');
 // 현재 페이지가 login이나 register가 아닐 때 체크해야 함.
 // 하지만 app.js는 spa처럼 동작하므로 단순 체크.
 if (!token && !window.location.pathname.startsWith('/login') && !window.location.pathname.startsWith('/register')) {
-    window.location.href = '/login';
+    window.location.replace('/login');
 }
 
 // Axios 인터셉터 설정
@@ -50,7 +50,7 @@ if (window.axios) {
                 localStorage.removeItem('token');
                 localStorage.removeItem('refreshToken');
                 localStorage.removeItem('user');
-                window.location.href = '/login';
+                window.location.replace('/login');
                 return Promise.reject(error);
             }
 
@@ -71,7 +71,7 @@ if (window.axios) {
                 localStorage.removeItem('token');
                 localStorage.removeItem('refreshToken');
                 localStorage.removeItem('user');
-                window.location.href = '/login';
+                window.location.replace('/login');
                 return Promise.reject(error);
             }
 
@@ -92,7 +92,7 @@ if (window.axios) {
                 localStorage.removeItem('token');
                 localStorage.removeItem('refreshToken');
                 localStorage.removeItem('user');
-                window.location.href = '/login';
+                window.location.replace('/login');
                 return Promise.reject(refreshError);
             } finally {
                 isRefreshing = false;

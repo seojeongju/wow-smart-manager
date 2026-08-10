@@ -904,6 +904,102 @@ function helpEsc(str) {
     .replace(/"/g, '&quot;');
 }
 
+function helpNormalizeQuery(q) {
+  return String(q || '').trim().toLowerCase().replace(/\s+/g, ' ');
+}
+
+function helpMatchesQuery(blob, query) {
+  if (!query) return true;
+  const tokens = query.split(' ').filter(Boolean);
+  const text = String(blob || '').toLowerCase();
+  return tokens.every((t) => text.includes(t));
+}
+
+/** 제목 + 본문(요약·단계·팁·관련) + 네비 라벨 검색용 텍스트 */
+function helpGuideSearchBlob(key, itemLabel, hint, sectionTitle) {
+  const { guide } = helpResolveGuide(key);
+  return [
+    key,
+    sectionTitle,
+    itemLabel,
+    hint,
+    guide.title,
+    guide.summary,
+    ...(guide.steps || []),
+    ...(guide.tips || []),
+    ...(guide.related || []).map((r) => r.label)
+  ].filter(Boolean).join('\n');
+}
+
+function helpHubFilteredSections(query) {
+  const q = helpNormalizeQuery(query);
+  return HELP_HUB_SECTIONS.map((sec, si) => {
+    const sectionHit = q && helpMatchesQuery(sec.title, q);
+    const items = sec.items.filter((it) => {
+      if (!q) return true;
+      if (sectionHit) return true;
+      return helpMatchesQuery(
+        helpGuideSearchBlob(it.key, it.label, it.hint, sec.title),
+        q
+      );
+    });
+    return { sec, si, items, sectionHit };
+  }).filter((row) => row.items.length > 0);
+}
+
+function helpUpdateSearchMeta(total, query) {
+  const countEl = document.getElementById('help-hub-search-count');
+  const emptyEl = document.getElementById('help-hub-search-empty');
+  const clearBtn = document.getElementById('help-hub-search-clear');
+  const q = helpNormalizeQuery(query);
+  if (countEl) {
+    countEl.textContent = q ? `${total}건` : '';
+  }
+  if (clearBtn) {
+    clearBtn.classList.toggle('hidden', !q);
+  }
+  if (emptyEl) {
+    emptyEl.classList.toggle('hidden', !(q && total === 0));
+  }
+}
+
+window.onHelpHubSearchInput = function onHelpHubSearchInput(val) {
+  clearTimeout(window._helpHubSearchTimer);
+  window._helpHubSearchTimer = setTimeout(() => {
+    window.applyHelpHubSearch(val);
+  }, 160);
+};
+
+window.clearHelpHubSearch = function clearHelpHubSearch() {
+  const input = document.getElementById('help-hub-search');
+  if (input) input.value = '';
+  window.applyHelpHubSearch('');
+  input?.focus();
+};
+
+window.applyHelpHubSearch = function applyHelpHubSearch(val) {
+  const q = helpNormalizeQuery(val);
+  window._helpHubQuery = q;
+
+  const rows = helpHubFilteredSections(q);
+  const total = rows.reduce((n, r) => n + r.items.length, 0);
+  helpUpdateSearchMeta(total, q);
+
+  if (q) {
+    window._helpHubOpenSections = new Set(rows.map((r) => r.si));
+  } else if (!window._helpHubOpenSections || window._helpHubOpenSections.size === 0) {
+    window._helpHubOpenSections = new Set([0]);
+  }
+
+  const activeStill = rows.some((r) => r.items.some((it) => it.key === window._helpHubKey));
+  if (q && !activeStill && rows[0]?.items?.[0]) {
+    window.helpHubShow(rows[0].items[0].key, rows[0].si);
+    return;
+  }
+
+  window.renderHelpHubNav(window._helpHubKey);
+};
+
 function helpNormalizeKey(page, tab) {
   if (!page) return 'dashboard';
   if (page === 'help' || page === 'guide') return 'hub';
@@ -1058,22 +1154,57 @@ window.loadHelpHubPage = async function () {
   if (!content) return;
   window.setHelpContext('help');
   window._helpHubOpenSections = new Set([0]); // 첫 메인메뉴만 펼침
+  window._helpHubQuery = '';
 
-  content.innerHTML = `
-    <div class="max-w-5xl mx-auto">
+  const headerHtml = typeof window.renderPageHeader === 'function'
+    ? window.renderPageHeader({
+      title: '사용안내',
+      subtitle: '메인 메뉴를 펼쳐 하위 안내를 선택하세요. 제목·본문에서 검색할 수 있습니다.',
+      icon: 'fa-book-open',
+      actionsHtml: `
+        <button type="button" onclick="startHelpTour(true)"
+          class="inline-flex items-center gap-2 px-4 py-2 rounded-lg border border-teal-200 bg-teal-50 text-teal-800 text-sm font-semibold hover:bg-teal-100">
+          <i class="fas fa-route"></i>첫 사용 투어
+        </button>`
+    })
+    : `
       <div class="mb-6 flex flex-col sm:flex-row sm:items-end sm:justify-between gap-3">
         <div>
           <h1 class="text-2xl font-bold text-slate-800"><i class="fas fa-book-open mr-2 text-teal-600"></i>사용안내</h1>
-          <p class="text-sm text-slate-500 mt-1">메인 메뉴를 펼쳐 하위 안내를 선택하세요. 업무 중에는 헤더의 ? 버튼으로 현재 화면 안내를 여세요.</p>
+          <p class="text-sm text-slate-500 mt-1">메인 메뉴를 펼쳐 하위 안내를 선택하세요. 제목·본문에서 검색할 수 있습니다.</p>
         </div>
         <button type="button" onclick="startHelpTour(true)"
           class="inline-flex items-center gap-2 px-4 py-2 rounded-lg border border-teal-200 bg-teal-50 text-teal-800 text-sm font-semibold hover:bg-teal-100">
           <i class="fas fa-route"></i>첫 사용 투어
         </button>
+      </div>`;
+
+  content.innerHTML = `
+    <div class="flex flex-col h-full max-w-5xl mx-auto w-full">
+      ${headerHtml}
+
+      <div class="relative mb-4">
+        <i class="fas fa-search absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none"></i>
+        <input id="help-hub-search" type="search" autocomplete="off"
+          placeholder="제목·본문 검색 (예: 발주, OEE, 입고, 피킹)"
+          class="w-full pl-10 pr-24 py-2.5 border border-slate-300 rounded-xl bg-white text-sm text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-teal-500"
+          oninput="onHelpHubSearchInput(this.value)"
+          onkeydown="if(event.key==='Escape'){clearHelpHubSearch();}">
+        <div class="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1">
+          <span id="help-hub-search-count" class="text-xs font-semibold text-slate-400 tabular-nums px-1"></span>
+          <button type="button" id="help-hub-search-clear" onclick="clearHelpHubSearch()"
+            class="hidden w-8 h-8 rounded-lg text-slate-400 hover:bg-slate-100 hover:text-slate-600" title="검색 지우기">
+            <i class="fas fa-times"></i>
+          </button>
+        </div>
       </div>
 
-      <div class="grid lg:grid-cols-12 gap-6">
-        <nav id="help-hub-nav" class="lg:col-span-4 space-y-2"></nav>
+      <div id="help-hub-search-empty" class="hidden mb-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+        검색 결과가 없습니다. 다른 키워드로 시도해 보세요.
+      </div>
+
+      <div class="grid lg:grid-cols-12 gap-6 flex-1 min-h-0">
+        <nav id="help-hub-nav" class="lg:col-span-4 space-y-2 lg:overflow-y-auto lg:max-h-[calc(100vh-16rem)]"></nav>
         <div class="lg:col-span-8">
           <div id="help-hub-article" class="bg-white border border-slate-200 rounded-xl p-6 min-h-[420px]"></div>
           <div class="mt-4 flex flex-wrap gap-2">
@@ -1098,8 +1229,20 @@ window.renderHelpHubNav = function renderHelpHubNav(activeKey) {
   if (!nav) return;
   const openSet = window._helpHubOpenSections || new Set([0]);
   const key = activeKey || window._helpHubKey || '';
+  const query = window._helpHubQuery || '';
+  const rows = helpHubFilteredSections(query);
+  const total = rows.reduce((n, r) => n + r.items.length, 0);
+  helpUpdateSearchMeta(total, query);
 
-  nav.innerHTML = HELP_HUB_SECTIONS.map((sec, si) => {
+  if (!rows.length) {
+    nav.innerHTML = `
+      <div class="bg-white border border-dashed border-slate-200 rounded-xl px-4 py-8 text-center text-sm text-slate-400">
+        일치하는 안내가 없습니다
+      </div>`;
+    return;
+  }
+
+  nav.innerHTML = rows.map(({ sec, si, items }) => {
     const isOpen = openSet.has(si);
     return `
       <div class="bg-white border border-slate-200 rounded-xl overflow-hidden" data-help-section="${si}">
@@ -1110,12 +1253,12 @@ window.renderHelpHubNav = function renderHelpHubNav(activeKey) {
           <span class="flex items-center gap-2 min-w-0">
             <span class="w-1.5 h-1.5 rounded-full flex-shrink-0 ${si === 0 ? 'bg-teal-500' : si === 1 ? 'bg-orange-500' : si === 2 ? 'bg-indigo-500' : 'bg-blue-500'}"></span>
             <span class="text-sm font-bold text-slate-800 truncate">${helpEsc(sec.title)}</span>
-            <span class="text-[10px] font-semibold text-slate-400">${sec.items.length}</span>
+            <span class="text-[10px] font-semibold text-slate-400">${items.length}${query ? `/${sec.items.length}` : ''}</span>
           </span>
           <i class="fas fa-chevron-down text-[10px] text-slate-400 transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}"></i>
         </button>
         <div class="help-hub-submenu divide-y divide-slate-100 ${isOpen ? '' : 'hidden'}">
-          ${sec.items.map((it) => {
+          ${items.map((it) => {
             const active = it.key === key;
             return `
               <button type="button" onclick="helpHubShow('${it.key}', ${si})"

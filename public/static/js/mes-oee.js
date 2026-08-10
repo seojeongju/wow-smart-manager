@@ -33,21 +33,22 @@ window.loadMesEquipmentPage = async function loadMesEquipmentPage() {
   if (typeof window.setHelpContext === 'function') window.setHelpContext('mes-equipment');
 
   content.innerHTML = `
-    <div class="space-y-4">
-      <div class="flex flex-wrap justify-between gap-3 items-center">
-        <div>
-          <h2 class="text-lg font-bold text-slate-800">설비 상태</h2>
-          <p class="text-sm text-slate-500">가동/정지/고장/보전 이벤트를 기록하면 OEE에 반영됩니다</p>
-        </div>
-        <div class="flex gap-2">
-          <button type="button" onclick="loadPage('mes-oee')" class="px-3 py-2 text-sm border rounded-lg hover:bg-slate-50">OEE 보기</button>
-          <button type="button" onclick="loadPage('production','masters')" class="px-3 py-2 text-sm border rounded-lg hover:bg-slate-50">설비 마스터</button>
-          <button type="button" onclick="reloadMesEquipment()" class="px-3 py-2 text-sm border rounded-lg"><i class="fas fa-sync-alt"></i></button>
-        </div>
-      </div>
+    <div class="flex flex-col h-full">
+      ${window.renderPageHeader({
+        title: '설비 상태',
+        subtitle: '가동/정지/고장/보전 이벤트를 기록하면 OEE에 반영됩니다',
+        icon: 'fa-cogs',
+        accent: 'orange',
+        actionsHtml: `
+          <button type="button" onclick="loadPage('mes-oee')" class="px-3 py-2 text-sm border border-slate-300 rounded-lg hover:bg-slate-50">OEE 보기</button>
+          <button type="button" onclick="loadPage('production','masters')" class="px-3 py-2 text-sm border border-slate-300 rounded-lg hover:bg-slate-50">설비 마스터</button>
+          <button type="button" onclick="reloadMesEquipment()" class="px-3 py-2 text-sm border border-slate-300 rounded-lg hover:bg-slate-50"><i class="fas fa-sync-alt"></i></button>`
+      })}
+      <div class="space-y-4 flex-1">
       <div id="mesEqSummary" class="grid grid-cols-2 lg:grid-cols-4 gap-3"></div>
-      <div class="bg-white border rounded-xl overflow-hidden">
+      <div class="bg-white border border-slate-200 rounded-xl overflow-hidden">
         <div id="mesEqTable" class="p-4 text-center text-slate-400"><i class="fas fa-spinner fa-spin"></i></div>
+      </div>
       </div>
     </div>
   `;
@@ -136,29 +137,30 @@ window.loadMesOeePage = async function loadMesOeePage() {
   if (typeof window.setHelpContext === 'function') window.setHelpContext('mes-oee');
 
   content.innerHTML = `
-    <div class="space-y-4">
-      <div class="flex flex-wrap justify-between gap-3 items-center">
-        <div>
-          <h2 class="text-lg font-bold text-slate-800">OEE 대시보드</h2>
-          <p class="text-sm text-slate-500">가동률(Availability) × 성능 × 품질 — 성능은 이상사이클 미설정 시 100%</p>
-        </div>
-        <div class="flex gap-2 items-center">
-          <select id="mesOeeDays" class="border rounded-lg px-3 py-2 text-sm">
+    <div class="flex flex-col h-full">
+      ${window.renderPageHeader({
+        title: 'OEE 대시보드',
+        subtitle: '가동률(Availability) × 성능 × 품질 — 성능은 이상사이클 미설정 시 100%',
+        icon: 'fa-tachometer-alt',
+        accent: 'orange',
+        actionsHtml: `
+          <select id="mesOeeDays" class="border border-slate-300 rounded-lg px-3 py-2 text-sm">
             <option value="1">오늘</option>
             <option value="7" selected>7일</option>
             <option value="30">30일</option>
           </select>
-          <button type="button" onclick="loadPage('mes-equipment')" class="px-3 py-2 text-sm border rounded-lg">설비 상태</button>
-          <button type="button" onclick="reloadMesOee()" class="px-3 py-2 text-sm border rounded-lg"><i class="fas fa-sync-alt"></i></button>
-        </div>
-      </div>
+          <button type="button" onclick="loadPage('mes-equipment')" class="px-3 py-2 text-sm border border-slate-300 rounded-lg hover:bg-slate-50">설비 상태</button>
+          <button type="button" onclick="reloadMesOee()" class="px-3 py-2 text-sm border border-slate-300 rounded-lg hover:bg-slate-50"><i class="fas fa-sync-alt"></i></button>`
+      })}
+      <div class="space-y-4 flex-1">
       <div id="mesOeeSummary" class="grid grid-cols-2 lg:grid-cols-4 gap-3"></div>
-      <div class="bg-white border rounded-xl overflow-hidden">
+      <div class="bg-white border border-slate-200 rounded-xl overflow-hidden">
         <div id="mesOeeTable" class="p-4 text-center text-slate-400"><i class="fas fa-spinner fa-spin"></i></div>
       </div>
-      <div class="text-xs text-slate-500 bg-slate-50 border rounded-xl px-4 py-3">
+      <div class="text-xs text-slate-500 bg-slate-50 border border-slate-200 rounded-xl px-4 py-3">
         OEE = 가동시간 / (가동+정지+고장+보전) × 성능 × (양품/(양품+불량)).
         설비 상태 화면에서 이벤트를 기록해야 수치가 쌓입니다.
+      </div>
       </div>
     </div>
   `;
@@ -241,21 +243,22 @@ window.loadMesWipPage = async function loadMesWipPage() {
   if (typeof window.setHelpContext === 'function') window.setHelpContext('mes-wip');
 
   content.innerHTML = `
-    <div class="space-y-4">
-      <div class="flex flex-wrap justify-between gap-3">
-        <div>
-          <h2 class="text-lg font-bold text-slate-800">WIP 현황</h2>
-          <p class="text-sm text-slate-500">계획·확정·진행 중인 작업지시의 잔량(재공)</p>
-        </div>
-        <div class="flex gap-2">
-          <button type="button" onclick="loadPage('production','work-orders')" class="px-3 py-2 text-sm border rounded-lg">작업지시</button>
-          <button type="button" onclick="loadPage('production','shopfloor')" class="px-3 py-2 text-sm border rounded-lg">현장 실행</button>
-          <button type="button" onclick="reloadMesWip()" class="px-3 py-2 text-sm border rounded-lg"><i class="fas fa-sync-alt"></i></button>
-        </div>
-      </div>
+    <div class="flex flex-col h-full">
+      ${window.renderPageHeader({
+        title: 'WIP 현황',
+        subtitle: '계획·확정·진행 중인 작업지시의 잔량(재공)',
+        icon: 'fa-stream',
+        accent: 'orange',
+        actionsHtml: `
+          <button type="button" onclick="loadPage('production','work-orders')" class="px-3 py-2 text-sm border border-slate-300 rounded-lg hover:bg-slate-50">작업지시</button>
+          <button type="button" onclick="loadPage('production','shopfloor')" class="px-3 py-2 text-sm border border-slate-300 rounded-lg hover:bg-slate-50">현장 실행</button>
+          <button type="button" onclick="reloadMesWip()" class="px-3 py-2 text-sm border border-slate-300 rounded-lg hover:bg-slate-50"><i class="fas fa-sync-alt"></i></button>`
+      })}
+      <div class="space-y-4 flex-1">
       <div id="mesWipSummary" class="grid grid-cols-3 gap-3"></div>
-      <div class="bg-white border rounded-xl overflow-hidden">
+      <div class="bg-white border border-slate-200 rounded-xl overflow-hidden">
         <div id="mesWipTable" class="p-4 text-center text-slate-400"><i class="fas fa-spinner fa-spin"></i></div>
+      </div>
       </div>
     </div>
   `;

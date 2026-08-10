@@ -247,6 +247,9 @@
 
     <script>
         const API_BASE = '/api';
+        if (localStorage.getItem('token')) {
+            window.location.replace('/');
+        }
 
         function switchTab(tab) {
             const loginForm = document.getElementById('loginForm');
@@ -290,7 +293,7 @@
                 if (res.data.success) {
                     localStorage.setItem('token', res.data.data.token);
                     localStorage.setItem('user', JSON.stringify(res.data.data.user));
-                    window.location.href = '/';
+                    window.location.replace('/');
                 }
             } catch (err) {
                 alert(err.response?.data?.error || '로그인 실패');
@@ -316,7 +319,7 @@
                         alert('회원가입이 완료되었습니다. 자동 로그인됩니다.');
                         localStorage.setItem('token', res.data.data.token);
                         localStorage.setItem('user', JSON.stringify(res.data.data.user));
-                        window.location.href = '/';
+                        window.location.replace('/');
                     } else {
                         // 유료 플랜 등 승인 대기인 경우
                         const msg = res.data.message || '회원가입이 완료되었습니다.\n관리자 승인 후 이용 가능합니다.';

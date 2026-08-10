@@ -13,16 +13,17 @@ window.loadProcReceivePage = async function loadProcReceivePage() {
   if (typeof window.setHelpContext === 'function') window.setHelpContext('proc-receive');
 
   content.innerHTML = `
-    <div class="space-y-4">
-      <div class="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h2 class="text-lg font-bold text-slate-800">입고 · 검수</h2>
-          <p class="text-sm text-slate-500">발주 대기/부분입고 건을 선택해 창고별 입고합니다</p>
-        </div>
-        <button type="button" onclick="reloadProcReceive()" class="px-3 py-2 text-sm border border-slate-300 rounded-lg hover:bg-slate-50">
-          <i class="fas fa-sync-alt"></i>
-        </button>
-      </div>
+    <div class="flex flex-col h-full">
+      ${window.renderPageHeader({
+        title: '입고 · 검수',
+        subtitle: '발주 대기/부분입고 건을 선택해 창고별 입고합니다',
+        icon: 'fa-clipboard-check',
+        actionsHtml: `
+          <button type="button" onclick="reloadProcReceive()" class="px-3 py-2 text-sm border border-slate-300 rounded-lg hover:bg-slate-50">
+            <i class="fas fa-sync-alt"></i>
+          </button>`
+      })}
+      <div class="space-y-4 flex-1">
       <div class="grid lg:grid-cols-5 gap-4">
         <div class="lg:col-span-2 bg-white border border-slate-200 rounded-xl overflow-hidden">
           <div class="px-4 py-3 bg-slate-50 border-b text-sm font-bold text-slate-700">입고 대기 발주</div>
@@ -31,6 +32,7 @@ window.loadProcReceivePage = async function loadProcReceivePage() {
         <div class="lg:col-span-3 bg-white border border-slate-200 rounded-xl overflow-hidden">
           <div id="procReceiveDetail" class="p-8 text-center text-slate-400 text-sm">왼쪽에서 발주를 선택하세요</div>
         </div>
+      </div>
       </div>
     </div>
   `;
@@ -180,20 +182,19 @@ window.loadProcPricePage = async function loadProcPricePage() {
   if (typeof window.setHelpContext === 'function') window.setHelpContext('proc-price');
 
   content.innerHTML = `
-    <div class="space-y-4">
-      <div class="flex flex-wrap justify-between gap-3 items-end">
-        <div>
-          <h2 class="text-lg font-bold text-slate-800">구매 단가 관리</h2>
-          <p class="text-sm text-slate-500">공급사×품목 단가 이력 (입고 시 자동 기록 + 수동 등록)</p>
-        </div>
-        <div class="flex flex-wrap gap-2 items-end">
+    <div class="flex flex-col h-full">
+      ${window.renderPageHeader({
+        title: '구매 단가 관리',
+        subtitle: '공급사×품목 단가 이력 (입고 시 자동 기록 + 수동 등록)',
+        icon: 'fa-tags',
+        actionsHtml: `
           <div>
             <label class="text-xs font-bold text-slate-500">공급사</label>
             <select id="procPriceSupplier" class="block mt-1 border border-slate-300 rounded-lg px-3 py-2 text-sm min-w-[160px]"></select>
           </div>
-          <button type="button" onclick="reloadProcPrices()" class="px-3 py-2 text-sm border rounded-lg hover:bg-slate-50"><i class="fas fa-sync-alt"></i></button>
-        </div>
-      </div>
+          <button type="button" onclick="reloadProcPrices()" class="px-3 py-2 text-sm border border-slate-300 rounded-lg hover:bg-slate-50 self-end"><i class="fas fa-sync-alt"></i></button>`
+      })}
+      <div class="space-y-4 flex-1">
       <div class="grid lg:grid-cols-3 gap-4">
         <div class="bg-white border border-slate-200 rounded-xl p-4 space-y-3">
           <h3 class="font-bold text-slate-800 text-sm">단가 등록</h3>
@@ -218,6 +219,7 @@ window.loadProcPricePage = async function loadProcPricePage() {
         <div class="lg:col-span-2 bg-white border border-slate-200 rounded-xl overflow-hidden">
           <div id="procPriceTable" class="p-4 text-center text-slate-400 text-sm"><i class="fas fa-spinner fa-spin"></i></div>
         </div>
+      </div>
       </div>
     </div>
   `;
@@ -307,16 +309,17 @@ window.loadProcEvalPage = async function loadProcEvalPage() {
   if (typeof window.setHelpContext === 'function') window.setHelpContext('proc-eval');
 
   content.innerHTML = `
-    <div class="space-y-4">
-      <div class="flex justify-between items-center">
-        <div>
-          <h2 class="text-lg font-bold text-slate-800">공급사 평가</h2>
-          <p class="text-sm text-slate-500">납기·품질·가격(각 0–10) 평균으로 등급화</p>
-        </div>
-        <button type="button" onclick="reloadProcEval()" class="px-3 py-2 text-sm border rounded-lg"><i class="fas fa-sync-alt"></i></button>
-      </div>
+    <div class="flex flex-col h-full">
+      ${window.renderPageHeader({
+        title: '공급사 평가',
+        subtitle: '납기·품질·가격(각 0–10) 평균으로 등급화',
+        icon: 'fa-star-half-alt',
+        actionsHtml: `
+          <button type="button" onclick="reloadProcEval()" class="px-3 py-2 text-sm border border-slate-300 rounded-lg hover:bg-slate-50"><i class="fas fa-sync-alt"></i></button>`
+      })}
+      <div class="space-y-4 flex-1">
       <div class="grid lg:grid-cols-3 gap-4">
-        <div class="bg-white border rounded-xl p-4 space-y-3">
+        <div class="bg-white border border-slate-200 rounded-xl p-4 space-y-3">
           <h3 class="font-bold text-sm">평가 등록</h3>
           <select id="procEvalSupplier" class="w-full border rounded-lg px-3 py-2 text-sm"></select>
           <input id="procEvalPeriod" type="text" placeholder="기간 예: 2026-Q1" class="w-full border rounded-lg px-3 py-2 text-sm">
@@ -328,9 +331,10 @@ window.loadProcEvalPage = async function loadProcEvalPage() {
           <textarea id="procEvalNotes" rows="2" class="w-full border rounded-lg px-3 py-2 text-sm" placeholder="메모"></textarea>
           <button type="button" onclick="submitProcEval()" class="w-full bg-teal-600 text-white font-bold py-2 rounded-lg">저장</button>
         </div>
-        <div class="lg:col-span-2 bg-white border rounded-xl overflow-hidden">
+        <div class="lg:col-span-2 bg-white border border-slate-200 rounded-xl overflow-hidden">
           <div id="procEvalTable" class="p-4 text-center text-slate-400"><i class="fas fa-spinner fa-spin"></i></div>
         </div>
+      </div>
       </div>
     </div>
   `;
@@ -406,24 +410,24 @@ window.loadScmReservePage = async function loadScmReservePage() {
   if (typeof window.setHelpContext === 'function') window.setHelpContext('scm-reserve');
 
   content.innerHTML = `
-    <div class="space-y-4">
-      <div class="flex flex-wrap justify-between gap-3">
-        <div>
-          <h2 class="text-lg font-bold text-slate-800">예약 재고</h2>
-          <p class="text-sm text-slate-500">견적 등 soft allocation 현황 · 수동 해제</p>
-        </div>
-        <div class="flex gap-2">
-          <select id="scmReserveStatus" class="border rounded-lg px-3 py-2 text-sm">
+    <div class="flex flex-col h-full">
+      ${window.renderPageHeader({
+        title: '예약 재고',
+        subtitle: '견적 등 soft allocation 현황 · 수동 해제',
+        icon: 'fa-bookmark',
+        actionsHtml: `
+          <select id="scmReserveStatus" class="border border-slate-300 rounded-lg px-3 py-2 text-sm">
             <option value="active">활성</option>
             <option value="released">해제</option>
             <option value="consumed">소진</option>
             <option value="all">전체</option>
           </select>
-          <button type="button" onclick="reloadScmReserve()" class="px-3 py-2 border rounded-lg text-sm"><i class="fas fa-sync-alt"></i></button>
-        </div>
-      </div>
-      <div class="bg-white border rounded-xl overflow-hidden">
+          <button type="button" onclick="reloadScmReserve()" class="px-3 py-2 border border-slate-300 rounded-lg text-sm hover:bg-slate-50"><i class="fas fa-sync-alt"></i></button>`
+      })}
+      <div class="space-y-4 flex-1">
+      <div class="bg-white border border-slate-200 rounded-xl overflow-hidden">
         <div id="scmReserveTable" class="p-4 text-center text-slate-400"><i class="fas fa-spinner fa-spin"></i></div>
+      </div>
       </div>
     </div>
   `;
@@ -493,19 +497,21 @@ window.loadScmReorderPage = async function loadScmReorderPage() {
   if (typeof window.setHelpContext === 'function') window.setHelpContext('scm-reorder');
 
   content.innerHTML = `
-    <div class="space-y-4">
-      <div class="flex justify-between items-center">
-        <div>
-          <h2 class="text-lg font-bold text-slate-800">적정재고 · 발주제안</h2>
-          <p class="text-sm text-slate-500">가용재고(물리−예약) &lt; 최소재고(min_stock_alert) 품목</p>
-        </div>
-        <button type="button" onclick="reloadScmReorder()" class="px-3 py-2 border rounded-lg text-sm"><i class="fas fa-sync-alt"></i></button>
-      </div>
+    <div class="flex flex-col h-full">
+      ${window.renderPageHeader({
+        title: '적정재고 · 발주제안',
+        subtitle: '가용재고(물리−예약) &lt; 최소재고(min_stock_alert) 품목',
+        icon: 'fa-lightbulb',
+        actionsHtml: `
+          <button type="button" onclick="reloadScmReorder()" class="px-3 py-2 border border-slate-300 rounded-lg text-sm hover:bg-slate-50"><i class="fas fa-sync-alt"></i></button>`
+      })}
+      <div class="space-y-4 flex-1">
       <div class="bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 text-sm text-amber-900">
         최소재고는 품목 정보의 재고 알림 수량으로 설정합니다. 부족분은 발주 관리에서 수동으로 작성하세요.
       </div>
-      <div class="bg-white border rounded-xl overflow-hidden">
+      <div class="bg-white border border-slate-200 rounded-xl overflow-hidden">
         <div id="scmReorderTable" class="p-4 text-center text-slate-400"><i class="fas fa-spinner fa-spin"></i></div>
+      </div>
       </div>
     </div>
   `;

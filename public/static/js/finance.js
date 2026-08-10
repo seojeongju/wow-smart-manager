@@ -36,13 +36,12 @@ window.loadFinanceArPage = async function loadFinanceArPage() {
   if (typeof window.setHelpContext === 'function') window.setHelpContext('finance-ar');
 
   content.innerHTML = `
-    <div class="space-y-4">
-      <div class="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h2 class="text-lg font-bold text-slate-800">매출채권 (AR)</h2>
-          <p class="text-sm text-slate-500">외상·부분입금 판매의 미수 잔액과 연령 분석</p>
-        </div>
-        <div class="flex items-center gap-2">
+    <div class="flex flex-col h-full">
+      ${window.renderPageHeader({
+        title: '매출채권 (AR)',
+        subtitle: '외상·부분입금 판매의 미수 잔액과 연령 분석',
+        icon: 'fa-file-invoice-dollar',
+        actionsHtml: `
           <select id="arStatusFilter" class="border border-slate-300 rounded-lg px-3 py-2 text-sm">
             <option value="open">미수 (미결제/부분)</option>
             <option value="paid">완납</option>
@@ -50,14 +49,15 @@ window.loadFinanceArPage = async function loadFinanceArPage() {
           </select>
           <button type="button" onclick="reloadFinanceAr()" class="px-3 py-2 text-sm border border-slate-300 rounded-lg hover:bg-slate-50">
             <i class="fas fa-sync-alt"></i>
-          </button>
-        </div>
-      </div>
+          </button>`
+      })}
+      <div class="space-y-4 flex-1">
       <div id="arSummary"></div>
       <div class="bg-white border border-slate-200 rounded-xl overflow-hidden">
         <div id="arTable" class="overflow-x-auto p-4 text-center text-slate-400">
           <i class="fas fa-spinner fa-spin"></i>
         </div>
+      </div>
       </div>
     </div>
   `;
@@ -163,13 +163,12 @@ window.loadFinanceApPage = async function loadFinanceApPage() {
   if (typeof window.setHelpContext === 'function') window.setHelpContext('finance-ap');
 
   content.innerHTML = `
-    <div class="space-y-4">
-      <div class="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h2 class="text-lg font-bold text-slate-800">매입채무 (AP)</h2>
-          <p class="text-sm text-slate-500">입고된 발주의 미지급 잔액과 연령 분석</p>
-        </div>
-        <div class="flex items-center gap-2">
+    <div class="flex flex-col h-full">
+      ${window.renderPageHeader({
+        title: '매입채무 (AP)',
+        subtitle: '입고된 발주의 미지급 잔액과 연령 분석',
+        icon: 'fa-hand-holding-usd',
+        actionsHtml: `
           <select id="apStatusFilter" class="border border-slate-300 rounded-lg px-3 py-2 text-sm">
             <option value="open">미지급</option>
             <option value="paid">지급완료</option>
@@ -177,14 +176,15 @@ window.loadFinanceApPage = async function loadFinanceApPage() {
           </select>
           <button type="button" onclick="reloadFinanceAp()" class="px-3 py-2 text-sm border border-slate-300 rounded-lg hover:bg-slate-50">
             <i class="fas fa-sync-alt"></i>
-          </button>
-        </div>
-      </div>
+          </button>`
+      })}
+      <div class="space-y-4 flex-1">
       <div id="apSummary"></div>
       <div class="bg-white border border-slate-200 rounded-xl overflow-hidden">
         <div id="apTable" class="overflow-x-auto p-4 text-center text-slate-400">
           <i class="fas fa-spinner fa-spin"></i>
         </div>
+      </div>
       </div>
     </div>
   `;
@@ -298,13 +298,12 @@ window.loadFinanceVouchersPage = async function loadFinanceVouchersPage() {
   if (typeof window.setHelpContext === 'function') window.setHelpContext('finance-vouchers');
 
   content.innerHTML = `
-    <div class="space-y-4">
-      <div class="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h2 class="text-lg font-bold text-slate-800">전표</h2>
-          <p class="text-sm text-slate-500">매출·매입·입금·지급에서 자동 생성된 회계 전표</p>
-        </div>
-        <div class="flex items-center gap-2">
+    <div class="flex flex-col h-full">
+      ${window.renderPageHeader({
+        title: '전표',
+        subtitle: '매출·매입·입금·지급에서 자동 생성된 회계 전표',
+        icon: 'fa-book',
+        actionsHtml: `
           <select id="voucherTypeFilter" class="border border-slate-300 rounded-lg px-3 py-2 text-sm">
             <option value="">전체 유형</option>
             <option value="AR_INVOICE">매출채권</option>
@@ -314,13 +313,14 @@ window.loadFinanceVouchersPage = async function loadFinanceVouchersPage() {
           </select>
           <button type="button" onclick="reloadFinanceVouchers()" class="px-3 py-2 text-sm border border-slate-300 rounded-lg hover:bg-slate-50">
             <i class="fas fa-sync-alt"></i>
-          </button>
-        </div>
-      </div>
+          </button>`
+      })}
+      <div class="space-y-4 flex-1">
       <div class="bg-white border border-slate-200 rounded-xl overflow-hidden">
         <div id="voucherTable" class="overflow-x-auto p-4 text-center text-slate-400">
           <i class="fas fa-spinner fa-spin"></i>
         </div>
+      </div>
       </div>
     </div>
   `;

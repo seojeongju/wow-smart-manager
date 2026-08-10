@@ -12,12 +12,15 @@ async function renderOutboundPage(initialTab = 'reg') {
   content.innerHTML = `
     <div class="flex flex-col h-full">
       <div class="flex justify-between items-center mb-6">
-        <h1 class="text-2xl font-bold text-slate-800">
-          <i class="fas fa-truck-loading mr-2 text-teal-600"></i>출고 관리
-        </h1>
+        <div>
+          <h1 class="text-2xl font-bold text-slate-800">
+            <i class="fas fa-truck-loading mr-2 text-teal-600"></i>출고 관리
+          </h1>
+          <p class="text-sm text-slate-500 mt-1">사이드바 출고·물류 순서와 동일 · 등록 → 피킹 → 패킹 → 이력 → 창고</p>
+        </div>
       </div>
 
-      <!-- 탭 네비게이션 -->
+      <!-- 탭 네비게이션 (사이드바: reg → picking → packing → hist → warehouse) -->
       <div class="flex border-b border-slate-200 mb-6 bg-white rounded-t-xl px-4 pt-2 shadow-sm overflow-x-auto">
         <button id="tab-out-reg" class="px-6 py-4 font-bold text-teal-600 border-b-2 border-teal-600 transition-colors flex items-center whitespace-nowrap" onclick="switchOutboundTab('reg')">
           <i class="fas fa-edit mr-2"></i>간편 출고 등록
@@ -64,6 +67,9 @@ async function switchOutboundTab(tabName) {
 
   if (typeof window.setHelpContext === 'function') {
     window.setHelpContext('outbound', tabName);
+  }
+  if (typeof window.syncSidebarNav === 'function') {
+    window.syncSidebarNav('outbound', tabName);
   }
 
   const container = document.getElementById('outboundTabContent');

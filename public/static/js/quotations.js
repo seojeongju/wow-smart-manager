@@ -8,10 +8,20 @@ window.loadQuotationsPage = async function loadQuotationsPage() {
   if (typeof window.setHelpContext === 'function') window.setHelpContext('quotations');
 
   content.innerHTML = `
-    <div class="flex flex-col lg:flex-row gap-6">
+    <div class="flex flex-col h-full">
+      ${window.renderPageHeader({
+        title: '견적 관리',
+        subtitle: '견적 작성 · 재고예약 · 수주 변환',
+        icon: 'fa-file-signature',
+        actionsHtml: `
+          <button type="button" onclick="reloadQuotations()" class="px-3 py-2 text-sm border border-slate-300 rounded-lg hover:bg-slate-50">
+            <i class="fas fa-sync-alt"></i>
+          </button>`
+      })}
+    <div class="flex flex-col lg:flex-row gap-6 flex-1">
       <div class="lg:w-5/12 space-y-4">
         <div class="bg-white border border-slate-200 rounded-xl p-5">
-          <h2 class="text-lg font-bold text-slate-800 mb-4"><i class="fas fa-file-signature text-teal-600 mr-2"></i>견적 작성</h2>
+          <h2 class="text-sm font-bold text-slate-700 mb-4">견적 작성</h2>
           <div class="space-y-3">
             <div>
               <label class="text-xs font-bold text-slate-500">고객 (선택)</label>
@@ -64,6 +74,7 @@ window.loadQuotationsPage = async function loadQuotationsPage() {
           </div>
         </div>
       </div>
+    </div>
     </div>
   `;
 

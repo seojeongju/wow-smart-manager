@@ -8,8 +8,45 @@ function logout() {
   localStorage.removeItem('refreshToken');
   localStorage.removeItem('user');
   localStorage.removeItem('tenant');
-  window.location.href = '/login';
+  window.location.replace('/login');
 }
+
+/**
+ * 앱 내 라우트 (해시) — 로그인 페이지를 히스토리에 남기지 않고
+ * 뒤로가기는 앱 화면만 이동하도록 함
+ */
+window.parseAppRoute = function parseAppRoute() {
+  const raw = String(location.hash || '').replace(/^#\/?/, '');
+  if (!raw) return { page: 'dashboard', tab: null };
+  const parts = raw.split('/').filter(Boolean).map((p) => {
+    try { return decodeURIComponent(p); } catch { return p; }
+  });
+  return {
+    page: parts[0] || 'dashboard',
+    tab: parts[1] || null
+  };
+};
+
+window.formatAppRoute = function formatAppRoute(page, tab = null) {
+  const p = encodeURIComponent(page || 'dashboard');
+  const t = tab != null && String(tab).length ? `/${encodeURIComponent(tab)}` : '';
+  return `#/${p}${t}`;
+};
+
+window.commitAppRoute = function commitAppRoute(page, tab = null, { replace = false } = {}) {
+  const nextHash = window.formatAppRoute(page, tab);
+  const cur = history.state || {};
+  const same =
+    cur.page === page &&
+    (cur.tab || null) === (tab || null) &&
+    location.hash === nextHash;
+  if (same && !replace) return;
+
+  const url = `${location.pathname}${location.search}${nextHash}`;
+  const state = { page, tab: tab || null };
+  if (replace) history.replaceState(state, '', url);
+  else history.pushState(state, '', url);
+};
 
 // 회사명 표시
 // 회사명 표시
@@ -117,7 +154,30 @@ document.addEventListener('DOMContentLoaded', () => {
   loadUserInfo();
   // Check Impersonation Status
   checkImpersonationStatus();
-  loadPage('dashboard');
+
+  const route = typeof window.parseAppRoute === 'function'
+    ? window.parseAppRoute()
+    : { page: 'dashboard', tab: null };
+
+  if (typeof window.commitAppRoute === 'function') {
+    window.commitAppRoute(route.page, route.tab, { replace: true });
+  }
+
+  loadPage(route.page, route.tab, { skipHistory: true });
+
+  window.addEventListener('popstate', (e) => {
+    if (!localStorage.getItem('token')) {
+      window.location.replace('/login');
+      return;
+    }
+    const st = e.state && e.state.page
+      ? { page: e.state.page, tab: e.state.tab || null }
+      : (typeof window.parseAppRoute === 'function'
+        ? window.parseAppRoute()
+        : { page: 'dashboard', tab: null });
+    loadPage(st.page || 'dashboard', st.tab || null, { skipHistory: true });
+  });
+
   if (typeof window.maybeStartHelpTour === 'function') {
     window.maybeStartHelpTour();
   }
@@ -221,7 +281,6 @@ function setupNavigation() {
       const target = e.currentTarget;
       const page = target.dataset.page;
       const tab = target.dataset.tab || null;
-      syncSidebarNav(page, tab);
       loadPage(page, tab);
     });
   });
@@ -231,8 +290,9 @@ function setupNavigation() {
  * 본문 탭 ↔ 사이드바 서브메뉴 활성 상태 동기화
  * @param {string} page data-page
  * @param {string|null} tab data-tab
+ * @param {{ skipHistory?: boolean }} opts
  */
-window.syncSidebarNav = function syncSidebarNav(page, tab = null) {
+window.syncSidebarNav = function syncSidebarNav(page, tab = null, opts = {}) {
   if (!page) return;
 
   document.querySelectorAll('.nav-link').forEach((l) => {
@@ -252,12 +312,25 @@ window.syncSidebarNav = function syncSidebarNav(page, tab = null) {
   if (!target) {
     target = links.find((l) => l.dataset.page === page);
   }
-  if (!target) return;
+
+  const commit = () => {
+    if (!opts.skipHistory && typeof window.commitAppRoute === 'function') {
+      window.commitAppRoute(page, tabKey);
+    }
+  };
+
+  if (!target) {
+    commit();
+    return;
+  }
 
   target.classList.add('active');
 
   const parentSubmenu = target.closest('.nav-submenu');
-  if (!parentSubmenu) return;
+  if (!parentSubmenu) {
+    commit();
+    return;
+  }
 
   // MES / ERP 그룹 내에서는 해당 서브메뉴만 열기
   const mesGroup = document.getElementById('nav-mes-group');
@@ -290,6 +363,8 @@ window.syncSidebarNav = function syncSidebarNav(page, tab = null) {
   try {
     target.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
   } catch (_) { /* ignore */ }
+
+  commit();
 };
 
 // 페이지 타이틀 업데이트
@@ -304,10 +379,87 @@ function updatePageTitle(title, subtitle) {
   }
 }
 
+/**
+ * ERP/MES 공통 페이지 헤더 (구현 페이지 기준)
+ * h1 + 아이콘 + 부제 + 우측 액션
+ */
+window.renderPageHeader = function renderPageHeader(opts = {}) {
+  const {
+    title = '',
+    subtitle = '',
+    icon = 'fa-file-alt',
+    accent = 'teal',
+    badgeHtml = '',
+    actionsHtml = ''
+  } = opts;
+  const iconColor = accent === 'orange' ? 'text-orange-600' : 'text-teal-600';
+  return `
+    <div class="flex flex-wrap justify-between items-center gap-3 mb-6">
+      <div>
+        <h1 class="text-2xl font-bold text-slate-800">
+          <i class="fas ${icon} mr-2 ${iconColor}"></i>${title}${badgeHtml || ''}
+        </h1>
+        ${subtitle ? `<p class="text-sm text-slate-500 mt-1">${subtitle}</p>` : ''}
+      </div>
+      ${actionsHtml ? `<div class="flex flex-wrap items-center gap-2">${actionsHtml}</div>` : ''}
+    </div>
+  `;
+};
+
+function renderStubRelatedButtons(related, accent = 'teal') {
+  const hover = accent === 'orange'
+    ? 'hover:border-orange-300 hover:bg-orange-50'
+    : 'hover:border-teal-300 hover:bg-teal-50';
+  const arrow = accent === 'orange' ? 'text-orange-600' : 'text-teal-600';
+  return (related || []).map((r) => {
+    const tabArg = r.tab ? `, '${r.tab}'` : '';
+    return `<button type="button" onclick="loadPage('${r.page}'${tabArg})"
+      class="inline-flex items-center gap-2 px-3 py-2 rounded-lg border border-slate-300 bg-white ${hover} text-sm text-slate-700 transition-colors">
+      <i class="fas fa-arrow-right ${arrow} text-xs"></i>${r.label}
+    </button>`;
+  }).join('');
+}
+
+function renderStubPageShell(container, meta, accent = 'teal') {
+  const phasePill = accent === 'orange'
+    ? 'bg-orange-100 text-orange-800'
+    : 'bg-indigo-100 text-indigo-700';
+  const badgeHtml = `
+    <span class="align-middle ml-2 text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-100 text-amber-800">준비중</span>
+    <span class="align-middle ml-1 text-[10px] font-bold px-2 py-0.5 rounded-full ${phasePill}">${meta.phase || ''}</span>
+  `;
+  const relatedHtml = renderStubRelatedButtons(meta.related, accent);
+  const domain = accent === 'orange' ? 'MES' : 'ERP';
+  container.innerHTML = `
+    <div class="flex flex-col h-full">
+      ${window.renderPageHeader({
+        title: meta.title,
+        subtitle: meta.summary || '',
+        icon: meta.icon || 'fa-layer-group',
+        accent,
+        badgeHtml
+      })}
+      <div class="bg-white border border-slate-200 rounded-xl p-6 space-y-4">
+        <p class="text-xs font-bold text-slate-500">${meta.module || domain}</p>
+        <p class="text-sm text-slate-600">
+          ${domain} 메뉴 골격에 등록된 항목입니다. 기능 구현은 로드맵 <strong>${meta.phase || '추후'}</strong>에서 진행됩니다.
+        </p>
+        ${relatedHtml ? `
+          <div>
+            <p class="text-xs font-bold text-slate-500 mb-2">관련 메뉴</p>
+            <div class="flex flex-wrap gap-2">${relatedHtml}</div>
+          </div>
+        ` : ''}
+      </div>
+    </div>
+  `;
+}
+
 // ERP 미구현 메뉴 스텁 메타 (Phase 0 골격)
 const ERP_STUB_META = {
   'crm-pipeline': {
     title: '영업 기회',
+    icon: 'fa-filter',
     module: '영업 · CRM',
     phase: 'Phase 3',
     summary: '리드·기회·파이프라인 추적 및 수주 전환을 관리합니다.',
@@ -319,6 +471,7 @@ const ERP_STUB_META = {
   },
   'proc-receive': {
     title: '입고 · 검수',
+    icon: 'fa-clipboard-check',
     module: '구매',
     phase: 'Phase 2',
     summary: '발주 대비 입고·품질검수·부분입고를 전용 화면으로 처리합니다. (현재는 발주 관리에서 입고 가능)',
@@ -329,6 +482,7 @@ const ERP_STUB_META = {
   },
   'proc-price': {
     title: '단가 관리',
+    icon: 'fa-tags',
     module: '구매',
     phase: 'Phase 2',
     summary: '공급사별·품목별 구매 단가 이력과 유효기간을 관리합니다.',
@@ -336,6 +490,7 @@ const ERP_STUB_META = {
   },
   'proc-eval': {
     title: '공급사 평가',
+    icon: 'fa-star-half-alt',
     module: '구매',
     phase: 'Phase 2',
     summary: '납기·품질·가격 기준으로 공급사를 평가하고 등급을 부여합니다.',
@@ -343,6 +498,7 @@ const ERP_STUB_META = {
   },
   'scm-reserve': {
     title: '예약 재고',
+    icon: 'fa-bookmark',
     module: '재고 · SCM',
     phase: 'Phase 2',
     summary: '견적·수주 기준 soft allocation 현황을 조회·조정합니다. (API는 견적/가용재고에 연동됨)',
@@ -353,6 +509,7 @@ const ERP_STUB_META = {
   },
   'scm-reorder': {
     title: '적정재고 · 발주제안',
+    icon: 'fa-lightbulb',
     module: '재고 · SCM',
     phase: 'Phase 2',
     summary: '안전재고·소진 예측 기반 자동 발주 제안을 제공합니다.',
@@ -363,6 +520,7 @@ const ERP_STUB_META = {
   },
   'fin-ar': {
     title: '매출채권 (AR)',
+    icon: 'fa-file-invoice-dollar',
     module: '재무 · 회계',
     phase: 'Phase 1',
     summary: '구현됨 — 사이드바 ERP → 재무 · 회계 → 매출채권 메뉴를 이용하세요.',
@@ -370,6 +528,7 @@ const ERP_STUB_META = {
   },
   'fin-ap': {
     title: '매입채무 (AP)',
+    icon: 'fa-hand-holding-usd',
     module: '재무 · 회계',
     phase: 'Phase 1',
     summary: '구현됨 — 사이드바 ERP → 재무 · 회계 → 매입채무 메뉴를 이용하세요.',
@@ -377,6 +536,7 @@ const ERP_STUB_META = {
   },
   'fin-voucher': {
     title: '전표',
+    icon: 'fa-book',
     module: '재무 · 회계',
     phase: 'Phase 1',
     summary: '구현됨 — 사이드바 ERP → 재무 · 회계 → 전표 메뉴를 이용하세요.',
@@ -384,6 +544,7 @@ const ERP_STUB_META = {
   },
   'fin-cash': {
     title: '자금 관리',
+    icon: 'fa-wallet',
     module: '재무 · 회계',
     phase: 'Phase 6',
     summary: '계좌·현금흐름·자금계획을 관리합니다.',
@@ -391,6 +552,7 @@ const ERP_STUB_META = {
   },
   'fin-close': {
     title: '결산 · 재무제표',
+    icon: 'fa-balance-scale',
     module: '재무 · 회계',
     phase: 'Phase 6',
     summary: '월/년 결산과 손익·재무상태표 등 재무제표를 작성합니다.',
@@ -398,6 +560,7 @@ const ERP_STUB_META = {
   },
   'fin-tax': {
     title: '세무',
+    icon: 'fa-percent',
     module: '재무 · 회계',
     phase: 'Phase 6',
     summary: '부가세 등 신고 기초 자료와 세무 리포트를 지원합니다.',
@@ -405,6 +568,7 @@ const ERP_STUB_META = {
   },
   'hr-org': {
     title: '조직 · 사원',
+    icon: 'fa-sitemap',
     module: '인사 · 급여',
     phase: 'Phase 5',
     summary: '조직도·사원 마스터·발령 정보를 관리합니다.',
@@ -412,6 +576,7 @@ const ERP_STUB_META = {
   },
   'hr-attendance': {
     title: '근태',
+    icon: 'fa-user-clock',
     module: '인사 · 급여',
     phase: 'Phase 5',
     summary: '출퇴근·휴가·연장근로를 기록하고 정산에 반영합니다.',
@@ -419,6 +584,7 @@ const ERP_STUB_META = {
   },
   'hr-payroll': {
     title: '급여',
+    icon: 'fa-money-check-alt',
     module: '인사 · 급여',
     phase: 'Phase 5',
     summary: '급여 계산·공제·이체 명세를 처리합니다.',
@@ -426,6 +592,7 @@ const ERP_STUB_META = {
   },
   'hr-talent': {
     title: '채용 · 평가 · 교육',
+    icon: 'fa-user-graduate',
     module: '인사 · 급여',
     phase: 'Phase 5',
     summary: '채용 프로세스, 성과평가, 교육 이력을 관리합니다.',
@@ -436,45 +603,20 @@ const ERP_STUB_META = {
 function renderErpStubPage(container, stubKey) {
   const meta = ERP_STUB_META[stubKey] || {
     title: '준비 중',
+    icon: 'fa-layer-group',
     module: 'ERP',
     phase: '추후',
     summary: '해당 ERP 메뉴는 골격만 등록된 상태입니다.',
     related: [{ label: '대시보드', page: 'dashboard' }]
   };
-  const relatedHtml = (meta.related || []).map((r) => {
-    const tabArg = r.tab ? `, '${r.tab}'` : '';
-    return `<button type="button" onclick="loadPage('${r.page}'${tabArg})"
-      class="inline-flex items-center gap-2 px-3 py-2 rounded-lg border border-slate-200 bg-white hover:border-teal-300 hover:bg-teal-50 text-sm text-slate-700 transition-colors">
-      <i class="fas fa-arrow-right text-teal-600 text-xs"></i>${r.label}
-    </button>`;
-  }).join('');
-
-  container.innerHTML = `
-    <div class="max-w-3xl mx-auto">
-      <div class="rounded-2xl border border-slate-200 bg-gradient-to-br from-slate-50 to-white p-8 shadow-sm">
-        <div class="flex flex-wrap items-center gap-2 mb-4">
-          <span class="text-[11px] font-bold uppercase tracking-wider text-slate-500">${meta.module}</span>
-          <span class="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-100 text-amber-800">준비중</span>
-          <span class="text-[10px] font-bold px-2 py-0.5 rounded-full bg-indigo-100 text-indigo-700">${meta.phase}</span>
-        </div>
-        <h2 class="text-2xl font-bold text-slate-900 mb-2">${meta.title}</h2>
-        <p class="text-slate-600 leading-relaxed mb-6">${meta.summary}</p>
-        <div class="rounded-xl bg-slate-900 text-slate-200 px-4 py-3 text-sm mb-6">
-          ERP 메뉴 골격에 등록된 항목입니다. 기능 구현은 로드맵 ${meta.phase}에서 진행됩니다.
-        </div>
-        ${relatedHtml ? `
-          <p class="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">관련 메뉴</p>
-          <div class="flex flex-wrap gap-2">${relatedHtml}</div>
-        ` : ''}
-      </div>
-    </div>
-  `;
+  renderStubPageShell(container, meta, 'teal');
 }
 
 // MES 미구현 메뉴 스텁 (MESA 모듈 골격)
 const MES_STUB_META = {
   'capa-plan': {
     title: '능력 · 부하 계획',
+    icon: 'fa-chart-area',
     module: '생산 계획 · 스케줄',
     phase: 'MES Phase 2',
     summary: '설비·라인 능력과 WO 부하를 맞춰 단기 스케줄을 최적화합니다.',
@@ -486,6 +628,7 @@ const MES_STUB_META = {
   },
   'data-collect': {
     title: '데이터 수집 허브',
+    icon: 'fa-satellite-dish',
     module: '작업 · 공정 제어',
     phase: 'MES Phase 3',
     summary: 'PLC·센서·IoT·터치패널 수집을 한곳에서 모니터링합니다. 현재는 현장 실행·QR로 수동/스캔 수집이 가능합니다.',
@@ -496,6 +639,7 @@ const MES_STUB_META = {
   },
   pm: {
     title: '예방보전 (PM)',
+    icon: 'fa-tools',
     module: '설비 · OEE',
     phase: 'MES Phase 2',
     summary: '보전 주기·캘린더·점검 체크리스트를 관리합니다. 현재는 설비 상태에서 보전 이벤트를 기록할 수 있습니다.',
@@ -506,6 +650,7 @@ const MES_STUB_META = {
   },
   spc: {
     title: 'SPC 관리도',
+    icon: 'fa-chart-line',
     module: '품질 관리',
     phase: 'MES Phase 2',
     summary: '치수·온습도 등 측정치의 관리도와 초/중/종물 검사를 통계적으로 관리합니다.',
@@ -518,43 +663,18 @@ const MES_STUB_META = {
 function renderMesStubPage(container, stubKey) {
   const meta = MES_STUB_META[stubKey] || {
     title: '준비 중',
+    icon: 'fa-industry',
     module: 'MES',
     phase: '추후',
     summary: '해당 MES 메뉴는 MESA 골격만 등록된 상태입니다.',
     related: [{ label: '현장 실행', page: 'production', tab: 'shopfloor' }]
   };
-  const relatedHtml = (meta.related || []).map((r) => {
-    const tabArg = r.tab ? `, '${r.tab}'` : '';
-    return `<button type="button" onclick="loadPage('${r.page}'${tabArg})"
-      class="inline-flex items-center gap-2 px-3 py-2 rounded-lg border border-slate-200 bg-white hover:border-orange-300 hover:bg-orange-50 text-sm text-slate-700 transition-colors">
-      <i class="fas fa-arrow-right text-orange-600 text-xs"></i>${r.label}
-    </button>`;
-  }).join('');
-
-  container.innerHTML = `
-    <div class="max-w-3xl mx-auto">
-      <div class="rounded-2xl border border-slate-200 bg-gradient-to-br from-orange-50/40 to-white p-8 shadow-sm">
-        <div class="flex flex-wrap items-center gap-2 mb-4">
-          <span class="text-[11px] font-bold uppercase tracking-wider text-slate-500">${meta.module}</span>
-          <span class="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-100 text-amber-800">준비중</span>
-          <span class="text-[10px] font-bold px-2 py-0.5 rounded-full bg-orange-100 text-orange-800">${meta.phase}</span>
-        </div>
-        <h2 class="text-2xl font-bold text-slate-900 mb-2">${meta.title}</h2>
-        <p class="text-slate-600 leading-relaxed mb-6">${meta.summary}</p>
-        <div class="rounded-xl bg-slate-900 text-slate-200 px-4 py-3 text-sm mb-6">
-          MESA 기준 MES 메뉴 골격입니다. 기능은 ${meta.phase}에서 구현됩니다.
-        </div>
-        ${relatedHtml ? `
-          <p class="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">관련 메뉴</p>
-          <div class="flex flex-wrap gap-2">${relatedHtml}</div>
-        ` : ''}
-      </div>
-    </div>
-  `;
+  renderStubPageShell(container, meta, 'orange');
 }
 
 // 페이지 로드
-async function loadPage(page, subPage = null) {
+async function loadPage(page, subPage = null, opts = {}) {
+  const skipHistory = !!(opts && opts.skipHistory);
   currentPage = page;
   const content = document.getElementById('content');
 
@@ -586,7 +706,9 @@ async function loadPage(page, subPage = null) {
     } else if (page === 'production') {
       navTab = subPage || 'shopfloor';
     }
-    window.syncSidebarNav(navPage, navTab);
+    window.syncSidebarNav(navPage, navTab, { skipHistory });
+  } else if (!skipHistory && typeof window.commitAppRoute === 'function') {
+    window.commitAppRoute(page, subPage);
   }
 
   if (typeof window.setHelpContext === 'function') {
@@ -643,7 +765,7 @@ async function loadPage(page, subPage = null) {
       break;
     case 'stock':
       updatePageTitle('재고 관리', '입고/출고 및 재고 조정');
-      await loadStock(content, subPage || 'movements');
+      await loadStock(content, subPage || 'levels');
       break;
     case 'sales':
       updatePageTitle('판매 관리', '판매 및 주문 내역 관리');
@@ -1383,19 +1505,18 @@ const custPerPage = 10;
 // 고객 관리 로드
 async function loadCustomers(content) {
   content.innerHTML = `
-    <div class="flex justify-between items-center mb-6">
-      <h1 class="text-2xl font-bold text-slate-800">
-        <i class="fas fa-users mr-2 text-teal-600"></i>고객 관리
-      </h1>
-      <div class="flex gap-2">
+    ${window.renderPageHeader({
+      title: '고객 관리',
+      subtitle: '고객 정보 및 구매 이력',
+      icon: 'fa-users',
+      actionsHtml: `
         <button onclick="downloadCustomers()" class="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-lg shadow-sm transition-colors flex items-center">
           <i class="fas fa-file-excel mr-2"></i>엑셀 다운로드
         </button>
         <button onclick="showCustomerModal()" class="bg-teal-600 hover:bg-teal-700 text-white px-4 py-2 rounded-lg shadow-sm transition-colors flex items-center">
           <i class="fas fa-plus mr-2"></i>고객 등록
-        </button>
-      </div>
-    </div>
+        </button>`
+    })}
     
     <!-- 검색 및 필터 -->
     <div class="bg-white rounded-lg shadow-sm p-4 mb-6 border border-slate-100">
@@ -1554,13 +1675,16 @@ window.changeCustomerPage = changeCustomerPage;
 // ==========================================
 
 // 재고 관리 로드
-async function loadStock(content, initialTab = 'movements') {
+async function loadStock(content, initialTab = 'levels') {
   content.innerHTML = `
     <div class="flex flex-col h-full">
       <div class="flex justify-between items-center mb-6">
-        <h1 class="text-2xl font-bold text-slate-800">
-          <i class="fas fa-cubes mr-2 text-teal-600"></i>재고 관리
-        </h1>
+        <div>
+          <h1 class="text-2xl font-bold text-slate-800">
+            <i class="fas fa-cubes mr-2 text-teal-600"></i>재고 관리
+          </h1>
+          <p class="text-sm text-slate-500 mt-1">사이드바 재고·SCM 순서와 동일 · 창고별 재고 → 이동 내역</p>
+        </div>
         <div class="space-x-2">
           <button onclick="openStockModal('in')" class="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-lg shadow-sm transition-colors">
             <i class="fas fa-plus mr-2"></i>입고
@@ -1577,13 +1701,13 @@ async function loadStock(content, initialTab = 'movements') {
         </div>
       </div>
 
-      <!-- 탭 버튼 -->
+      <!-- 탭 버튼 (사이드바: levels → movements) -->
       <div class="flex border-b border-slate-200 mb-6 bg-white rounded-t-xl px-4 pt-2 shadow-sm">
-        <button id="tab-stock-movements" class="px-6 py-4 font-bold text-teal-600 border-b-2 border-teal-600 transition-colors flex items-center">
-           <i class="fas fa-list-ul mr-2"></i>재고 이동 내역
-        </button>
-        <button id="tab-stock-levels" class="px-6 py-4 font-medium text-slate-500 hover:text-slate-700 transition-colors border-b-2 border-transparent flex items-center">
+        <button id="tab-stock-levels" class="px-6 py-4 font-bold text-teal-600 border-b-2 border-teal-600 transition-colors flex items-center">
            <i class="fas fa-boxes mr-2"></i>창고별 재고 현황
+        </button>
+        <button id="tab-stock-movements" class="px-6 py-4 font-medium text-slate-500 hover:text-slate-700 transition-colors border-b-2 border-transparent flex items-center">
+           <i class="fas fa-list-ul mr-2"></i>재고 이동 내역
         </button>
       </div>
 
@@ -1656,7 +1780,7 @@ async function loadStock(content, initialTab = 'movements') {
 // 재고 탭 전환
 async function switchStockTab(tabName) {
   console.log('Switching stock tab to:', tabName);
-  const tabs = ['movements', 'levels'];
+  const tabs = ['levels', 'movements'];
   tabs.forEach(t => {
     const btn = document.getElementById(`tab-stock-${t}`);
     if (btn) {
@@ -1672,6 +1796,9 @@ async function switchStockTab(tabName) {
 
   if (typeof window.setHelpContext === 'function') {
     window.setHelpContext('stock', tabName);
+  }
+  if (typeof window.syncSidebarNav === 'function') {
+    window.syncSidebarNav('stock', tabName);
   }
 
   const container = document.getElementById('stockTabContent');
@@ -2095,12 +2222,15 @@ async function loadSales(content, initialTab = 'pos') {
   content.innerHTML = `
     <div class="flex flex-col h-full">
       <div class="flex justify-between items-center mb-6">
-        <h1 class="text-2xl font-bold text-slate-800">
-          <i class="fas fa-shopping-cart mr-2 text-teal-600"></i>판매 및 주문 관리
-        </h1>
+        <div>
+          <h1 class="text-2xl font-bold text-slate-800">
+            <i class="fas fa-shopping-cart mr-2 text-teal-600"></i>판매 및 주문 관리
+          </h1>
+          <p class="text-sm text-slate-500 mt-1">사이드바 영업·CRM 탭 순서와 동일 · POS → 주문/배송 → 반품/교환</p>
+        </div>
       </div>
 
-      <!-- 탭 네비게이션 -->
+      <!-- 탭 네비게이션 (사이드바: pos → orders → claims) -->
       <div class="flex border-b border-slate-200 mb-6 bg-white rounded-t-xl px-4 pt-2 shadow-sm">
         <button id="tab-pos" class="px-6 py-4 font-bold text-teal-600 border-b-2 border-teal-600 transition-colors flex items-center" onclick="switchSalesTab('pos')">
           <i class="fas fa-cash-register mr-2"></i>POS (판매등록)
@@ -2137,6 +2267,9 @@ async function switchSalesTab(tabName) {
 
   if (typeof window.setHelpContext === 'function') {
     window.setHelpContext('sales', tabName);
+  }
+  if (typeof window.syncSidebarNav === 'function') {
+    window.syncSidebarNav('sales', tabName);
   }
 
   const container = document.getElementById('salesTabContent');
