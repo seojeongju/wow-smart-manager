@@ -608,4 +608,198 @@ app.get('/stats', async (c) => {
   return c.json({ success: true, data: row })
 })
 
+/** OEE 집계 — Availability 중심 (가동/정지/고장/보전 로그) */
+app.get('/oee', async (c) => {
+  const { DB } = c.env
+  const tenantId = c.get('tenantId')
+  const days = Math.min(Math.max(parseInt(c.req.query('days') || '7', 10) || 7, 1), 90)
+
+  try {
+    const { results: equipment } = await DB.prepare(`
+      SELECT e.id, e.code, e.name, e.status, e.location, pr.name as process_name
+      FROM mes_equipment e
+      LEFT JOIN mes_processes pr ON e.process_id = pr.id
+      WHERE e.tenant_id = ? AND e.is_active = 1
+      ORDER BY e.name ASC
+    `).bind(tenantId).all<any>()
+
+    const { results: logs } = await DB.prepare(`
+      SELECT equipment_id, event_type, started_at, ended_at, duration_minutes
+      FROM mes_equipment_logs
+      WHERE tenant_id = ?
+        AND started_at >= datetime('now', ?)
+      ORDER BY started_at ASC
+    `).bind(tenantId, `-${days} days`).all<any>()
+
+    const now = Date.now()
+    const byEq: Record<number, { run: number; stop: number; breakdown: number; maintenance: number }> = {}
+
+    for (const eq of equipment || []) {
+      byEq[eq.id] = { run: 0, stop: 0, breakdown: 0, maintenance: 0 }
+    }
+
+    for (const log of logs || []) {
+      const eid = Number(log.equipment_id)
+      if (!byEq[eid]) byEq[eid] = { run: 0, stop: 0, breakdown: 0, maintenance: 0 }
+      let mins = Number(log.duration_minutes)
+      if (!Number.isFinite(mins) || mins <= 0) {
+        const start = Date.parse(String(log.started_at).replace(' ', 'T'))
+        const end = log.ended_at
+          ? Date.parse(String(log.ended_at).replace(' ', 'T'))
+          : now
+        if (Number.isFinite(start) && Number.isFinite(end) && end > start) {
+          mins = (end - start) / 60000
+        } else {
+          mins = 0
+        }
+      }
+      const t = String(log.event_type || '')
+      if (t === 'run') byEq[eid].run += mins
+      else if (t === 'stop') byEq[eid].stop += mins
+      else if (t === 'breakdown') byEq[eid].breakdown += mins
+      else if (t === 'maintenance') byEq[eid].maintenance += mins
+    }
+
+    // 품질: 기간 내 WO 실적 (설비 연계 시) — scrap_qty 사용
+    let qMap = new Map<number, { good: number; defect: number }>()
+    try {
+      const { results: qualityRows } = await DB.prepare(`
+        SELECT
+          wo.equipment_id,
+          COALESCE(SUM(r.good_qty), 0) as good_qty,
+          COALESCE(SUM(r.scrap_qty), 0) as scrap_qty
+        FROM mes_production_records r
+        JOIN mes_work_orders wo ON wo.id = r.work_order_id
+        WHERE r.tenant_id = ?
+          AND wo.equipment_id IS NOT NULL
+          AND r.recorded_at >= datetime('now', ?)
+        GROUP BY wo.equipment_id
+      `).bind(tenantId, `-${days} days`).all<any>()
+      for (const q of qualityRows || []) {
+        qMap.set(Number(q.equipment_id), {
+          good: Number(q.good_qty) || 0,
+          defect: Number(q.scrap_qty) || 0
+        })
+      }
+    } catch { /* schema variance */ }
+
+    const rows = (equipment || []).map((eq: any) => {
+      const m = byEq[eq.id] || { run: 0, stop: 0, breakdown: 0, maintenance: 0 }
+      const total = m.run + m.stop + m.breakdown + m.maintenance
+      const availability = total > 0 ? m.run / total : (eq.status === 'running' ? 1 : 0)
+      const q = qMap.get(Number(eq.id)) || { good: 0, defect: 0 }
+      const qTotal = q.good + q.defect
+      const quality = qTotal > 0 ? q.good / qTotal : 1
+      const performance = 1 // 이상사이클 미정의 시 100%
+      const oee = availability * performance * quality
+      return {
+        equipment_id: eq.id,
+        code: eq.code,
+        name: eq.name,
+        status: eq.status,
+        location: eq.location,
+        process_name: eq.process_name,
+        minutes: {
+          run: Math.round(m.run * 10) / 10,
+          stop: Math.round(m.stop * 10) / 10,
+          breakdown: Math.round(m.breakdown * 10) / 10,
+          maintenance: Math.round(m.maintenance * 10) / 10,
+          total: Math.round(total * 10) / 10
+        },
+        availability: Math.round(availability * 1000) / 10,
+        performance: Math.round(performance * 1000) / 10,
+        quality: Math.round(quality * 1000) / 10,
+        oee: Math.round(oee * 1000) / 10,
+        good_qty: q.good,
+        defect_qty: q.defect
+      }
+    })
+
+    const withData = rows.filter((r: any) => r.minutes.total > 0)
+    const avg = (key: string) =>
+      withData.length
+        ? Math.round((withData.reduce((s: number, r: any) => s + r[key], 0) / withData.length) * 10) / 10
+        : rows.length
+          ? Math.round((rows.reduce((s: number, r: any) => s + r[key], 0) / rows.length) * 10) / 10
+          : 0
+
+    const statusSummary = {
+      running: rows.filter((r: any) => r.status === 'running').length,
+      idle: rows.filter((r: any) => r.status === 'idle' || r.status === 'stop').length,
+      breakdown: rows.filter((r: any) => r.status === 'breakdown').length,
+      maintenance: rows.filter((r: any) => r.status === 'maintenance').length,
+      total: rows.length
+    }
+
+    return c.json({
+      success: true,
+      data: {
+        days,
+        summary: {
+          avg_availability: avg('availability'),
+          avg_performance: avg('performance'),
+          avg_quality: avg('quality'),
+          avg_oee: avg('oee'),
+          status: statusSummary
+        },
+        equipment: rows
+      }
+    })
+  } catch (e: any) {
+    return c.json({ success: false, error: e.message || 'OEE 집계 실패' }, 500)
+  }
+})
+
+/** WIP 현황 — 진행/확정 작업지시 */
+app.get('/wip', async (c) => {
+  const { DB } = c.env
+  const tenantId = c.get('tenantId')
+
+  try {
+    const { results } = await DB.prepare(`
+      SELECT
+        wo.id, wo.wo_number, wo.status, wo.planned_qty, wo.completed_qty, wo.scrap_qty,
+        wo.planned_start_date, wo.planned_end_date, wo.actual_start_at,
+        p.name as product_name, p.sku,
+        pr.name as process_name, eq.name as equipment_name, eq.status as equipment_status
+      FROM mes_work_orders wo
+      LEFT JOIN products p ON p.id = wo.product_id
+      LEFT JOIN mes_processes pr ON pr.id = wo.process_id
+      LEFT JOIN mes_equipment eq ON eq.id = wo.equipment_id
+      WHERE wo.tenant_id = ?
+        AND wo.status IN ('released', 'confirmed', 'in_progress', 'planned')
+      ORDER BY
+        CASE wo.status
+          WHEN 'in_progress' THEN 0
+          WHEN 'released' THEN 1
+          WHEN 'confirmed' THEN 2
+          ELSE 3
+        END,
+        wo.id DESC
+      LIMIT 200
+    `).bind(tenantId).all<any>()
+
+    const rows = (results || []).map((r: any) => {
+      const planned = Number(r.planned_qty) || 0
+      const produced = Number(r.completed_qty) || 0
+      return {
+        ...r,
+        produced_qty: produced,
+        remaining_qty: Math.max(0, planned - produced),
+        progress_pct: planned > 0 ? Math.round((produced / planned) * 1000) / 10 : 0
+      }
+    })
+
+    const summary = {
+      count: rows.length,
+      in_progress: rows.filter((r: any) => r.status === 'in_progress').length,
+      remaining_qty: rows.reduce((s: number, r: any) => s + r.remaining_qty, 0)
+    }
+
+    return c.json({ success: true, data: rows, summary })
+  } catch (e: any) {
+    return c.json({ success: false, error: e.message || 'WIP 조회 실패' }, 500)
+  }
+})
+
 export default app

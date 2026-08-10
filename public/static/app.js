@@ -460,7 +460,89 @@ function renderErpStubPage(container, stubKey) {
         <h2 class="text-2xl font-bold text-slate-900 mb-2">${meta.title}</h2>
         <p class="text-slate-600 leading-relaxed mb-6">${meta.summary}</p>
         <div class="rounded-xl bg-slate-900 text-slate-200 px-4 py-3 text-sm mb-6">
-          ERP 메뉴 골격(Phase 0)에 등록된 항목입니다. 기능 구현은 로드맵 ${meta.phase}에서 진행됩니다.
+          ERP 메뉴 골격에 등록된 항목입니다. 기능 구현은 로드맵 ${meta.phase}에서 진행됩니다.
+        </div>
+        ${relatedHtml ? `
+          <p class="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">관련 메뉴</p>
+          <div class="flex flex-wrap gap-2">${relatedHtml}</div>
+        ` : ''}
+      </div>
+    </div>
+  `;
+}
+
+// MES 미구현 메뉴 스텁 (MESA 모듈 골격)
+const MES_STUB_META = {
+  'capa-plan': {
+    title: '능력 · 부하 계획',
+    module: '생산 계획 · 스케줄',
+    phase: 'MES Phase 2',
+    summary: '설비·라인 능력과 WO 부하를 맞춰 단기 스케줄을 최적화합니다.',
+    related: [
+      { label: '생산 일정', page: 'production', tab: 'schedule' },
+      { label: '작업지시', page: 'production', tab: 'work-orders' },
+      { label: 'OEE', page: 'mes-oee' }
+    ]
+  },
+  'data-collect': {
+    title: '데이터 수집 허브',
+    module: '작업 · 공정 제어',
+    phase: 'MES Phase 3',
+    summary: 'PLC·센서·IoT·터치패널 수집을 한곳에서 모니터링합니다. 현재는 현장 실행·QR로 수동/스캔 수집이 가능합니다.',
+    related: [
+      { label: '현장 실행', page: 'production', tab: 'shopfloor' },
+      { label: 'QR 현황', page: 'qr', tab: 'dashboard' }
+    ]
+  },
+  pm: {
+    title: '예방보전 (PM)',
+    module: '설비 · OEE',
+    phase: 'MES Phase 2',
+    summary: '보전 주기·캘린더·점검 체크리스트를 관리합니다. 현재는 설비 상태에서 보전 이벤트를 기록할 수 있습니다.',
+    related: [
+      { label: '설비 상태', page: 'mes-equipment' },
+      { label: 'OEE', page: 'mes-oee' }
+    ]
+  },
+  spc: {
+    title: 'SPC 관리도',
+    module: '품질 관리',
+    phase: 'MES Phase 2',
+    summary: '치수·온습도 등 측정치의 관리도와 초/중/종물 검사를 통계적으로 관리합니다.',
+    related: [
+      { label: '검사 · NCR', page: 'production', tab: 'quality' }
+    ]
+  }
+};
+
+function renderMesStubPage(container, stubKey) {
+  const meta = MES_STUB_META[stubKey] || {
+    title: '준비 중',
+    module: 'MES',
+    phase: '추후',
+    summary: '해당 MES 메뉴는 MESA 골격만 등록된 상태입니다.',
+    related: [{ label: '현장 실행', page: 'production', tab: 'shopfloor' }]
+  };
+  const relatedHtml = (meta.related || []).map((r) => {
+    const tabArg = r.tab ? `, '${r.tab}'` : '';
+    return `<button type="button" onclick="loadPage('${r.page}'${tabArg})"
+      class="inline-flex items-center gap-2 px-3 py-2 rounded-lg border border-slate-200 bg-white hover:border-orange-300 hover:bg-orange-50 text-sm text-slate-700 transition-colors">
+      <i class="fas fa-arrow-right text-orange-600 text-xs"></i>${r.label}
+    </button>`;
+  }).join('');
+
+  container.innerHTML = `
+    <div class="max-w-3xl mx-auto">
+      <div class="rounded-2xl border border-slate-200 bg-gradient-to-br from-orange-50/40 to-white p-8 shadow-sm">
+        <div class="flex flex-wrap items-center gap-2 mb-4">
+          <span class="text-[11px] font-bold uppercase tracking-wider text-slate-500">${meta.module}</span>
+          <span class="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-100 text-amber-800">준비중</span>
+          <span class="text-[10px] font-bold px-2 py-0.5 rounded-full bg-orange-100 text-orange-800">${meta.phase}</span>
+        </div>
+        <h2 class="text-2xl font-bold text-slate-900 mb-2">${meta.title}</h2>
+        <p class="text-slate-600 leading-relaxed mb-6">${meta.summary}</p>
+        <div class="rounded-xl bg-slate-900 text-slate-200 px-4 py-3 text-sm mb-6">
+          MESA 기준 MES 메뉴 골격입니다. 기능은 ${meta.phase}에서 구현됩니다.
         </div>
         ${relatedHtml ? `
           <p class="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">관련 메뉴</p>
@@ -609,6 +691,28 @@ async function loadPage(page, subPage = null) {
       renderErpStubPage(content, stubKey);
       break;
     }
+    case 'mes-stub': {
+      const stubKey = subPage || 'capa-plan';
+      const stubMeta = MES_STUB_META[stubKey];
+      updatePageTitle(stubMeta?.title || '준비 중', `${stubMeta?.module || 'MES'} · ${stubMeta?.phase || '추후'} 예정`);
+      renderMesStubPage(content, stubKey);
+      break;
+    }
+    case 'mes-equipment':
+      updatePageTitle('설비 상태', '가동·비가동 이벤트 기록');
+      if (window.loadMesEquipmentPage) await window.loadMesEquipmentPage();
+      else content.innerHTML = '<div class="text-center py-10">MES 모듈 로딩 중...</div>';
+      break;
+    case 'mes-oee':
+      updatePageTitle('OEE 대시보드', '종합설비효율 · 가동률 분석');
+      if (window.loadMesOeePage) await window.loadMesOeePage();
+      else content.innerHTML = '<div class="text-center py-10">MES 모듈 로딩 중...</div>';
+      break;
+    case 'mes-wip':
+      updatePageTitle('WIP 현황', '재공 · 진행 작업지시');
+      if (window.loadMesWipPage) await window.loadMesWipPage();
+      else content.innerHTML = '<div class="text-center py-10">MES 모듈 로딩 중...</div>';
+      break;
     case 'finance-ar':
       updatePageTitle('매출채권 (AR)', '미수 잔액 · 입금 · 연령분석');
       if (window.loadFinanceArPage) await window.loadFinanceArPage();

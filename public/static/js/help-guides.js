@@ -691,6 +691,45 @@ const HELP_GUIDES = {
     tips: [],
     related: [{ label: '현장 실행', page: 'production', tab: 'shopfloor' }]
   },
+  'mes-equipment': {
+    title: '설비 상태',
+    summary: '설비가동·정지·고장·보전 이벤트를 실시간 기록합니다.',
+    steps: [
+      '설비 카드를 확인하고 현재 상태를 봅니다.',
+      '[가동]/[정지]/[고장]/[보전]으로 상태 전환 이벤트를 기록합니다.'
+    ],
+    tips: ['이벤트 시간은 OEE 가동률 계산에 사용됩니다.'],
+    related: [
+      { label: 'OEE', page: 'mes-oee' },
+      { label: '설비 마스터', page: 'production', tab: 'masters' }
+    ]
+  },
+  'mes-oee': {
+    title: 'OEE 대시보드',
+    summary: '종합설비효율(가동률×성능×품질)을 설비별로 확인합니다.',
+    steps: [
+      '조회 기간(오늘/7일/30일)을 고릅니다.',
+      '평균 OEE와 설비별 A/P/Q를 확인합니다.'
+    ],
+    tips: ['성능(P)은 이상 사이클 미정의 시 100%로 계산됩니다.', '설비 상태에서 이벤트를 먼저 쌓으세요.'],
+    related: [
+      { label: '설비 상태', page: 'mes-equipment' },
+      { label: '제조 KPI', page: 'production', tab: 'kpi' }
+    ]
+  },
+  'mes-wip': {
+    title: 'WIP 현황',
+    summary: '계획·확정·진행 작업지시의 재공(잔량)을 한눈에 봅니다.',
+    steps: [
+      '진행중 건수·잔량 합을 확인합니다.',
+      '필요 시 작업지시·현장 실행으로 이동합니다.'
+    ],
+    tips: [],
+    related: [
+      { label: '작업지시', page: 'production', tab: 'work-orders' },
+      { label: '현장 실행', page: 'production', tab: 'shopfloor' }
+    ]
+  },
 
   // ---------- QR (우선) ----------
   'qr:dashboard': {
@@ -795,16 +834,19 @@ const HELP_HUB_SECTIONS = [
     ]
   },
   {
-    title: '제조실행',
+    title: 'MES (MESA)',
     items: [
-      { key: 'production:shopfloor', label: '현장 실행' },
-      { key: 'production:kpi', label: '제조 현황' },
+      { key: 'production:masters', label: 'BOM · 공정 · 설비' },
       { key: 'production:schedule', label: '생산 일정' },
-      { key: 'production:masters', label: '기준정보' },
       { key: 'production:work-orders', label: '작업지시' },
-      { key: 'production:materials', label: '자재·외주' },
-      { key: 'production:trace', label: '현장추적' },
-      { key: 'production:quality', label: '품질검사' }
+      { key: 'production:shopfloor', label: '현장 실행' },
+      { key: 'mes-equipment', label: '설비 상태' },
+      { key: 'mes-oee', label: 'OEE 대시보드' },
+      { key: 'production:quality', label: '검사 · NCR' },
+      { key: 'production:materials', label: '자재 · 외주' },
+      { key: 'mes-wip', label: 'WIP 현황' },
+      { key: 'production:trace', label: 'Lot · 역추적' },
+      { key: 'production:kpi', label: '제조 KPI · 원가' }
     ]
   },
   {
