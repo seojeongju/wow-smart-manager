@@ -1215,7 +1215,7 @@ app.get('/', (c: Context) => {
                                                                 시스템
                                                             </p>
                                                             <div class="space-y-1">
-                                                                <a href="#" data-page="help" class="nav-link flex items-center px-4 py-3 rounded-lg group" onclick="closeSidebarOnMobile()">
+                                                                <a href="#" id="nav-help" data-page="help" class="nav-link flex items-center px-4 py-3 rounded-lg group" onclick="closeSidebarOnMobile()">
                                                                     <i class="fas fa-book-open w-6 text-center text-lg mr-3"></i>
                                                                     <span class="font-medium">사용안내</span>
                                                                 </a>
@@ -1362,12 +1362,12 @@ app.get('/', (c: Context) => {
                                             <script src="/static/js/utils.js?v=2"></script>
                                             <script src="/static/js/utils_address.js?v=1"></script>
                                             <script src="/static/js/auth.js?v=1"></script>
-                                            <script src="/static/app.js?v=40"></script>
-                                            <script src="/static/js/outbound.js?v=10"></script>
-                                            <script src="/static/js/purchases.js?v=2"></script>
+                                            <script src="/static/app.js?v=41"></script>
+                                            <script src="/static/js/outbound.js?v=11"></script>
+                                            <script src="/static/js/purchases.js?v=3"></script>
                                             <script src="/static/js/options.js?v=1"></script>
                                             <script src="/static/js/products.js?v=8"></script>
-                                            <script src="/static/js/prices.js?v=1"></script>
+                                            <script src="/static/js/prices.js?v=2"></script>
                                             <script src="/static/js/system-settings.js?v=2"></script>
                                             <script src="/static/js/tracking.js?v=1"></script>
                                             <script src="/static/js/transaction-statement.js?v=1"></script>
@@ -1376,7 +1376,7 @@ app.get('/', (c: Context) => {
                                             <script src="/static/js/shopfloor.js?v=2"></script>
                                             <script src="/static/js/mes-schedule.js?v=1"></script>
                                             <script src="/static/js/barcode-manager.js?v=3"></script>
-                                            <script src="/static/js/help-guides.js?v=1"></script>
+                                            <script src="/static/js/help-guides.js?v=2"></script>
                                         </body>
                                     </html>
                                     `)

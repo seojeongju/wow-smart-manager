@@ -118,6 +118,9 @@ document.addEventListener('DOMContentLoaded', () => {
   // Check Impersonation Status
   checkImpersonationStatus();
   loadPage('dashboard');
+  if (typeof window.maybeStartHelpTour === 'function') {
+    window.maybeStartHelpTour();
+  }
 });
 
 // 사용자 정보 로드
@@ -1338,6 +1341,10 @@ async function switchStockTab(tabName) {
     }
   });
 
+  if (typeof window.setHelpContext === 'function') {
+    window.setHelpContext('stock', tabName);
+  }
+
   const container = document.getElementById('stockTabContent');
   if (!container) {
     console.error('stockTabContent 컨테이너를 찾을 수 없습니다.');
@@ -1912,6 +1919,10 @@ async function switchSalesTab(tabName) {
   const activeTab = document.getElementById(`tab-${tabName}`);
   activeTab.classList.remove('text-slate-500', 'font-medium', 'border-transparent');
   activeTab.classList.add('text-teal-600', 'border-b-2', 'border-teal-600', 'font-bold');
+
+  if (typeof window.setHelpContext === 'function') {
+    window.setHelpContext('sales', tabName);
+  }
 
   const container = document.getElementById('salesTabContent');
 

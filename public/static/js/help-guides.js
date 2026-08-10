@@ -34,74 +34,285 @@ const HELP_GUIDES = {
     title: '상품 관리',
     summary: '상품·SKU·바코드·가격·재고의 기준 정보를 관리합니다.',
     steps: [
-      '상품 등록에서 SKU·판매가를 입력합니다.',
+      '[상품 등록]에서 이름·SKU·판매가·매입가를 입력합니다.',
       '바코드가 있으면 바코드 칸에 스캔/입력합니다.',
+      '옵션·이미지가 필요하면 옵션 관리·상품 수정에서 연결합니다.',
       '수정 시 SKU는 변경되지 않습니다.'
     ],
     tips: ['바코드만 대량으로 다루려면 바코드 관리 메뉴를 쓰세요.'],
     related: [
+      { label: '옵션 관리', page: 'product-options' },
       { label: '바코드 등록', page: 'barcode', tab: 'register' },
       { label: '재고', page: 'stock' }
     ]
   },
+  'product-options': {
+    title: '옵션 관리',
+    summary: '색상·사이즈 등 옵션 그룹과 값을 관리하고 상품에 연결합니다.',
+    steps: [
+      '[새 옵션 그룹 등록]으로 그룹명과 값 목록을 만듭니다.',
+      '상품 등록/수정 화면에서 해당 옵션을 선택합니다.',
+      '사용하지 않는 그룹은 삭제하거나 수정합니다.'
+    ],
+    tips: ['옵션을 바꾸면 기존 재고·주문에 영향이 있을 수 있으니 운영 중에는 신중히 수정하세요.'],
+    related: [{ label: '상품', page: 'products' }]
+  },
   stock: {
     title: '재고 관리',
-    summary: '입고·출고·조정을 통해 창고별 재고를 맞춥니다.',
+    summary: '입고·출고·조정·이동으로 창고별 재고를 맞춥니다.',
     steps: [
-      '입고/출고 유형을 선택합니다.',
-      '상품·창고·수량을 입력 후 확정합니다.',
-      '이력에서 이동 내역을 확인합니다.'
+      '상단 [입고]/[출고]/[조정]/[이동]으로 즉시 처리할 수 있습니다.',
+      '재고 이동 내역 탭에서 이력을 확인합니다.',
+      '창고별 재고 현황 탭에서 위치별 잔량을 봅니다.'
     ],
-    tips: ['QR/바코드 현장 스캔 입고는 QR 현장 메뉴가 더 빠르습니다.'],
-    related: [{ label: 'QR 입고', page: 'qr', tab: 'inbound' }]
+    tips: ['현장 스캔 입고/출고는 QR 현장 메뉴가 더 빠릅니다.'],
+    related: [
+      { label: '재고 이동 내역', page: 'stock', tab: 'movements' },
+      { label: 'QR 입고', page: 'qr', tab: 'inbound' }
+    ]
+  },
+  'stock:movements': {
+    title: '재고 이동 내역',
+    summary: '입고·출고·조정·이동 이력을 조회합니다.',
+    steps: [
+      '기간·상품·창고 필터로 이력을 좁힙니다.',
+      '상단 버튼으로 새 입고/출고/조정을 등록합니다.',
+      '이상이 있으면 조정으로 수량을 맞춥니다.'
+    ],
+    tips: [],
+    related: [{ label: '창고별 현황', page: 'stock', tab: 'levels' }]
+  },
+  'stock:levels': {
+    title: '창고별 재고 현황',
+    summary: '창고·상품별 현재고를 확인합니다.',
+    steps: [
+      '창고를 골라 잔량을 확인합니다.',
+      '부족·과다가 보이면 이동 또는 발주를 검토합니다.'
+    ],
+    tips: ['부족 자재 생산용은 제조실행 → 자재·외주도 함께 보세요.'],
+    related: [
+      { label: '재고 이동', page: 'stock', tab: 'movements' },
+      { label: '자재·외주', page: 'production', tab: 'materials' }
+    ]
   },
   sales: {
     title: '판매 관리',
-    summary: '판매 전표 등록과 이력을 관리합니다.',
+    summary: 'POS 판매, 주문 이력, 클레임을 관리합니다.',
     steps: [
-      '고객·상품·수량을 넣어 판매를 등록합니다.',
-      '목록에서 이력을 조회합니다.'
+      '판매(POS) 탭에서 상품을 담아 즉시 판매합니다.',
+      '주문 관리에서 이력을 조회·처리합니다.',
+      '클레임 탭에서 반품·교환을 등록합니다.'
     ],
-    tips: ['스캔 판매는 QR 현장 → 판매를 이용하세요.'],
-    related: [{ label: 'QR 판매', page: 'qr', tab: 'sale' }]
+    tips: ['스캔 위주 매장이면 QR 현장 → 판매도 활용하세요.'],
+    related: [
+      { label: '판매(POS)', page: 'sales', tab: 'pos' },
+      { label: 'QR 판매', page: 'qr', tab: 'sale' }
+    ]
+  },
+  'sales:pos': {
+    title: '판매 (POS)',
+    summary: '상품을 담고 결제·판매를 즉시 처리하는 화면입니다.',
+    steps: [
+      '상품을 검색·선택해 장바구니에 담습니다.',
+      '(선택) 고객을 연결하면 등급/전용 단가가 반영될 수 있습니다.',
+      '수량·할인을 확인한 뒤 판매를 확정합니다.',
+      '최근 판매 목록에서 결과를 확인합니다.'
+    ],
+    tips: ['바코드건은 검색/스캔 입력칸에 포커스를 두고 사용하세요.'],
+    related: [
+      { label: '주문 관리', page: 'sales', tab: 'orders' },
+      { label: '가격 정책', page: 'pricing-policy' }
+    ]
+  },
+  'sales:orders': {
+    title: '주문 관리',
+    summary: '판매 주문 이력을 조회하고 상태를 관리합니다.',
+    steps: [
+      '기간·고객·상태로 주문을 검색합니다.',
+      '상세에서 품목·금액을 확인합니다.',
+      '필요 시 클레임으로 연결합니다.'
+    ],
+    tips: [],
+    related: [
+      { label: '클레임', page: 'sales', tab: 'claims' },
+      { label: '거래명세서', page: 'transaction-statement' }
+    ]
+  },
+  'sales:claims': {
+    title: '클레임',
+    summary: '반품·교환·불만 등 판매 후 이슈를 처리합니다.',
+    steps: [
+      '관련 주문을 찾아 클레임을 등록합니다.',
+      '사유·수량을 입력하고 처리 상태를 갱신합니다.'
+    ],
+    tips: ['재고 환원 여부는 처리 유형에 따라 확인하세요.'],
+    related: [{ label: '주문 관리', page: 'sales', tab: 'orders' }]
   },
   customers: {
     title: '고객 관리',
     summary: '고객 연락처·주소·등급 정보를 관리합니다.',
-    steps: ['고객을 등록/수정합니다.', '판매·출고 시 고객을 연결할 수 있습니다.'],
-    tips: [],
-    related: [{ label: '판매', page: 'sales' }]
+    steps: [
+      '[고객 등록]으로 기본 정보를 저장합니다.',
+      '등급을 지정하면 가격 정책의 단가가 연결됩니다.',
+      '판매·출고·거래명세서에서 고객을 선택합니다.'
+    ],
+    tips: ['등급·전용 단가는 가격 정책 메뉴에서 관리합니다.'],
+    related: [
+      { label: '판매', page: 'sales', tab: 'pos' },
+      { label: '가격 정책', page: 'pricing-policy' }
+    ]
   },
   outbound: {
     title: '출고 관리',
-    summary: '거래처 출고 주문과 배송 추적을 관리합니다.',
-    steps: ['출고를 등록하고 품목을 담습니다.', '출고 확정 후 송장/추적을 입력합니다.'],
-    tips: ['Lot/QR과 연계된 출고는 QR 출고·현장추적을 함께 보세요.'],
-    related: [{ label: 'QR 출고', page: 'qr', tab: 'outbound' }]
+    summary: '거래처 출고 등록·이력·창고별 현황을 관리합니다.',
+    steps: [
+      '간편 출고 등록에서 상품·수량을 담아 출고합니다.',
+      '이력에서 송장/추적을 확인합니다.',
+      '창고별 관리로 위치별 출고를 점검합니다.'
+    ],
+    tips: ['현장 스캔 출고는 QR 출고를 사용하세요.'],
+    related: [{ label: '간편 출고', page: 'outbound', tab: 'reg' }]
+  },
+  'outbound:reg': {
+    title: '간편 출고 등록',
+    summary: '상품을 선택해 빠르게 출고 전표를 만듭니다.',
+    steps: [
+      '왼쪽에서 상품을 골라 장바구니에 담습니다.',
+      '고객·창고·수량을 확인합니다.',
+      '출고를 확정하면 재고가 차감됩니다.'
+    ],
+    tips: ['엑셀 템플릿 일괄 등록도 지원됩니다.'],
+    related: [
+      { label: '출고 이력', page: 'outbound', tab: 'hist' },
+      { label: 'QR 출고', page: 'qr', tab: 'outbound' }
+    ]
+  },
+  'outbound:hist': {
+    title: '출고 이력',
+    summary: '과거 출고 전표와 배송 정보를 조회합니다.',
+    steps: [
+      '기간·고객으로 이력을 검색합니다.',
+      '상세에서 품목을 확인하고 추적을 입력합니다.'
+    ],
+    tips: [],
+    related: [{ label: '간편 출고', page: 'outbound', tab: 'reg' }]
+  },
+  'outbound:warehouse': {
+    title: '창고별 출고 관리',
+    summary: '창고 기준으로 출고·재고를 점검합니다.',
+    steps: ['창고를 선택합니다.', '해당 창고의 출고·잔량을 확인합니다.'],
+    tips: [],
+    related: [{ label: '창고별 재고', page: 'stock', tab: 'levels' }]
   },
   purchases: {
     title: '입고/발주',
-    summary: '공급사 발주서 작성·입고 처리 화면입니다.',
+    summary: '공급사 발주서 작성·입고 처리와 공급사 마스터를 관리합니다.',
     steps: [
-      '발주서를 작성하거나 MES에서 만든 초안을 확인합니다.',
-      '상태가 초안(DRAFT)이면 발주확정 후 입고합니다.',
-      '입고 처리 시 재고가 반영됩니다.'
+      '발주 관리 탭에서 발주서를 작성하거나 MES 초안을 확인합니다.',
+      '초안(DRAFT)은 발주확정 후 입고합니다.',
+      '공급사 관리에서 거래처를 먼저 등록해 두세요.'
     ],
     tips: ['부족 자재는 제조실행 → 자재·외주에서 초안을 만들 수 있습니다.'],
-    related: [{ label: '자재·외주', page: 'production', tab: 'materials' }]
+    related: [
+      { label: '발주 관리', page: 'purchases', tab: 'purchases' },
+      { label: '자재·외주', page: 'production', tab: 'materials' }
+    ]
+  },
+  'purchases:purchases': {
+    title: '발주 관리',
+    summary: '발주서 작성·확정·입고 처리를 진행합니다.',
+    steps: [
+      '새 발주를 만들거나 목록의 초안을 엽니다.',
+      '공급사·품목·수량·납기를 확인합니다.',
+      '[발주확정] 후 입고 처리하면 재고에 반영됩니다.'
+    ],
+    tips: ['DRAFT는 수정 가능, ORDERED 이후는 입고 흐름을 따릅니다.'],
+    related: [
+      { label: '공급사', page: 'purchases', tab: 'suppliers' },
+      { label: '자재·외주', page: 'production', tab: 'materials' }
+    ]
+  },
+  'purchases:suppliers': {
+    title: '공급사 관리',
+    summary: '발주에 사용할 공급사(거래처)를 등록합니다.',
+    steps: [
+      '[공급사 등록]으로 상호·담당·연락처를 저장합니다.',
+      '발주서 작성 시 이 목록에서 선택합니다.'
+    ],
+    tips: [],
+    related: [{ label: '발주 관리', page: 'purchases', tab: 'purchases' }]
   },
   prices: {
     title: '가격 정책',
     summary: '등급·고객별 특수 단가를 관리합니다.',
-    steps: ['등급 단가 또는 고객 단가를 등록합니다.', '판매 시 적용됩니다.'],
+    steps: ['등급별 단가 또는 고객 전용 단가를 등록합니다.', '판매(POS) 시 고객/등급에 따라 적용됩니다.'],
     tips: [],
-    related: [{ label: '고객', page: 'customers' }]
+    related: [{ label: '가격 정책', page: 'pricing-policy' }]
+  },
+  'pricing-policy': {
+    title: '가격 정책',
+    summary: '등급별 가격과 고객별 전용 단가를 설정합니다.',
+    steps: [
+      '등급별 가격 설정 탭에서 상품·등급 단가를 입력·저장합니다.',
+      '고객별 전용 단가 탭에서 특정 고객 계약을 등록합니다.',
+      '판매 시 고객을 선택하면 해당 단가가 반영됩니다.'
+    ],
+    tips: ['운영 가이드 버튼으로 화면 내 안내도 확인할 수 있습니다.'],
+    related: [
+      { label: '고객', page: 'customers' },
+      { label: '판매(POS)', page: 'sales', tab: 'pos' }
+    ]
+  },
+  'pricing-policy:grade': {
+    title: '등급별 가격',
+    summary: '고객 등급(A/B/C 등)에 따른 상품 단가를 설정합니다.',
+    steps: [
+      '상품을 검색합니다.',
+      '등급별 칸에 단가를 입력하고 저장합니다.'
+    ],
+    tips: [],
+    related: [{ label: '고객별 단가', page: 'pricing-policy', tab: 'customer' }]
+  },
+  'pricing-policy:customer': {
+    title: '고객별 전용 단가',
+    summary: '특정 고객과 상품의 계약 단가를 관리합니다.',
+    steps: [
+      '고객을 선택하고 계약 상품·단가를 추가합니다.',
+      '저장 후 POS/판매에서 해당 고객 선택 시 적용됩니다.'
+    ],
+    tips: [],
+    related: [{ label: '등급별 가격', page: 'pricing-policy', tab: 'grade' }]
+  },
+  'transaction-statement': {
+    title: '거래명세서',
+    summary: '고객·기간 기준으로 거래명세서를 조회·출력합니다.',
+    steps: [
+      '고객을 검색·선택합니다.',
+      '시작일·종료일을 지정합니다.',
+      '명세를 조회한 뒤 인쇄/PDF로 출력합니다.'
+    ],
+    tips: ['판매·출고 데이터가 반영되므로 기간을 정확히 맞추세요.'],
+    related: [
+      { label: '주문 관리', page: 'sales', tab: 'orders' },
+      { label: '고객', page: 'customers' }
+    ]
   },
   settings: {
     title: '설정',
     summary: '회사·사용자·권한 등 시스템 설정을 다룹니다.',
-    steps: ['회사 정보·로고를 확인합니다.', '필요 시 멤버를 초대하고 역할을 지정합니다.'],
-    tips: [],
+    steps: [
+      '회사 정보·로고를 확인합니다.',
+      '필요 시 멤버를 초대하고 역할을 지정합니다.',
+      '창고·기본 운영 옵션을 점검합니다.'
+    ],
+    tips: ['관리자 권한이 필요합니다.'],
+    related: [{ label: '사용안내', page: 'help' }]
+  },
+  'super-admin': {
+    title: '슈퍼관리',
+    summary: '플랫폼 관리자용 테넌트·시스템 점검 화면입니다.',
+    steps: ['테넌트를 조회·전환합니다.', '일반 운영 업무는 각 테넌트 메뉴에서 진행합니다.'],
+    tips: ['일반 사용자에게는 보이지 않습니다.'],
     related: []
   },
 
@@ -343,11 +554,19 @@ const HELP_HUB_SECTIONS = [
     title: '유통·공통',
     items: [
       { key: 'dashboard', label: '대시보드' },
+      { key: 'sales:pos', label: '판매(POS)' },
+      { key: 'sales:orders', label: '주문 관리' },
+      { key: 'sales:claims', label: '클레임' },
+      { key: 'outbound:reg', label: '간편 출고' },
+      { key: 'outbound:hist', label: '출고 이력' },
+      { key: 'purchases:purchases', label: '발주 관리' },
+      { key: 'purchases:suppliers', label: '공급사' },
+      { key: 'stock:movements', label: '재고 이동' },
+      { key: 'stock:levels', label: '창고별 재고' },
+      { key: 'transaction-statement', label: '거래명세서' },
       { key: 'products', label: '상품' },
-      { key: 'stock', label: '재고' },
-      { key: 'sales', label: '판매' },
-      { key: 'purchases', label: '입고/발주' },
-      { key: 'outbound', label: '출고' },
+      { key: 'product-options', label: '옵션 관리' },
+      { key: 'pricing-policy', label: '가격 정책' },
       { key: 'customers', label: '고객' },
       { key: 'settings', label: '설정' }
     ]
@@ -365,6 +584,7 @@ function helpEsc(str) {
 function helpNormalizeKey(page, tab) {
   if (!page) return 'dashboard';
   if (page === 'help' || page === 'guide') return 'hub';
+  if (page === 'prices') page = 'pricing-policy';
   if (page === 'shopfloor') return 'production:shopfloor';
   if (String(page).startsWith('qr-')) {
     const m = {
@@ -517,9 +737,15 @@ window.loadHelpHubPage = async function () {
 
   content.innerHTML = `
     <div class="max-w-5xl mx-auto">
-      <div class="mb-6">
-        <h1 class="text-2xl font-bold text-slate-800"><i class="fas fa-book-open mr-2 text-teal-600"></i>사용안내</h1>
-        <p class="text-sm text-slate-500 mt-1">메뉴별 짧은 설명서입니다. 업무 중에는 헤더의 ? 버튼으로 현재 화면 안내를 여세요.</p>
+      <div class="mb-6 flex flex-col sm:flex-row sm:items-end sm:justify-between gap-3">
+        <div>
+          <h1 class="text-2xl font-bold text-slate-800"><i class="fas fa-book-open mr-2 text-teal-600"></i>사용안내</h1>
+          <p class="text-sm text-slate-500 mt-1">메뉴별 짧은 설명서입니다. 업무 중에는 헤더의 ? 버튼으로 현재 화면 안내를 여세요.</p>
+        </div>
+        <button type="button" onclick="startHelpTour(true)"
+          class="inline-flex items-center gap-2 px-4 py-2 rounded-lg border border-teal-200 bg-teal-50 text-teal-800 text-sm font-semibold hover:bg-teal-100">
+          <i class="fas fa-route"></i>첫 사용 투어
+        </button>
       </div>
 
       <div class="grid lg:grid-cols-12 gap-6">
@@ -578,4 +804,191 @@ window.helpHubShow = function (key) {
       if (typeof loadPage === 'function') loadPage(page, tab || null);
     };
   }
+};
+
+/* ========== 첫 방문 투어 ========== */
+const HELP_TOUR_STORAGE_KEY = 'wsm_help_tour_v1';
+const HELP_TOUR_SESSION_KEY = 'wsm_help_tour_session_v1';
+
+const HELP_TOUR_STEPS = [
+  {
+    title: '왼쪽 메뉴',
+    body: '유통·제조·QR·바코드 업무가 사이드바에 모여 있습니다. 그룹을 펼쳐 원하는 화면으로 이동하세요.',
+    selector: '#sidebar',
+    pad: 8
+  },
+  {
+    title: '현재 화면 도움말',
+    body: '우측 상단 ? (도움말)을 누르면 지금 보고 있는 메뉴의 짧은 설명서가 열립니다.',
+    selector: '#help-page-btn',
+    pad: 10
+  },
+  {
+    title: '사용안내 허브',
+    body: '시스템 → 사용안내에서 전체 메뉴 설명과 추천 업무 시나리오를 볼 수 있습니다.',
+    selector: '#nav-help',
+    pad: 8
+  },
+  {
+    title: '제조·현장부터',
+    body: '생산 일정을 배치한 뒤 현장 실행으로 스캔·실적을 처리하고, 부족 자재는 자재·외주에서 발주 초안을 만들 수 있습니다.',
+    selector: 'a.nav-link[data-page="production"][data-tab="shopfloor"]',
+    pad: 8
+  }
+];
+
+function helpTourIsDismissed() {
+  try {
+    if (localStorage.getItem(HELP_TOUR_STORAGE_KEY) === 'dismissed') return true;
+    if (sessionStorage.getItem(HELP_TOUR_SESSION_KEY) === 'done') return true;
+    return false;
+  } catch {
+    return false;
+  }
+}
+
+function helpTourMarkDismissed() {
+  try {
+    localStorage.setItem(HELP_TOUR_STORAGE_KEY, 'dismissed');
+  } catch { /* ignore */ }
+}
+
+function helpTourMarkSessionDone() {
+  try {
+    sessionStorage.setItem(HELP_TOUR_SESSION_KEY, 'done');
+  } catch { /* ignore */ }
+}
+
+function ensureHelpTourDom() {
+  if (document.getElementById('help-tour-overlay')) return;
+  const wrap = document.createElement('div');
+  wrap.innerHTML = `
+    <div id="help-tour-overlay" class="hidden fixed inset-0 z-[90]">
+      <div id="help-tour-backdrop" class="absolute inset-0 cursor-default"></div>
+      <div id="help-tour-spot" class="absolute rounded-xl ring-2 ring-teal-400 pointer-events-none shadow-[0_0_0_9999px_rgba(15,23,42,0.55)] transition-all duration-200 bg-transparent"></div>
+      <div id="help-tour-card" class="absolute z-10 w-[min(360px,calc(100vw-2rem))] bg-white rounded-2xl shadow-2xl border border-slate-200 p-4">
+        <div class="text-[11px] font-bold text-teal-700 mb-1" id="help-tour-step-label">1 / 4</div>
+        <h3 id="help-tour-title" class="text-base font-bold text-slate-800"></h3>
+        <p id="help-tour-body" class="text-sm text-slate-600 mt-2 leading-relaxed"></p>
+        <label class="mt-3 flex items-center gap-2 text-xs text-slate-500 cursor-pointer select-none">
+          <input type="checkbox" id="help-tour-dont-show" class="rounded border-slate-300 text-teal-600 focus:ring-teal-500">
+          다시 보지 않기
+        </label>
+        <div class="mt-4 flex items-center justify-between gap-2">
+          <button type="button" id="help-tour-skip" class="text-sm text-slate-500 hover:text-slate-700 px-2 py-1.5">건너뛰기</button>
+          <div class="flex gap-2">
+            <button type="button" id="help-tour-prev" class="px-3 py-1.5 rounded-lg border border-slate-200 text-sm text-slate-600 hover:bg-slate-50">이전</button>
+            <button type="button" id="help-tour-next" class="px-3 py-1.5 rounded-lg bg-teal-600 text-white text-sm font-semibold hover:bg-teal-700">다음</button>
+          </div>
+        </div>
+      </div>
+    </div>`;
+  document.body.appendChild(wrap.firstElementChild);
+
+  document.getElementById('help-tour-backdrop')?.addEventListener('click', () => finishHelpTour(true));
+  document.getElementById('help-tour-skip')?.addEventListener('click', () => finishHelpTour(true));
+  document.getElementById('help-tour-prev')?.addEventListener('click', () => {
+    if (window._helpTourIndex > 0) {
+      window._helpTourIndex -= 1;
+      renderHelpTourStep();
+    }
+  });
+  document.getElementById('help-tour-next')?.addEventListener('click', () => {
+    if (window._helpTourIndex < HELP_TOUR_STEPS.length - 1) {
+      window._helpTourIndex += 1;
+      renderHelpTourStep();
+    } else {
+      finishHelpTour(true);
+    }
+  });
+}
+
+function placeHelpTourCard(rect) {
+  const card = document.getElementById('help-tour-card');
+  if (!card) return;
+  const cw = card.offsetWidth || 360;
+  const ch = card.offsetHeight || 220;
+  const gap = 12;
+  let top = rect.bottom + gap;
+  let left = Math.min(Math.max(12, rect.left), window.innerWidth - cw - 12);
+  if (top + ch > window.innerHeight - 12) {
+    top = Math.max(12, rect.top - ch - gap);
+  }
+  if (top < 12) top = 12;
+  card.style.top = `${top}px`;
+  card.style.left = `${left}px`;
+}
+
+function renderHelpTourStep() {
+  const step = HELP_TOUR_STEPS[window._helpTourIndex];
+  if (!step) return finishHelpTour(false);
+
+  const title = document.getElementById('help-tour-title');
+  const body = document.getElementById('help-tour-body');
+  const label = document.getElementById('help-tour-step-label');
+  const nextBtn = document.getElementById('help-tour-next');
+  const prevBtn = document.getElementById('help-tour-prev');
+  const spot = document.getElementById('help-tour-spot');
+  if (title) title.textContent = step.title;
+  if (body) body.textContent = step.body;
+  if (label) label.textContent = `${window._helpTourIndex + 1} / ${HELP_TOUR_STEPS.length}`;
+  if (nextBtn) nextBtn.textContent = window._helpTourIndex === HELP_TOUR_STEPS.length - 1 ? '시작하기' : '다음';
+  if (prevBtn) prevBtn.disabled = window._helpTourIndex === 0;
+
+  const el = document.querySelector(step.selector);
+  const pad = step.pad || 8;
+  let rect;
+  if (el) {
+    el.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+    rect = el.getBoundingClientRect();
+  } else {
+    rect = { top: 80, left: 80, right: 280, bottom: 200, width: 200, height: 120 };
+  }
+  if (spot) {
+    spot.style.top = `${Math.max(0, rect.top - pad)}px`;
+    spot.style.left = `${Math.max(0, rect.left - pad)}px`;
+    spot.style.width = `${Math.max(40, rect.width + pad * 2)}px`;
+    spot.style.height = `${Math.max(40, rect.height + pad * 2)}px`;
+  }
+  placeHelpTourCard(rect);
+}
+
+window.finishHelpTour = function (respectCheckbox) {
+  const overlay = document.getElementById('help-tour-overlay');
+  overlay?.classList.add('hidden');
+  window._helpTourActive = false;
+  helpTourMarkSessionDone();
+  if (respectCheckbox) {
+    const cb = document.getElementById('help-tour-dont-show');
+    if (cb?.checked) helpTourMarkDismissed();
+  }
+  window.removeEventListener('resize', renderHelpTourStep);
+};
+
+window.startHelpTour = function (force = false) {
+  if (!force && helpTourIsDismissed()) return;
+  if (window._helpTourActive) return;
+  if (force) {
+    try {
+      sessionStorage.removeItem(HELP_TOUR_SESSION_KEY);
+    } catch { /* ignore */ }
+  }
+  ensureHelpTourDom();
+  window._helpTourActive = true;
+  window._helpTourIndex = 0;
+  const cb = document.getElementById('help-tour-dont-show');
+  if (cb) cb.checked = false;
+  document.getElementById('help-tour-overlay')?.classList.remove('hidden');
+  window.addEventListener('resize', renderHelpTourStep);
+  renderHelpTourStep();
+};
+
+window.maybeStartHelpTour = function () {
+  if (helpTourIsDismissed()) return;
+  if (window._helpTourScheduled) return;
+  window._helpTourScheduled = true;
+  setTimeout(() => {
+    if (!document.getElementById('sidebar')) return;
+    startHelpTour(false);
+  }, 900);
 };

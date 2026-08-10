@@ -202,7 +202,18 @@ async function submitCustomerPriceBulk() { const cid = document.getElementById('
 async function renderPricingGradeTab() { const area = document.getElementById('pricingSearchArea'); if (area) area.classList.remove('hidden'); const container = document.getElementById('pricingTabContent'); const q = document.getElementById('pricingProdSearch')?.value || ''; container.innerHTML = `<div class="flex justify-center py-10"><div class="animate-spin h-8 w-8 border-b-2 border-teal-600"></div></div>`; try { const [pRes, prRes] = await Promise.all([axios.get(`${API_BASE}/products`, { params: { search: q, limit: 100 } }), axios.get(`${API_BASE}/prices/all`)]); const priceMap = {}; prRes.data.data.grade_prices.forEach(gp => { if (!priceMap[gp.product_id]) priceMap[gp.product_id] = {}; priceMap[gp.product_id][gp.grade] = gp.price; }); container.innerHTML = `<div class="bg-white rounded-2xl border shadow-sm overflow-hidden"><table class="min-w-full"><thead class="bg-slate-50"><tr><th class="px-6 py-4 text-left text-xs font-bold text-slate-500">상품 정보</th><th class="px-6 py-4 text-right text-xs font-bold text-slate-500">기본가</th><th class="px-4 py-4 text-center text-xs font-bold text-indigo-500">VIP</th><th class="px-4 py-4 text-center text-xs font-bold text-amber-600">도매</th><th class="px-4 py-4 text-center text-xs font-bold text-emerald-500">대리점</th></tr></thead><tbody>${pRes.data.data.map(p => `<tr><td class="px-6 py-4 text-sm font-bold">${p.name}<div class="text-[10px] text-slate-400 font-mono">${p.sku}</div></td><td class="px-6 py-4 text-right text-xs text-slate-400">${formatCurrency(p.selling_price)}</td>${['VIP', '도매', '대리점'].map(g => `<td class="px-4 py-4"><input type="number" class="w-24 border border-slate-200 rounded px-2 py-1 text-xs text-center" value="${priceMap[p.id]?.[g] || ''}" onchange="quickSaveGradePrice(${p.id}, '${g}', this.value)"></td>`).join('')}</tr>`).join('')}</tbody></table></div>`; } catch (e) { } }
 async function quickSaveGradePrice(pid, grade, price) { try { await axios.post(`${API_BASE}/prices/grade`, { product_id: pid, grade, price: parseFloat(price) || 0 }); showToast('저장 완료'); } catch (e) { } }
 async function deleteCustomerPrice(id) { if (!confirm('삭제하시겠습니까?')) return; try { await axios.delete(`${API_BASE}/prices/customer/${id}`); renderPricingCustomerTab(); } catch (e) { } }
-function switchPricingTab(tabName) { document.querySelectorAll('[id^="tab-"]').forEach(el => { el.classList.remove('text-teal-600', 'border-b-2', 'border-teal-600', 'font-bold'); el.classList.add('text-slate-500', 'font-medium', 'border-transparent'); }); document.getElementById(`tab-${tabName}-prices`).classList.add('text-teal-600', 'border-b-2', 'border-teal-600', 'font-bold'); if (tabName === 'grade') renderPricingGradeTab(); else renderPricingCustomerTab(); }
+function switchPricingTab(tabName) {
+  document.querySelectorAll('[id^="tab-"]').forEach(el => {
+    el.classList.remove('text-teal-600', 'border-b-2', 'border-teal-600', 'font-bold');
+    el.classList.add('text-slate-500', 'font-medium', 'border-transparent');
+  });
+  document.getElementById(`tab-${tabName}-prices`).classList.add('text-teal-600', 'border-b-2', 'border-teal-600', 'font-bold');
+  if (typeof window.setHelpContext === 'function') {
+    window.setHelpContext('pricing-policy', tabName);
+  }
+  if (tabName === 'grade') renderPricingGradeTab();
+  else renderPricingCustomerTab();
+}
 function showPricingHelp() { alert('도움말: 기준 단가를 크게 보강하였습니다. 할인폭을 더 쉽게 확인하세요.'); }
 
 window.loadPricingPolicy = loadPricingPolicy;

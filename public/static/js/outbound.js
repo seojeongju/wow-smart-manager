@@ -56,6 +56,10 @@ async function switchOutboundTab(tabName) {
     }
   });
 
+  if (typeof window.setHelpContext === 'function') {
+    window.setHelpContext('outbound', tabName);
+  }
+
   const container = document.getElementById('outboundTabContent');
   container.innerHTML = ''; // Clear content first
 
