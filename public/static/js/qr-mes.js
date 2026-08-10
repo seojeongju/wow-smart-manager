@@ -186,701 +186,387 @@ async function renderQRDashboardPage(container) {
 // ================================================
 // QR 입고 페이지
 // ================================================
-async function renderQRInboundPage(container) {
+// ================================================
+// QR 입고 / 출고 / 판매 — 통합 현장 UX
+// ================================================
+
+const QR_OPS = {
+  inbound: {
+    type: 'inbound',
+    title: 'QR 입고',
+    subtitle: '스캔 → 수량·창고 확인 → 입고 확정',
+    icon: 'fa-sign-in-alt',
+    accent: 'teal',
+    confirmLabel: '입고 확정',
+    confirmFn: 'confirmQRInbound()',
+    historyTitle: '오늘 입고',
+    historyRefresh: 'loadInboundHistory()',
+    readerId: 'qr-reader',
+    startBtnId: 'start-scan-btn',
+    stopBtnId: 'stop-scan-btn',
+    guideId: 'scan-guide',
+    manualId: 'manual-qr-input',
+    waitingId: 'scan-waiting',
+    resultId: 'qr-scan-result',
+    historyId: 'qr-inbound-history',
+    needsWarehouse: true
+  },
+  outbound: {
+    type: 'outbound',
+    title: 'QR 출고',
+    subtitle: '스캔 → 수량·창고 확인 → 출고 확정',
+    icon: 'fa-dolly',
+    accent: 'amber',
+    confirmLabel: '출고 확정',
+    confirmFn: 'confirmQROutbound()',
+    historyTitle: '오늘 출고',
+    historyRefresh: 'loadOutboundHistory()',
+    readerId: 'qr-reader-outbound',
+    startBtnId: 'start-scan-btn-outbound',
+    stopBtnId: 'stop-scan-btn-outbound',
+    guideId: 'scan-guide-outbound',
+    manualId: 'manual-qr-input-outbound',
+    waitingId: 'scan-waiting-outbound',
+    resultId: 'qr-outbound-result',
+    historyId: 'qr-outbound-history',
+    needsWarehouse: true
+  },
+  sale: {
+    type: 'sale',
+    title: 'QR 판매',
+    subtitle: '스캔 → 수량·단가 확인 → 판매 확정',
+    icon: 'fa-cash-register',
+    accent: 'emerald',
+    confirmLabel: '판매 확정',
+    confirmFn: 'confirmQRSale()',
+    historyTitle: '오늘 판매',
+    historyRefresh: 'loadSaleHistory()',
+    readerId: 'qr-reader-sale',
+    startBtnId: 'start-scan-btn-sale',
+    stopBtnId: 'stop-scan-btn-sale',
+    guideId: 'scan-guide-sale',
+    manualId: 'manual-qr-input-sale',
+    waitingId: 'scan-waiting-sale',
+    resultId: 'qr-sale-result',
+    historyId: 'qr-sale-history',
+    needsWarehouse: false
+  }
+};
+
+const QR_ACCENT = {
+  teal: {
+    bar: 'bg-teal-600',
+    soft: 'bg-teal-50 border-teal-200',
+    text: 'text-teal-700',
+    btn: 'bg-teal-600 hover:bg-teal-700',
+    ring: 'focus:ring-teal-500 border-teal-300',
+    chip: 'bg-teal-100 text-teal-800',
+    cam: 'border-teal-500'
+  },
+  amber: {
+    bar: 'bg-amber-600',
+    soft: 'bg-amber-50 border-amber-200',
+    text: 'text-amber-800',
+    btn: 'bg-amber-600 hover:bg-amber-700',
+    ring: 'focus:ring-amber-500 border-amber-300',
+    chip: 'bg-amber-100 text-amber-900',
+    cam: 'border-amber-500'
+  },
+  emerald: {
+    bar: 'bg-emerald-600',
+    soft: 'bg-emerald-50 border-emerald-200',
+    text: 'text-emerald-800',
+    btn: 'bg-emerald-600 hover:bg-emerald-700',
+    ring: 'focus:ring-emerald-500 border-emerald-300',
+    chip: 'bg-emerald-100 text-emerald-900',
+    cam: 'border-emerald-500'
+  }
+};
+
+function renderQROpsWorkspace(container, type) {
+  const op = QR_OPS[type];
+  const a = QR_ACCENT[op.accent];
+
   container.innerHTML = `
-    <div class="bg-gradient-to-br from-teal-50 to-blue-50 rounded-2xl shadow-sm border border-teal-200 overflow-hidden">
-      <!-- 헤더 -->
-      <div class="bg-gradient-to-r from-teal-600 to-blue-600 p-6">
-        <div class="flex items-center justify-between">
-          <div class="flex items-center gap-4">
-            <div class="w-14 h-14 bg-white/20 backdrop-blur-sm rounded-2xl flex items-center justify-center">
-              <i class="fas fa-qrcode text-white text-2xl"></i>
-            </div>
-            <div>
-              <h2 class="text-2xl font-bold text-white flex items-center gap-3">
-                QR 스캔 입고
-              </h2>
-              <p class="text-teal-100 mt-1">QR 코드를 스캔하여 빠르게 입고 처리</p>
-            </div>
+    <div class="max-w-6xl mx-auto space-y-4">
+      <!-- 상단: 작업 요약 -->
+      <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+        <div class="flex items-center gap-3">
+          <div class="w-11 h-11 ${a.bar} rounded-xl flex items-center justify-center text-white">
+            <i class="fas ${op.icon}"></i>
           </div>
-          <button onclick="loadInboundHistory()" class="px-4 py-2 bg-white/20 backdrop-blur-sm text-white rounded-lg hover:bg-white/30 transition-all">
-            <i class="fas fa-sync-alt mr-2"></i>새로고침
-          </button>
+          <div>
+            <h2 class="text-xl font-bold text-slate-800">${op.title}</h2>
+            <p class="text-sm text-slate-500">${op.subtitle}</p>
+          </div>
+        </div>
+        <div class="flex items-center gap-2 text-xs">
+          <span class="px-2.5 py-1 rounded-full ${a.chip} font-semibold">1. 스캔</span>
+          <i class="fas fa-chevron-right text-slate-300"></i>
+          <span class="px-2.5 py-1 rounded-full bg-slate-100 text-slate-600 font-semibold">2. 확인</span>
+          <i class="fas fa-chevron-right text-slate-300"></i>
+          <span class="px-2.5 py-1 rounded-full bg-slate-100 text-slate-600 font-semibold">3. 확정</span>
         </div>
       </div>
 
-      <div class="p-8">
-        <!-- 메인 스캔 영역 -->
-        <div class="grid lg:grid-cols-2 gap-8 mb-8">
-          <!-- 왼쪽: 스캔 카메라 -->
-          <div class="space-y-6">
-            <!-- 스캔 상태 표시 -->
-            <div id="scan-status-bar" class="bg-white rounded-xl p-4 border-2 border-slate-200 hidden">
-              <div class="flex items-center gap-3">
-                <
-div id="scan-status-icon" class="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center">
-                  <i class="fas fa-camera text-blue-600"></i>
-                </div>
-                <div class="flex-1">
-                  <p id="scan-status-text" class="font-semibold text-slate-800">스캔 준비 중...</p>
-                  <p id="scan-status-subtext" class="text-sm text-slate-500">QR 코드를 카메라에 비춰주세요</p>
-                </div>
-              </div>
+      <div class="grid lg:grid-cols-12 gap-4">
+        <!-- 스캔 패널 -->
+        <section class="lg:col-span-5 space-y-3">
+          <div class="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-sm">
+            <div class="px-4 py-3 border-b border-slate-100 flex items-center justify-between">
+              <span class="text-sm font-bold text-slate-700"><i class="fas fa-camera mr-2 ${a.text}"></i>카메라 스캔</span>
+              <span id="qr-scan-live-${type}" class="text-xs text-slate-400">대기</span>
             </div>
-
-            <!-- 카메라 뷰포트 -->
-            <div class="relative bg-slate-900 rounded-2xl overflow-hidden border-4 border-teal-500 shadow-2xl">
-              <!-- 스캔 가이드 오버레이 -->
-              <div id="scan-guide" class="absolute inset-0 z-10 pointer-events-none hidden">
-                <div class="absolute inset-0 bg-black/60"></div>
+            <div class="relative bg-slate-900 ${a.cam} border-b-4">
+              <div id="${op.guideId}" class="absolute inset-0 z-10 pointer-events-none hidden">
+                <div class="absolute inset-0 bg-black/50"></div>
                 <div class="absolute inset-0 flex items-center justify-center">
-                  <div class="relative w-64 h-64">
-                    <!-- 스캔 박스 애니메이션 -->
-                    <div class="scan-box-border"></div>
-                    <div class="absolute inset-0 border-4 border-teal-400 rounded-2xl animate-pulse"></div>
-                    <!-- 코너 마크 -->
-                    <div class="scan-corner top-0 left-0"></div>
-                    <div class="scan-corner top-0 right-0"></div>
-                    <div class="scan-corner bottom-0 left-0"></div>
-                    <div class="scan-corner bottom-0 right-0"></div>
-                    <!-- 스캔 라인 애니메이션 -->
-                    <div class="scan-line"></div>
+                  <div class="w-52 h-52 border-2 border-white/80 rounded-xl relative">
+                    <div class="absolute inset-x-3 top-1/2 h-0.5 bg-white/80 animate-pulse"></div>
                   </div>
                 </div>
               </div>
-              
-              <!-- 카메라 영역 -->
-              <div id="qr-reader" class="min-h-[400px] bg-slate-800 flex items-center justify-center">
-                <div class="text-center text-white p-8">
-                  <i class="fas fa-camera text-6xl mb-4 opacity-50"></i>
-                  <p class="text-lg">스캔을 시작하려면 아래 버튼을 클릭하세요</p>
+              <div id="${op.readerId}" class="min-h-[240px] sm:min-h-[280px] flex items-center justify-center text-slate-300 text-sm p-6 text-center">
+                <div>
+                  <i class="fas fa-qrcode text-4xl mb-2 opacity-40"></i>
+                  <p>아래 버튼으로 스캔을 시작하세요</p>
                 </div>
               </div>
             </div>
-
-            <!-- 컨트롤 버튼 -->
-            <div class="flex gap-3">
-              <button id="start-scan-btn" onclick="startQRScan('inbound')" 
-                      class="flex-1 px-6 py-4 bg-gradient-to-r from-teal-600 to-blue-600 text-white rounded-xl hover:from-teal-700 hover:to-blue-700 transition-all font-bold text-lg shadow-lg hover:shadow-xl transform hover:scale-105">
-                <i class="fas fa-camera mr-2"></i>스캔 시작
+            <div class="p-3 grid grid-cols-2 gap-2">
+              <button id="${op.startBtnId}" onclick="startQRScan('${type}')"
+                class="py-3 rounded-xl text-white text-sm font-bold ${a.btn}">
+                <i class="fas fa-play mr-1"></i>스캔 시작
               </button>
-              <button id="stop-scan-btn" onclick="stopQRScan()" 
-                      class="flex-1 px-6 py-4 bg-gradient-to-r from-slate-600 to-slate-700 text-white rounded-xl hover:from-slate-700 hover:to-slate-800 transition-all font-bold text-lg shadow-lg hidden">
-                <i class="fas fa-stop-circle mr-2"></i>스캔 중지
+              <button id="${op.stopBtnId}" onclick="stopQRScan('${type}')"
+                class="hidden py-3 rounded-xl bg-slate-700 hover:bg-slate-800 text-white text-sm font-bold">
+                <i class="fas fa-stop mr-1"></i>중지
               </button>
             </div>
+          </div>
 
-            <!-- 수동 입력 -->
-            <div class="bg-white rounded-xl p-6 border-2 border-slate-200 shadow-sm">
-              <label class="block text-sm font-bold text-slate-700 mb-3 flex items-center gap-2">
-                <i class="fas fa-keyboard text-teal-600"></i>
-                수동 입력
-              </label>
-              <div class="flex gap-2">
-                <input type="text" id="manual-qr-input" placeholder="QR-XXXXXX-XXXXX 형식으로 입력..." 
-                       class="flex-1 px-4 py-3 border-2 border-slate-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500 transition-all text-lg font-mono"
-                       onkeypress="if(event.key==='Enter') handleManualQRInput('inbound')">
-                <button onclick="handleManualQRInput('inbound')" 
-                        class="px-6 py-3 bg-teal-600 text-white rounded-lg hover:bg-teal-700 transition-all font-semibold">
-                  <i class="fas fa-check mr-2"></i>확인
-                </button>
-              </div>
-              <p class="text-xs text-slate-500 mt-2">
-                <i class="fas fa-info-circle mr-1"></i>카메라를 사용할 수 없는 경우 QR 코드를 직접 입력할 수 있습니다
-              </p>
+          <div class="bg-white border border-slate-200 rounded-2xl p-3 shadow-sm">
+            <label class="text-xs font-bold text-slate-500 mb-1.5 block">수동 입력 / 바코드건</label>
+            <div class="flex gap-2">
+              <input id="${op.manualId}" type="text" autocomplete="off"
+                placeholder="QR 코드 입력 후 Enter"
+                class="flex-1 border border-slate-300 rounded-xl px-3 py-3 text-sm font-mono ${a.ring} focus:outline-none focus:ring-2"
+                onkeypress="if(event.key==='Enter') handleManualQRInput('${type}')">
+              <button onclick="handleManualQRInput('${type}')"
+                class="px-4 py-3 rounded-xl ${a.btn} text-white text-sm font-bold whitespace-nowrap">조회</button>
             </div>
           </div>
+        </section>
 
-          <!-- 오른쪽: 스캔 결과 및 입고 폼 -->
-          <div>
-            <!-- 대기 상태 -->
-            <div id="scan-waiting" class="bg-white rounded-xl p-8 border-2 border-dashed border-slate-300">
-              <div class="text-center text-slate-400 py-12">
-                <div class="w-24 h-24 bg-slate-100 rounded-full mx-auto mb-6 flex items-center justify-center">
-                  <i class="fas fa-qrcode text-5xl text-slate-300"></i>
-                </div>
-                <h3 class="text-xl font-bold text-slate-600 mb-2">스캔 대기 중</h3>
-                <p class="text-slate-500">QR 코드를 스캔하면<br/>여기에 제품 정보가 표시됩니다</p>
-              </div>
+        <!-- 결과 / 확정 패널 -->
+        <section class="lg:col-span-7 space-y-3">
+          <div id="${op.waitingId}" class="bg-white border border-dashed border-slate-300 rounded-2xl p-8 text-center min-h-[280px] flex flex-col items-center justify-center">
+            <div class="w-16 h-16 rounded-2xl bg-slate-100 flex items-center justify-center mb-3">
+              <i class="fas ${op.icon} text-2xl text-slate-400"></i>
             </div>
+            <p class="font-bold text-slate-700">스캔 대기</p>
+            <p class="text-sm text-slate-500 mt-1">QR을 스캔하면 여기에 상품·수량 입력창이 열립니다</p>
+          </div>
+          <div id="${op.resultId}" class="hidden"></div>
 
-            <!-- 스캔 결과 표시 -->
-            <div id="qr-scan-result" class="hidden">
-              <div class="bg-gradient-to-br from-teal-50 to-blue-50 rounded-2xl p-6 border-2 border-teal-300 shadow-lg">
-                <!-- 성공 헤더 -->
-                <div class="flex items-center gap-3 mb-6 pb-4 border-b-2 border-teal-200">
-                  <div class="w-12 h-12 bg-teal-600 rounded-xl flex items-center justify-center">
-                    <i class="fas fa-check text-white text-xl"></i>
-                  </div>
-                  <div class="flex-1">
-                    <h3 class="text-lg font-bold text-teal-900">스캔 성공!</h3>
-                    <p class="text-sm text-teal-700">제품 정보를 확인하고 입고를 진행하세요</p>
-                  </div>
-                </div>
-
-                <div class="space-y-4">
-                  <!-- 제품 정보 카드 -->
-                  <div class="bg-white rounded-xl p-5 border border-teal-200">
-                    <div class="flex items-start gap-4">
-                      <div class="w-16 h-16 bg-teal-100 rounded-lg flex items-center justify-center flex-shrink-0">
-                        <i class="fas fa-box text-teal-600 text-2xl"></i>
-                      </div>
-                      <div class="flex-1">
-                        <label class="text-xs font-semibold text-slate-500 uppercase">제품명</label>
-                        <p id="scanned-product-name" class="text-xl font-bold text-slate-900 mt-1"></p>
-                        <div class="flex items-center gap-4 mt-2">
-                          <div>
-                            <label class="text-xs text-slate-500">현재 재고</label>
-                            <p id="scanned-product-stock" class="text-lg font-semibold text-blue-600"></p>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-
-                  <!-- 입고 정보 입력 -->
-                  <div class="bg-white rounded-xl p-5 border border-teal-200 space-y-4">
-                    <div>
-                      <label class="block text-sm font-bold text-slate-700 mb-2 flex items-center gap-2">
-                        <i class="fas fa-hashtag text-teal-600"></i>
-                        입고 수량
-                      </label>
-                      <div class="flex items-center gap-2">
-                        <button onclick="decreaseQuantity()" class="w-12 h-12 bg-slate-200 hover:bg-slate-300 rounded-lg transition-all">
-                          <i class="fas fa-minus text-slate-700"></i>
-                        </button>
-                        <input type="number" id="inbound-quantity" value="1" min="1" 
-                               class="flex-1 px-4 py-3 border-2 border-teal-300 rounded-lg focus:ring-2 focus:ring-teal-500 text-center text-2xl font-bold text-teal-900">
-                        <button onclick="increaseQuantity()" class="w-12 h-12 bg-teal-600 hover:bg-teal-700 rounded-lg transition-all">
-                          <i class="fas fa-plus text-white"></i>
-                        </button>
-                      </div>
-                    </div>
-
-                    <div>
-                      <label class="block text-sm font-bold text-slate-700 mb-2 flex items-center gap-2">
-                        <i class="fas fa-warehouse text-teal-600"></i>
-                        창고 선택
-                      </label>
-                      <select id="inbound-warehouse" 
-                              class="w-full px-4 py-3 border-2 border-teal-300 rounded-lg focus:ring-2 focus:ring-teal-500 text-lg">
-                        <option value="">창고를 선택하세요</option>
-                      </select>
-                    </div>
-
-                    <div>
-                      <label class="block text-sm font-bold text-slate-700 mb-2 flex items-center gap-2">
-                        <i class="fas fa-comment-alt text-teal-600"></i>
-                        메모 (선택사항)
-                      </label>
-                      <textarea id="inbound-notes" rows="3" placeholder="입고 관련 메모를 입력하세요..."
-                                class="w-full px-4 py-3 border-2 border-teal-300 rounded-lg focus:ring-2 focus:ring-teal-500 resize-none"></textarea>
-                    </div>
-                  </div>
-
-                  <!-- 액션 버튼 -->
-                  <div class="flex gap-3 pt-4">
-                    <button onclick="confirmQRInbound()" 
-                            class="flex-1 px-6 py-4 bg-gradient-to-r from-teal-600 to-blue-600 text-white rounded-xl hover:from-teal-700 hover:to-blue-700 font-bold text-lg shadow-lg hover:shadow-xl transform hover:scale-105 transition-all">
-                      <i class="fas fa-check-circle mr-2"></i>입고 확정
-                    </button>
-                    <button onclick="cancelQRScan()" 
-                            class="px-6 py-4 bg-slate-200 text-slate-700 hover:bg-slate-300 rounded-xl font-semibold transition-all">
-                      <i class="fas fa-times mr-2"></i>취소
-                    </button>
-                  </div>
-                </div>
-              </div>
+          <div class="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden">
+            <div class="px-4 py-3 border-b border-slate-100 flex items-center justify-between">
+              <h3 class="text-sm font-bold text-slate-700"><i class="fas fa-history mr-2 text-slate-400"></i>${op.historyTitle}</h3>
+              <button onclick="${op.historyRefresh}" class="text-xs ${a.text} font-semibold hover:underline">새로고침</button>
+            </div>
+            <div id="${op.historyId}" class="max-h-64 overflow-y-auto divide-y divide-slate-100">
+              <p class="text-center text-slate-400 text-sm py-8">불러오는 중...</p>
             </div>
           </div>
-        </div>
-
-        <!-- 오늘의 입고 이력 -->
-        <div class="bg-white rounded-2xl p-6 border-2 border-slate-200 shadow-sm">
-          <div class="flex items-center justify-between mb-6">
-            <h3 class="text-xl font-bold text-slate-800 flex items-center gap-2">
-              <i class="fas fa-history text-blue-600"></i>
-              오늘의 입고 이력
-            </h3>
-            <span class="px-3 py-1 bg-blue-100 text-blue-700 rounded-full text-sm font-semibold">
-              실시간 업데이트
-            </span>
-          </div>
-          <div id="qr-inbound-history" class="space-y-3">
-            <p class="text-center text-slate-400 py-8">입고 이력을 불러오는 중...</p>
-          </div>
-        </div>
+        </section>
       </div>
     </div>
-
-    <!-- CSS 애니메이션 -->
-    <style>
-      .scan-box-border {
-        position: absolute;
-        inset: -4px;
-        background: linear-gradient(45deg, #14b8a6, #3b82f6);
-        border-radius: 1.5rem;
-        animation: scan-box-glow 2s ease-in-out infinite;
-      }
-
-      @keyframes scan-box-glow {
-        0%, 100% { opacity: 0.3; transform: scale(1); }
-        50% { opacity: 0.8; transform: scale(1.02); }
-      }
-
-      .scan-corner {
-        position: absolute;
-        width: 40px;
-        height: 40px;
-        border: 4px solid #14b8a6;
-      }
-
-      .scan-corner.top-0.left-0 {
-        border-right: none;
-        border-bottom: none;
-        border-top-left-radius: 1rem;
-      }
-
-      .scan-corner.top-0.right-0 {
-        border-left: none;
-        border-bottom: none;
-        border-top-right-radius: 1rem;
-      }
-
-      .scan-corner.bottom-0.left-0 {
-        border-right: none;
-        border-top: none;
-        border-bottom-left-radius: 1rem;
-      }
-
-      .scan-corner.bottom-0.right-0 {
-        border-left: none;
-        border-top: none;
-        border-bottom-right-radius: 1rem;
-      }
-
-      .scan-line {
-        position: absolute;
-        left: 0;
-        right: 0;
-        height: 3px;
-        background: linear-gradient(90deg, transparent, #14b8a6, transparent);
-        box-shadow: 0 0 10px #14b8a6;
-        animation: scan-line-move 2s linear infinite;
-      }
-
-      @keyframes scan-line-move {
-        0% { top: 0; }
-        100% { top: 100%; }
-      }
-
-      #qr-reader video {
-        border-radius: 1rem;
-      }
-    </style>
   `;
+}
 
-  // 창고 목록 로드
+async function renderQRInboundPage(container) {
+  renderQROpsWorkspace(container, 'inbound');
   await loadWarehousesForQR('inbound-warehouse');
-  // 입고 이력 로드
   await loadInboundHistory();
 }
 
-// ================================================
-// QR 출고 페이지
-// ================================================
 async function renderQROutboundPage(container) {
-  container.innerHTML = `
-    <div class="bg-gradient-to-br from-orange-50 to-red-50 rounded-2xl shadow-sm border border-orange-200 overflow-hidden">
-      <!-- 헤더 -->
-      <div class="bg-gradient-to-r from-orange-600 to-red-600 p-6">
-        <div class="flex items-center justify-between">
-          <div class="flex items-center gap-4">
-            <div class="w-14 h-14 bg-white/20 backdrop-blur-sm rounded-2xl flex items-center justify-center">
-              <i class="fas fa-dolly text-white text-2xl"></i>
-            </div>
-            <div>
-              <h2 class="text-2xl font-bold text-white flex items-center gap-3">
-                QR 스캔 출고
-              </h2>
-              <p class="text-orange-100 mt-1">QR 코드를 스캔하여 빠르게 출고 처리</p>
-            </div>
-          </div>
-          <button onclick="loadOutboundHistory()" class="px-4 py-2 bg-white/20 backdrop-blur-sm text-white rounded-lg hover:bg-white/30 transition-all">
-            <i class="fas fa-sync-alt mr-2"></i>새로고침
-          </button>
-        </div>
-      </div>
-
-      <div class="p-8">
-        <!-- 중요 공지 -->
-        <div class="bg-orange-100 border-2 border-orange-300 rounded-xl p-4 mb-6 flex items-start gap-3">
-          <div class="w-10 h-10 bg-orange-600 rounded-lg flex items-center justify-center flex-shrink-0">
-            <i class="fas fa-exclamation-triangle text-white"></i>
-          </div>
-          <div class="flex-1">
-            <h4 class="font-bold text-orange-900 mb-1">재고 확인 필수</h4>
-            <p class="text-sm text-orange-800">
-              출고 시 재고가 자동으로 차감됩니다. 재고 부족 시 출고가 불가능하니 현재 재고를 반드시 확인하세요.
-            </p>
-          </div>
-        </div>
-
-        <!-- 메인 스캔 영역 -->
-        <div class="grid lg:grid-cols-2 gap-8 mb-8">
-          <!-- 왼쪽: 스캔 카메라 -->
-          <div class="space-y-6">
-            <!-- 스캔 상태 표시 -->
-            <div id="scan-status-bar-outbound" class="bg-white rounded-xl p-4 border-2 border-slate-200 hidden">
-              <div class="flex items-center gap-3">
-                <div id="scan-status-icon-outbound" class="w-10 h-10 rounded-full bg-orange-100 flex items-center justify-center">
-                  <i class="fas fa-camera text-orange-600"></i>
-                </div>
-                <div class="flex-1">
-                  <p id="scan-status-text-outbound" class="font-semibold text-slate-800">스캔 준비 중...</p>
-                  <p id="scan-status-subtext-outbound" class="text-sm text-slate-500">QR 코드를 카메라에 비춰주세요</p>
-                </div>
-              </div>
-            </div>
-
-            <!-- 카메라 뷰포트 -->
-            <div class="relative bg-slate-900 rounded-2xl overflow-hidden border-4 border-orange-500 shadow-2xl">
-              <!-- 스캔 가이드 오버레이 -->
-              <div id="scan-guide-outbound" class="absolute inset-0 z-10 pointer-events-none hidden">
-                <div class="absolute inset-0 bg-black/60"></div>
-                <div class="absolute inset-0 flex items-center justify-center">
-                  <div class="relative w-64 h-64">
-                    <!-- 스캔 박스 애니메이션 -->
-                    <div class="scan-box-border-outbound"></div>
-                    <div class="absolute inset-0 border-4 border-orange-400 rounded-2xl animate-pulse"></div>
-                    <!-- 코너 마크 -->
-                    <div class="scan-corner-outbound top-0 left-0"></div>
-                    <div class="scan-corner-outbound top-0 right-0"></div>
-                    <div class="scan-corner-outbound bottom-0 left-0"></div>
-                    <div class="scan-corner-outbound bottom-0 right-0"></div>
-                    <!-- 스캔 라인 애니메이션 -->
-                    <div class="scan-line-outbound"></div>
-                  </div>
-                </div>
-              </div>
-              
-              <!-- 카메라 영역 -->
-              <div id="qr-reader-outbound" class="min-h-[400px] bg-slate-800 flex items-center justify-center">
-                <div class="text-center text-white p-8">
-                  <i class="fas fa-camera text-6xl mb-4 opacity-50"></i>
-                  <p class="text-lg">스캔을 시작하려면 아래 버튼을 클릭하세요</p>
-                </div>
-              </div>
-            </div>
-
-            <!-- 컨트롤 버튼 -->
-            <div class="flex gap-3">
-              <button id="start-scan-btn-outbound" onclick="startQRScan('outbound')" 
-                      class="flex-1 px-6 py-4 bg-gradient-to-r from-orange-600 to-red-600 text-white rounded-xl hover:from-orange-700 hover:to-red-700 transition-all font-bold text-lg shadow-lg hover:shadow-xl transform hover:scale-105">
-                <i class="fas fa-camera mr-2"></i>스캔 시작
-              </button>
-              <button id="stop-scan-btn-outbound" onclick="stopQRScan()" 
-                      class="flex-1 px-6 py-4 bg-gradient-to-r from-slate-600 to-slate-700 text-white rounded-xl hover:from-slate-700 hover:to-slate-800 transition-all font-bold text-lg shadow-lg hidden">
-                <i class="fas fa-stop-circle mr-2"></i>스캔 중지
-              </button>
-            </div>
-
-            <!-- 수동 입력 -->
-            <div class="bg-white rounded-xl p-6 border-2 border-slate-200 shadow-sm">
-              <label class="block text-sm font-bold text-slate-700 mb-3 flex items-center gap-2">
-                <i class="fas fa-keyboard text-orange-600"></i>
-                수동 입력
-              </label>
-              <div class="flex gap-2">
-                <input type="text" id="manual-qr-input-outbound" placeholder="QR-XXXXXX-XXXXX 형식으로 입력..." 
-                       class="flex-1 px-4 py-3 border-2 border-slate-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500 transition-all text-lg font-mono"
-                       onkeypress="if(event.key==='Enter') handleManualQRInput('outbound')">
-                <button onclick="handleManualQRInput('outbound')" 
-                        class="px-6 py-3 bg-orange-600 text-white rounded-lg hover:bg-orange-700 transition-all font-semibold">
-                  <i class="fas fa-check mr-2"></i>확인
-                </button>
-              </div>
-              <p class="text-xs text-slate-500 mt-2">
-                <i class="fas fa-info-circle mr-1"></i>카메라를 사용할 수 없는 경우 QR 코드를 직접 입력할 수 있습니다
-              </p>
-            </div>
-          </div>
-
-          <!-- 오른쪽: 스캔 결과 및 출고 폼 -->
-          <div>
-            <!-- 대기 상태 -->
-            <div id="scan-waiting-outbound" class="bg-white rounded-xl p-8 border-2 border-dashed border-slate-300">
-              <div class="text-center text-slate-400 py-12">
-                <div class="w-24 h-24 bg-slate-100 rounded-full mx-auto mb-6 flex items-center justify-center">
-                  <i class="fas fa-dolly text-5xl text-slate-300"></i>
-                </div>
-                <h3 class="text-xl font-bold text-slate-600 mb-2">스캔 대기 중</h3>
-                <p class="text-slate-500">QR 코드를 스캔하면<br/>여기에 제품 정보가 표시됩니다</p>
-              </div>
-            </div>
-
-            <!-- 스캔 결과 표시 -->
-            <div id="qr-outbound-result" class="hidden">
-              <!-- JavaScript에서 동적으로 생성됨 -->
-            </div>
-          </div>
-        </div>
-
-        <!-- 오늘의 출고 이력 -->
-        <div class="bg-white rounded-2xl p-6 border-2 border-slate-200 shadow-sm">
-          <div class="flex items-center justify-between mb-6">
-            <h3 class="text-xl font-bold text-slate-800 flex items-center gap-2">
-              <i class="fas fa-history text-orange-600"></i>
-              오늘의 출고 이력
-            </h3>
-            <span class="px-3 py-1 bg-orange-100 text-orange-700 rounded-full text-sm font-semibold">
-              실시간 업데이트
-            </span>
-          </div>
-          <div id="qr-outbound-history" class="space-y-3">
-            <p class="text-center text-slate-400 py-8">출고 이력을 불러오는 중...</p>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <!-- CSS 애니메이션 (출고용) -->
-    <style>
-      .scan-box-border-outbound {
-        position: absolute;
-        inset: -4px;
-        background: linear-gradient(45deg, #ea580c, #dc2626);
-        border-radius: 1.5rem;
-        animation: scan-box-glow 2s ease-in-out infinite;
-      }
-
-      .scan-corner-outbound {
-        position: absolute;
-        width: 40px;
-        height: 40px;
-        border: 4px solid #ea580c;
-      }
-
-      .scan-corner-outbound.top-0.left-0 {
-        border-right: none;
-        border-bottom: none;
-        border-top-left-radius: 1rem;
-      }
-
-      .scan-corner-outbound.top-0.right-0 {
-        border-left: none;
-        border-bottom: none;
-        border-top-right-radius: 1rem;
-      }
-
-      .scan-corner-outbound.bottom-0.left-0 {
-        border-right: none;
-        border-top: none;
-        border-bottom-left-radius: 1rem;
-      }
-
-      .scan-corner-outbound.bottom-0.right-0 {
-        border-left: none;
-        border-top: none;
-        border-bottom-right-radius: 1rem;
-      }
-
-      .scan-line-outbound {
-        position: absolute;
-        left: 0;
-        right: 0;
-        height: 3px;
-        background: linear-gradient(90deg, transparent, #ea580c, transparent);
-        box-shadow: 0 0 10px #ea580c;
-        animation: scan-line-move 2s linear infinite;
-      }
-    </style>
-  `;
-
-  await loadWarehousesForQR('outbound-warehouse');
+  renderQROpsWorkspace(container, 'outbound');
   await loadOutboundHistory();
 }
 
-// ================================================
-// QR 판매 페이지
-// ================================================
 async function renderQRSalePage(container) {
-  container.innerHTML = `
-    <div class="bg-gradient-to-br from-green-50 to-emerald-50 rounded-2xl shadow-sm border border-green-200 overflow-hidden">
-      <!-- 헤더 -->
-      <div class="bg-gradient-to-r from-green-600 to-emerald-600 p-6">
-        <div class="flex items-center justify-between">
-          <div class="flex items-center gap-4">
-            <div class="w-14 h-14 bg-white/20 backdrop-blur-sm rounded-2xl flex items-center justify-center">
-              <i class="fas fa-cash-register text-white text-2xl"></i>
-            </div>
-            <div>
-              <h2 class="text-2xl font-bold text-white flex items-center gap-3">
-                QR 스캔 판매
-              </h2>
-              <p class="text-green-100 mt-1">QR 코드를 스캔하여 즉시 판매 등록</p>
-            </div>
+  renderQROpsWorkspace(container, 'sale');
+  await loadSaleHistory();
+}
+
+function qrQtyStepper(id, maxAttr, onChangeAttr) {
+  return `
+    <div class="flex items-center gap-2">
+      <button type="button" onclick="qrAdjustQty('${id}', -1)" class="w-12 h-12 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-lg">−</button>
+      <input type="number" id="${id}" value="1" min="1" ${maxAttr}
+        class="flex-1 border border-slate-300 rounded-xl px-3 py-3 text-center text-2xl font-bold focus:outline-none focus:ring-2 focus:ring-slate-400"
+        ${onChangeAttr}>
+      <button type="button" onclick="qrAdjustQty('${id}', 1)" class="w-12 h-12 rounded-xl bg-slate-800 hover:bg-slate-900 text-white font-bold text-lg">+</button>
+    </div>`;
+}
+
+window.qrAdjustQty = function (id, delta) {
+  const input = document.getElementById(id);
+  if (!input) return;
+  let v = (parseInt(input.value, 10) || 1) + delta;
+  const max = input.max ? parseInt(input.max, 10) : null;
+  if (v < 1) v = 1;
+  if (max != null && !Number.isNaN(max) && v > max) v = max;
+  input.value = v;
+  if (id === 'sale-quantity' && typeof updateTotalAmount === 'function') updateTotalAmount();
+};
+
+function buildQRResultPanel(type, data) {
+  const op = QR_OPS[type];
+  const a = QR_ACCENT[op.accent];
+  const stock = Number(data.current_stock) || 0;
+  const stockClass = stock > 0 ? 'text-emerald-600' : 'text-rose-600';
+  const price = Number(data.product_price) || 0;
+  const disabled = (type !== 'inbound' && stock <= 0);
+
+  let extraFields = '';
+  if (type === 'sale') {
+    extraFields = `
+      <div class="grid grid-cols-2 gap-3">
+        <div>
+          <label class="text-xs font-bold text-slate-500 mb-1 block">판매 단가</label>
+          <input type="number" id="sale-price" value="${price}" min="0" step="100"
+            class="w-full border border-slate-300 rounded-xl px-3 py-3 text-lg font-semibold focus:outline-none focus:ring-2 focus:ring-emerald-500"
+            oninput="updateTotalAmount()">
+        </div>
+        <div>
+          <label class="text-xs font-bold text-slate-500 mb-1 block">합계</label>
+          <div id="total-amount" class="rounded-xl ${a.soft} border px-3 py-3 text-center">
+            <span class="text-2xl font-bold ${a.text}">${price.toLocaleString()}</span>
+            <span class="text-sm ${a.text} ml-1">원</span>
           </div>
-          <button onclick="loadSaleHistory()" class="px-4 py-2 bg-white/20 backdrop-blur-sm text-white rounded-lg hover:bg-white/30 transition-all">
-            <i class="fas fa-sync-alt mr-2"></i>새로고침
+        </div>
+      </div>
+      <div>
+        <label class="text-xs font-bold text-slate-500 mb-1 block">고객명 (선택)</label>
+        <input type="text" id="customer-name" placeholder="미입력 가능"
+          class="w-full border border-slate-300 rounded-xl px-3 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500">
+      </div>
+      <div>
+        <label class="text-xs font-bold text-slate-500 mb-1 block">메모 (선택)</label>
+        <input type="text" id="sale-notes" placeholder="판매 메모"
+          class="w-full border border-slate-300 rounded-xl px-3 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500">
+      </div>`;
+  } else {
+    const whId = type === 'inbound' ? 'inbound-warehouse' : 'outbound-warehouse';
+    const notesId = type === 'inbound' ? 'inbound-notes' : 'outbound-notes';
+    extraFields = `
+      <div>
+        <label class="text-xs font-bold text-slate-500 mb-1 block">창고</label>
+        <select id="${whId}" class="w-full border border-slate-300 rounded-xl px-3 py-3 text-sm focus:outline-none focus:ring-2 ${a.ring}">
+          <option value="">창고 선택</option>
+        </select>
+      </div>
+      <div>
+        <label class="text-xs font-bold text-slate-500 mb-1 block">메모 (선택)</label>
+        <input type="text" id="${notesId}" placeholder="간단 메모"
+          class="w-full border border-slate-300 rounded-xl px-3 py-3 text-sm focus:outline-none focus:ring-2 ${a.ring}">
+      </div>`;
+  }
+
+  const qtyId = type === 'inbound' ? 'inbound-quantity' : type === 'outbound' ? 'outbound-quantity' : 'sale-quantity';
+  const maxAttr = type === 'inbound' ? '' : `max="${stock}"`;
+  const onChange = type === 'sale' ? 'oninput="updateTotalAmount()"' : '';
+
+  return `
+    <div class="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden">
+      <div class="px-4 py-3 ${a.bar} text-white flex items-center justify-between">
+        <div class="flex items-center gap-2">
+          <i class="fas fa-check-circle"></i>
+          <span class="font-bold">스캔 완료 — 정보 확인 후 확정</span>
+        </div>
+        <span class="text-xs bg-white/20 px-2 py-0.5 rounded-full font-mono">${escapeQrHtml(data.qr_code || '')}</span>
+      </div>
+      <div class="p-4 space-y-4">
+        <div class="flex items-start gap-3 p-3 rounded-xl ${a.soft} border">
+          <div class="w-12 h-12 rounded-xl bg-white flex items-center justify-center ${a.text}">
+            <i class="fas fa-box text-xl"></i>
+          </div>
+          <div class="flex-1 min-w-0">
+            <div class="font-bold text-slate-900 text-lg leading-snug">${escapeQrHtml(data.product_name || '-')}</div>
+            <div class="mt-1 flex flex-wrap gap-3 text-sm">
+              <span>재고 <strong class="${stockClass}">${stock}</strong></span>
+              ${type === 'sale' ? `<span>기준가 <strong>${price.toLocaleString()}원</strong></span>` : ''}
+              ${data.sku ? `<span class="text-slate-500 font-mono text-xs">${escapeQrHtml(data.sku)}</span>` : ''}
+            </div>
+            ${stock === 0 && type !== 'inbound' ? '<p class="text-xs text-rose-600 mt-1 font-semibold">재고가 없어 처리할 수 없습니다</p>' : ''}
+          </div>
+        </div>
+
+        <div>
+          <label class="text-xs font-bold text-slate-500 mb-1 block">수량</label>
+          ${qrQtyStepper(qtyId, maxAttr, onChange)}
+          ${type !== 'inbound' ? `<p class="text-xs text-slate-400 mt-1">최대 ${stock}개</p>` : ''}
+        </div>
+
+        ${extraFields}
+
+        <div class="grid grid-cols-3 gap-2 pt-1">
+          <button type="button" onclick="cancelQRScan()"
+            class="col-span-1 py-3.5 rounded-xl border border-slate-300 text-slate-600 font-semibold text-sm hover:bg-slate-50">
+            취소
+          </button>
+          <button type="button" onclick="${op.confirmFn}" ${disabled ? 'disabled' : ''}
+            class="col-span-2 py-3.5 rounded-xl text-white font-bold text-base ${disabled ? 'bg-slate-300 cursor-not-allowed' : a.btn}">
+            <i class="fas fa-check mr-2"></i>${op.confirmLabel}
           </button>
         </div>
       </div>
-
-      <div class="p-8">
-        <!-- 메인 스캔 영역 -->
-        <div class="grid lg:grid-cols-2 gap-8 mb-8">
-          <!-- 왼쪽: 스캔 카메라 -->
-          <div class="space-y-6">
-            <!-- 카메라 뷰포트 -->
-            <div class="relative bg-slate-900 rounded-2xl overflow-hidden border-4 border-green-500 shadow-2xl">
-              <!-- 스캔 가이드 오버레이 -->
-              <div id="scan-guide-sale" class="absolute inset-0 z-10 pointer-events-none hidden">
-                <div class="absolute inset-0 bg-black/60"></div>
-                <div class="absolute inset-0 flex items-center justify-center">
-                  <div class="relative w-64 h-64">
-                    <div class="scan-box-border-sale"></div>
-                    <div class="absolute inset-0 border-4 border-green-400 rounded-2xl animate-pulse"></div>
-                    <div class="scan-corner-sale top-0 left-0"></div>
-                    <div class="scan-corner-sale top-0 right-0"></div>
-                    <div class="scan-corner-sale bottom-0 left-0"></div>
-                    <div class="scan-corner-sale bottom-0 right-0"></div>
-                    <div class="scan-line-sale"></div>
-                  </div>
-                </div>
-              </div>
-              
-              <div id="qr-reader-sale" class="min-h-[400px] bg-slate-800 flex items-center justify-center">
-                <div class="text-center text-white p-8">
-                  <i class="fas fa-camera text-6xl mb-4 opacity-50"></i>
-                  <p class="text-lg">스캔을 시작하려면 아래 버튼을 클릭하세요</p>
-                </div>
-              </div>
-            </div>
-
-            <!-- 컨트롤 버튼 -->
-            <div class="flex gap-3">
-              <button id="start-scan-btn-sale" onclick="startQRScan('sale')" 
-                      class="flex-1 px-6 py-4 bg-gradient-to-r from-green-600 to-emerald-600 text-white rounded-xl hover:from-green-700 hover:to-emerald-700 transition-all font-bold text-lg shadow-lg hover:shadow-xl transform hover:scale-105">
-                <i class="fas fa-camera mr-2"></i>스캔 시작
-              </button>
-              <button id="stop-scan-btn-sale" onclick="stopQRScan('sale')" 
-                      class="flex-1 px-6 py-4 bg-gradient-to-r from-slate-600 to-slate-700 text-white rounded-xl hover:from-slate-700 hover:to-slate-800 transition-all font-bold text-lg shadow-lg hidden">
-                <i class="fas fa-stop-circle mr-2"></i>스캔 중지
-              </button>
-            </div>
-
-            <!-- 수동 입력 -->
-            <div class="bg-white rounded-xl p-6 border-2 border-slate-200 shadow-sm">
-              <label class="block text-sm font-bold text-slate-700 mb-3 flex items-center gap-2">
-                <i class="fas fa-keyboard text-green-600"></i>
-                수동 입력
-              </label>
-              <div class="flex gap-2">
-                <input type="text" id="manual-qr-input-sale" placeholder="QR-XXXXXX-XXXXX 형식으로 입력..." 
-                       class="flex-1 px-4 py-3 border-2 border-slate-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 transition-all text-lg font-mono"
-                       onkeypress="if(event.key==='Enter') handleManualQRInput('sale')">
-                <button onclick="handleManualQRInput('sale')" 
-                        class="px-6 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-all font-semibold">
-                  <i class="fas fa-check mr-2"></i>확인
-                </button>
-              </div>
-            </div>
-          </div>
-
-          <!-- 오른쪽: 스캔 결과 및 판매 폼 -->
-          <div>
-            <!-- 대기 상태 -->
-            <div id="scan-waiting-sale" class="bg-white rounded-xl p-8 border-2 border-dashed border-slate-300">
-              <div class="text-center text-slate-400 py-12">
-                <div class="w-24 h-24 bg-slate-100 rounded-full mx-auto mb-6 flex items-center justify-center">
-                  <i class="fas fa-cash-register text-5xl text-slate-300"></i>
-                </div>
-                <h3 class="text-xl font-bold text-slate-600 mb-2">스캔 대기 중</h3>
-                <p class="text-slate-500">QR 코드를 스캔하면<br/>여기에 제품 정보가 표시됩니다</p>
-              </div>
-            </div>
-
-            <!-- 스캔 결과 표시 -->
-            <div id="qr-sale-result" class="hidden">
-              <!-- JavaScript에서 동적으로 생성됨 -->
-            </div>
-          </div>
-        </div>
-
-        <!-- 오늘의 판매 이력 -->
-        <div class="bg-white rounded-2xl p-6 border-2 border-slate-200 shadow-sm">
-          <div class="flex items-center justify-between mb-6">
-            <h3 class="text-xl font-bold text-slate-800 flex items-center gap-2">
-              <i class="fas fa-history text-green-600"></i>
-              오늘의 판매 이력
-            </h3>
-            <span class="px-3 py-1 bg-green-100 text-green-700 rounded-full text-sm font-semibold">
-              실시간 업데이트
-            </span>
-          </div>
-          <div id="qr-sale-history" class="space-y-3">
-            <p class="text-center text-slate-400 py-8">판매 이력을 불러오는 중...</p>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <!-- CSS 애니메이션 (판매용) -->
-    <style>
-      .scan-box-border-sale {
-        position: absolute;
-        inset: -4px;
-        background: linear-gradient(45deg, #16a34a, #059669);
-        border-radius: 1.5rem;
-        animation: scan-box-glow 2s ease-in-out infinite;
-      }
-
-      .scan-corner-sale {
-        position: absolute;
-        width: 40px;
-        height: 40px;
-        border: 4px solid #16a34a;
-      }
-
-      .scan-corner-sale.top-0.left-0 {
-        border-right: none;
-        border-bottom: none;
-        border-top-left-radius: 1rem;
-      }
-
-      .scan-corner-sale.top-0.right-0 {
-        border-left: none;
-        border-bottom: none;
-        border-top-right-radius: 1rem;
-      }
-
-      .scan-corner-sale.bottom-0.left-0 {
-        border-right: none;
-        border-top: none;
-        border-bottom-left-radius: 1rem;
-      }
-
-      .scan-corner-sale.bottom-0.right-0 {
-        border-left: none;
-        border-top: none;
-        border-bottom-right-radius: 1rem;
-      }
-
-      .scan-line-sale {
-        position: absolute;
-        left: 0;
-        right: 0;
-        height: 3px;
-        background: linear-gradient(90deg, transparent, #16a34a, transparent);
-        box-shadow: 0 0 10px #16a34a;
-        animation: scan-line-move 2s linear infinite;
-      }
-    </style>
-  `;
-
-  await loadSaleHistory();
+    </div>`;
 }
+
+function escapeQrHtml(str) {
+  return String(str ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
+
+function renderQRHistoryList(containerId, transactions, accent) {
+  const container = document.getElementById(containerId);
+  if (!container) return;
+  const a = QR_ACCENT[accent] || QR_ACCENT.teal;
+
+  if (!transactions || !transactions.length) {
+    container.innerHTML = '<p class="text-center text-slate-400 text-sm py-8">오늘 이력이 없습니다</p>';
+    return;
+  }
+
+  container.innerHTML = transactions.map((tx) => {
+    const time = tx.created_at ? new Date(tx.created_at).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' }) : '';
+    const amount = tx.total_amount != null || tx.sale_price != null
+      ? `<span class="font-semibold ${a.text}">${Number(tx.total_amount || (tx.sale_price * tx.quantity) || 0).toLocaleString()}원</span>`
+      : '';
+    return `
+      <div class="px-4 py-3 flex items-center gap-3 hover:bg-slate-50">
+        <div class="w-9 h-9 rounded-lg ${a.soft} border flex items-center justify-center ${a.text} text-sm font-bold shrink-0">
+          ${tx.quantity}
+        </div>
+        <div class="flex-1 min-w-0">
+          <div class="font-semibold text-slate-800 text-sm truncate">${escapeQrHtml(tx.product_name || '')}</div>
+          <div class="text-xs text-slate-500 truncate">
+            ${tx.warehouse_name ? escapeQrHtml(tx.warehouse_name) + ' · ' : ''}${time}${tx.customer_name ? ' · ' + escapeQrHtml(tx.customer_name) : ''}
+          </div>
+        </div>
+        <div class="text-right shrink-0 text-xs text-slate-500">
+          ${amount || `<i class="fas fa-check ${a.text}"></i>`}
+        </div>
+      </div>`;
+  }).join('');
+}
+
 
 // ================================================
 // QR 관리 페이지
@@ -1045,16 +731,24 @@ async function loadWarehousesForQR(selectId) {
     const res = await fetch('/api/warehouses', {
       headers: { 'Authorization': `Bearer ${window.authToken}` }
     });
-    const warehouses = await res.json();
+    const payload = await res.json();
+    const warehouses = Array.isArray(payload) ? payload : (payload.data || []);
 
     const select = document.getElementById(selectId);
-    if (select) {
-      warehouses.forEach(wh => {
-        const option = document.createElement('option');
-        option.value = wh.id;
-        option.textContent = wh.name;
-        select.appendChild(option);
-      });
+    if (!select) return;
+
+    const current = select.value;
+    select.innerHTML = '<option value="">창고 선택</option>';
+    warehouses.forEach((wh) => {
+      const option = document.createElement('option');
+      option.value = wh.id;
+      option.textContent = wh.name;
+      select.appendChild(option);
+    });
+    if (current) select.value = current;
+    // 창고 1개면 자동 선택
+    if (!select.value && warehouses.length === 1) {
+      select.value = String(warehouses[0].id);
     }
   } catch (error) {
     console.error('창고 목록 로드 실패:', error);
@@ -1249,41 +943,39 @@ function updateTotalAmount() {
     const price = parseInt(priceInput.value || 0);
     const total = quantity * price;
 
-    totalDisplay.innerHTML = `<span class="text-3xl font-bold text-green-900">${total.toLocaleString()}</span><span class="text-xl text-green-700 ml-2">원</span>`;
+    totalDisplay.innerHTML = `<span class="text-2xl font-bold text-emerald-800">${total.toLocaleString()}</span><span class="text-sm text-emerald-700 ml-1">원</span>`;
   }
 }
 
 // 스캔 가이드 표시/숨기기
 function toggleScanGuide(show, type = 'inbound') {
-  const guideId = type === 'inbound' ? 'scan-guide' : 'scan-guide-outbound';
-  const statusBarId = type === 'inbound' ? 'scan-status-bar' : 'scan-status-bar-outbound';
-
+  const guideId = type === 'inbound' ? 'scan-guide'
+    : type === 'outbound' ? 'scan-guide-outbound'
+      : 'scan-guide-sale';
   const guide = document.getElementById(guideId);
-  const statusBar = document.getElementById(statusBarId);
-
+  const live = document.getElementById('qr-scan-live-' + type);
   if (guide) {
-    if (show) {
-      guide.classList.remove('hidden');
-      if (statusBar) statusBar.classList.remove('hidden');
-    } else {
-      guide.classList.add('hidden');
-      if (statusBar) statusBar.classList.add('hidden');
-    }
+    if (show) guide.classList.remove('hidden');
+    else guide.classList.add('hidden');
   }
+  if (live) live.textContent = show ? '스캔 중' : '대기';
 }
 
-// 대기 상태 표시
-function showScanWaiting(show) {
-  const waiting = document.getElementById('scan-waiting');
-  const result = document.getElementById('qr-scan-result');
-
-  if (waiting && result) {
-    if (show) {
-      waiting.classList.remove('hidden');
+// 대기 상태 표시 (입고/출고/판매 공통)
+function showScanWaiting(show, type = 'inbound') {
+  const op = typeof QR_OPS !== 'undefined' ? QR_OPS[type] : null;
+  const waitingId = op?.waitingId || (type === 'inbound' ? 'scan-waiting' : 'scan-waiting-' + type);
+  const resultId = op?.resultId || (type === 'inbound' ? 'qr-scan-result' : 'qr-' + type + '-result');
+  const waiting = document.getElementById(waitingId);
+  const result = document.getElementById(resultId);
+  if (show) {
+    if (waiting) waiting.classList.remove('hidden');
+    if (result) {
       result.classList.add('hidden');
-    } else {
-      waiting.classList.add('hidden');
+      result.innerHTML = '';
     }
+  } else if (waiting) {
+    waiting.classList.add('hidden');
   }
 }
 
@@ -1416,262 +1108,27 @@ async function processScannedQR(qrCode, type) {
 
 // 스캔 결과 표시
 function displayScannedResult(data, type) {
-  const resultId = type === 'inbound' ? 'qr-scan-result' : `qr-${type}-result`;
-  const resultContainer = document.getElementById(resultId);
-
+  const op = QR_OPS[type];
+  if (!op) return;
+  const resultContainer = document.getElementById(op.resultId);
   if (!resultContainer) return;
 
-  // 대기 상태 숨기기
-  showScanWaiting(false);
+  showScanWaiting(false, type);
+  resultContainer.innerHTML = buildQRResultPanel(type, data);
+  resultContainer.classList.remove('hidden');
 
-  // 입고용 결과 표시
-  if (type === 'inbound') {
-    document.getElementById('scanned-product-name').textContent = data.product_name;
-    document.getElementById('scanned-product-stock').textContent = `${data.current_stock || 0}개`;
-    document.getElementById('inbound-quantity').value = '1';
-    document.getElementById('inbound-notes').value = '';
-
-    resultContainer.classList.remove('hidden');
-
-    // 스크롤 이동
-    resultContainer.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  if (type === 'inbound' || type === 'outbound') {
+    const whId = type === 'inbound' ? 'inbound-warehouse' : 'outbound-warehouse';
+    loadWarehousesForQR(whId);
   }
 
-  // 출고용 결과 표시 (출고 페이지에 동일한 구조 추가 필요)
-  if (type === 'outbound') {
-    resultContainer.innerHTML = `
-      <div class="bg-gradient-to-br from-orange-50 to-red-50 rounded-2xl p-6 border-2 border-orange-300 shadow-lg">
-        <!-- 성공 헤더 -->
-        <div class="flex items-center gap-3 mb-6 pb-4 border-b-2 border-orange-200">
-          <div class="w-12 h-12 bg-orange-600 rounded-xl flex items-center justify-center">
-            <i class="fas fa-check text-white text-xl"></i>
-          </div>
-          <div class="flex-1">
-            <h3 class="text-lg font-bold text-orange-900">스캔 성공!</h3>
-            <p class="text-sm text-orange-700">제품 정보를 확인하고 출고를 진행하세요</p>
-          </div>
-        </div>
-
-        <div class="space-y-4">
-          <!-- 제품 정보 카드 -->
-          <div class="bg-white rounded-xl p-5 border border-orange-200">
-            <div class="flex items-start gap-4">
-              <div class="w-16 h-16 bg-orange-100 rounded-lg flex items-center justify-center flex-shrink-0">
-                <i class="fas fa-box text-orange-600 text-2xl"></i>
-              </div>
-              <div class="flex-1">
-                <label class="text-xs font-semibold text-slate-500 uppercase">제품명</label>
-                <p class="text-xl font-bold text-slate-900 mt-1">${data.product_name}</p>
-                <div class="flex items-center gap-4 mt-2">
-                  <div>
-                    <label class="text-xs text-slate-500">현재 재고</label>
-                    <p class="text-lg font-semibold ${data.current_stock > 0 ? 'text-green-600' : 'text-red-600'}">${data.current_stock || 0}개</p>
-                  </div>
-                  ${data.current_stock === 0 ? '<div class="px-3 py-1 bg-red-100 text-red-700 rounded-full text-xs font-bold">재고 없음</div>' : ''}
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <!-- 출고 정보 입력 -->
-          <div class="bg-white rounded-xl p-5 border border-orange-200 space-y-4">
-            <div>
-              <label class="block text-sm font-bold text-slate-700 mb-2 flex items-center gap-2">
-                <i class="fas fa-hashtag text-orange-600"></i>
-                출고 수량
-              </label>
-              <div class="flex items-center gap-2">
-                <button onclick="decreaseOutboundQuantity()" class="w-12 h-12 bg-slate-200 hover:bg-slate-300 rounded-lg transition-all">
-                  <i class="fas fa-minus text-slate-700"></i>
-                </button>
-                <input type="number" id="outbound-quantity" value="1" min="1" max="${data.current_stock || 0}"
-                       class="flex-1 px-4 py-3 border-2 border-orange-300 rounded-lg focus:ring-2 focus:ring-orange-500 text-center text-2xl font-bold text-orange-900">
-                <button onclick="increaseOutboundQuantity(${data.current_stock || 0})" class="w-12 h-12 bg-orange-600 hover:bg-orange-700 rounded-lg transition-all">
-                  <i class="fas fa-plus text-white"></i>
-                </button>
-              </div>
-              <p class="text-xs text-slate-500 mt-2">
-                <i class="fas fa-info-circle mr-1"></i>최대 출고 가능: ${data.current_stock || 0}개
-              </p>
-            </div>
-
-            <div>
-              <label class="block text-sm font-bold text-slate-700 mb-2 flex items-center gap-2">
-                <i class="fas fa-warehouse text-orange-600"></i>
-                창고 선택
-              </label>
-              <select id="outbound-warehouse" 
-                      class="w-full px-4 py-3 border-2 border-orange-300 rounded-lg focus:ring-2 focus:ring-orange-500 text-lg">
-                <option value="">창고를 선택하세요</option>
-              </select>
-            </div>
-
-            <div>
-              <label class="block text-sm font-bold text-slate-700 mb-2 flex items-center gap-2">
-                <i class="fas fa-comment-alt text-orange-600"></i>
-                메모 (선택사항)
-              </label>
-              <textarea id="outbound-notes" rows="3" placeholder="출고 관련 메모를 입력하세요..."
-                        class="w-full px-4 py-3 border-2 border-orange-300 rounded-lg focus:ring-2 focus:ring-orange-500 resize-none"></textarea>
-            </div>
-          </div>
-
-          <!-- 액션 버튼 -->
-          <div class="flex gap-3 pt-4">
-            <button onclick="confirmQROutbound()" 
-                    ${data.current_stock === 0 ? 'disabled' : ''}
-                    class="flex-1 px-6 py-4 ${data.current_stock > 0 ? 'bg-gradient-to-r from-orange-600 to-red-600 hover:from-orange-700 hover:to-red-700' : 'bg-slate-300 cursor-not-allowed'} text-white rounded-xl font-bold text-lg shadow-lg hover:shadow-xl transform hover:scale-105 transition-all">
-              <i class="fas fa-check-circle mr-2"></i>출고 확정
-            </button>
-            <button onclick="cancelQRScan()" 
-                    class="px-6 py-4 bg-slate-200 text-slate-700 hover:bg-slate-300 rounded-xl font-semibold transition-all">
-              <i class="fas fa-times mr-2"></i>취소
-            </button>
-          </div>
-        </div>
-      </div>
-    `;
-    resultContainer.classList.remove('hidden');
-
-    // 대기 상태 숨기기
-    const waiting = document.getElementById('scan-waiting-outbound');
-    if (waiting) waiting.classList.add('hidden');
-
-    // 창고 목록 로드
-    loadWarehousesForQR('outbound-warehouse');
-
-    resultContainer.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-  }
-
-  // 판매용 결과 표시
-  if (type === 'sale') {
-    resultContainer.innerHTML = `
-      <div class="bg-gradient-to-br from-green-50 to-emerald-50 rounded-2xl p-6 border-2 border-green-300 shadow-lg">
-        <!-- 성공 헤더 -->
-        <div class="flex items-center gap-3 mb-6 pb-4 border-b-2 border-green-200">
-          <div class="w-12 h-12 bg-green-600 rounded-xl flex items-center justify-center">
-            <i class="fas fa-check text-white text-xl"></i>
-          </div>
-          <div class="flex-1">
-            <h3 class="text-lg font-bold text-green-900">스캔 성공!</h3>
-            <p class="text-sm text-green-700">제품 정보를 확인하고 판매를 진행하세요</p>
-          </div>
-        </div>
-
-        <div class="space-y-4">
-          <!-- 제품 정보 카드 -->
-          <div class="bg-white rounded-xl p-5 border border-green-200">
-            <div class="flex items-start gap-4">
-              <div class="w-16 h-16 bg-green-100 rounded-lg flex items-center justify-center flex-shrink-0">
-                <i class="fas fa-box text-green-600 text-2xl"></i>
-              </div>
-              <div class="flex-1">
-                <label class="text-xs font-semibold text-slate-500 uppercase">제품명</label>
-                <p class="text-xl font-bold text-slate-900 mt-1">${data.product_name}</p>
-                <div class="flex items-center gap-4 mt-2">
-                  <div>
-                    <label class="text-xs text-slate-500">현재 재고</label>
-                    <p class="text-lg font-semibold ${data.current_stock > 0 ? 'text-green-600' : 'text-red-600'}">${data.current_stock || 0}개</p>
-                  </div>
-                  <div>
-                    <label class="text-xs text-slate-500">기준 판매가</label>
-                    <p class="text-lg font-semibold text-blue-600">${(data.product_price || 0).toLocaleString()}원</p>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <!-- 판매 정보 입력 -->
-          <div class="bg-white rounded-xl p-5 border border-green-200 space-y-4">
-            <div>
-              <label class="block text-sm font-bold text-slate-700 mb-2 flex items-center gap-2">
-                <i class="fas fa-hashtag text-green-600"></i>
-                판매 수량
-              </label>
-              <div class="flex items-center gap-2">
-                <button onclick="decreaseSaleQuantity()" class="w-12 h-12 bg-slate-200 hover:bg-slate-300 rounded-lg transition-all">
-                  <i class="fas fa-minus text-slate-700"></i>
-                </button>
-                <input type="number" id="sale-quantity" value="1" min="1" max="${data.current_stock || 0}"
-                       class="flex-1 px-4 py-3 border-2 border-green-300 rounded-lg focus:ring-2 focus:ring-green-500 text-center text-2xl font-bold text-green-900">
-                <button onclick="increaseSaleQuantity(${data.current_stock || 0})" class="w-12 h-12 bg-green-600 hover:bg-green-700 rounded-lg transition-all">
-                  <i class="fas fa-plus text-white"></i>
-                </button>
-              </div>
-            </div>
-
-            <div>
-              <label class="block text-sm font-bold text-slate-700 mb-2 flex items-center gap-2">
-                <i class="fas fa-won-sign text-green-600"></i>
-                판매 단가
-              </label>
-              <input type="number" id="sale-price" value="${data.product_price || 0}" min="0" step="100"
-                     class="w-full px-4 py-3 border-2 border-green-300 rounded-lg focus:ring-2 focus:ring-green-500 text-lg font-semibold"
-                     oninput="updateTotalAmount()">
-              <p class="text-xs text-slate-500 mt-2">
-                <i class="fas fa-info-circle mr-1"></i>기준가: ${(data.product_price || 0).toLocaleString()}원
-              </p>
-            </div>
-
-            <div>
-              <label class="block text-sm font-bold text-slate-700 mb-2 flex items-center gap-2">
-                <i class="fas fa-calculator text-green-600"></i>
-                총 판매금액
-              </label>
-              <div id="total-amount" class="px-4 py-4 bg-green-100 border-2 border-green-300 rounded-lg text-center">
-                <span class="text-3xl font-bold text-green-900">${(data.product_price || 0).toLocaleString()}</span>
-                <span class="text-xl text-green-700 ml-2">원</span>
-              </div< /div>
-
-            <div>
-              <label class="block text-sm font-bold text-slate-700 mb-2 flex items-center gap-2">
-                <i class="fas fa-user text-green-600"></i>
-                고객명 (선택사항)
-              </label>
-              <input type="text" id="customer-name" placeholder="고객명을 입력하세요..."
-                     class="w-full px-4 py-3 border-2 border-green-300 rounded-lg focus:ring-2 focus:ring-green-500">
-            </div>
-
-            <div>
-              <label class="block text-sm font-bold text-slate-700 mb-2 flex items-center gap-2">
-                <i class="fas fa-comment-alt text-green-600"></i>
-                메모 (선택사항)
-              </label>
-              <textarea id="sale-notes" rows="2" placeholder="판매 관련 메모를 입력하세요..."
-                        class="w-full px-4 py-3 border-2 border-green-300 rounded-lg focus:ring-2 focus:ring-green-500 resize-none"></textarea>
-            </div>
-          </div>
-
-          <!-- 액션 버튼 -->
-          <div class="flex gap-3 pt-4">
-            <button onclick="confirmQRSale()" 
-                    ${data.current_stock === 0 ? 'disabled' : ''}
-                    class="flex-1 px-6 py-4 ${data.current_stock > 0 ? 'bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700' : 'bg-slate-300 cursor-not-allowed'} text-white rounded-xl font-bold text-lg shadow-lg hover:shadow-xl transform hover:scale-105 transition-all">
-              <i class="fas fa-check-circle mr-2"></i>판매 확정
-            </button>
-            <button onclick="cancelQRScan()" 
-                    class="px-6 py-4 bg-slate-200 text-slate-700 hover:bg-slate-300 rounded-xl font-semibold transition-all">
-              <i class="fas fa-times mr-2"></i>취소
-            </button>
-          </div>
-        </div>
-      </div>
-    `;
-    resultContainer.classList.remove('hidden');
-
-    // 대기 상태 숨기기
-    const waiting = document.getElementById('scan-waiting-sale');
-    if (waiting) waiting.classList.add('hidden');
-
-    resultContainer.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-  }
+  resultContainer.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
 }
 
 // 수동 QR 입력
 async function handleManualQRInput(type) {
-  const inputId = type === 'inbound' ? 'manual-qr-input' : 'manual-qr-input-outbound';
-  const input = document.getElementById(inputId);
+  const op = QR_OPS[type];
+  const input = document.getElementById(op?.manualId || 'manual-qr-input');
   const qrCode = input?.value?.trim();
 
   if (!qrCode) {
@@ -1680,12 +1137,9 @@ async function handleManualQRInput(type) {
   }
 
   await processScannedQR(qrCode, type);
-
-  // 입력 필드 초기화
   if (input) input.value = '';
 }
 
-// QR 입고 확정
 async function confirmQRInbound() {
   if (!currentScannedData) {
     showToast('먼저 QR 코드를 스캔하세요', 'error');
@@ -1732,10 +1186,7 @@ async function confirmQRInbound() {
 
     // 폼 초기화
     currentScannedData = null;
-    document.getElementById('qr-scan-result')?.classList.add('hidden');
-    document.getElementById('inbound-quantity').value = '1';
-    document.getElementById('inbound-notes').value = '';
-
+    showScanWaiting(true, 'inbound');
     // 입고 이력 새로고침
     await loadInboundHistory();
 
@@ -1792,8 +1243,7 @@ async function confirmQROutbound() {
 
     // 폼 초기화
     currentScannedData = null;
-    document.getElementById('qr-outbound-result')?.classList.add('hidden');
-
+    showScanWaiting(true, 'outbound');
     // 출고 이력 새로고침
     await loadOutboundHistory();
 
@@ -1822,29 +1272,7 @@ async function loadInboundHistory() {
 
 // 입고 이력 렌더링
 function renderInboundHistory(transactions) {
-  const container = document.getElementById('qr-inbound-history');
-  if (!container) return;
-
-  if (!transactions || transactions.length === 0) {
-    container.innerHTML = '<p class="text-center text-slate-400 py-8">입고 이력이 없습니다</p>';
-    return;
-  }
-
-  container.innerHTML = transactions.map(tx => `
-    <div class="p-4 bg-blue-50 rounded-lg border border-blue-200">
-      <div class="flex items-center justify-between">
-        <div class="flex-1">
-          <h4 class="font-semibold text-blue-900">${tx.product_name}</h4>
-          <p class="text-sm text-slate-600">수량: ${tx.quantity}개 | 창고: ${tx.warehouse_name}</p>
-          <p class="text-xs text-slate-500">시간: ${new Date(tx.created_at).toLocaleString('ko-KR')}</p>
-          ${tx.notes ? `<p class="text-xs text-slate-600 mt-1">메모: ${tx.notes}</p>` : ''}
-        </div>
-        <div class="text-blue-600">
-          <i class="fas fa-check-circle text-2xl"></i>
-        </div>
-      </div>
-    </div>
-  `).join('');
+  renderQRHistoryList('qr-inbound-history', transactions, 'teal');
 }
 
 // 출고 이력 로드
@@ -1866,45 +1294,13 @@ async function loadOutboundHistory() {
 
 // 출고 이력 렌더링
 function renderOutboundHistory(transactions) {
-  const container = document.getElementById('qr-outbound-history');
-  if (!container) return;
-
-  if (!transactions || transactions.length === 0) {
-    container.innerHTML = '<p class="text-center text-slate-400 py-8">출고 이력이 없습니다</p>';
-    return;
-  }
-
-  container.innerHTML = transactions.map(tx => `
-    <div class="p-4 bg-orange-50 rounded-lg border border-orange-200">
-      <div class="flex items-center justify-between">
-        <div class="flex-1">
-          <h4 class="font-semibold text-orange-900">${tx.product_name}</h4>
-          <p class="text-sm text-slate-600">수량: ${tx.quantity}개 | 창고: ${tx.warehouse_name}</p>
-          <p class="text-xs text-slate-500">시간: ${new Date(tx.created_at).toLocaleString('ko-KR')}</p>
-          ${tx.notes ? `<p class="text-xs text-slate-600 mt-1">메모: ${tx.notes}</p>` : ''}
-        </div>
-        <div class="text-orange-600">
-          <i class="fas fa-check-circle text-2xl"></i>
-        </div>
-      </div>
-    </div>
-  `).join('');
+  renderQRHistoryList('qr-outbound-history', transactions, 'amber');
 }
 
 // QR 스캔 취소
 function cancelQRScan() {
   currentScannedData = null;
-  document.getElementById('qr-scan-result')?.classList.add('hidden');
-  document.getElementById('qr-outbound-result')?.classList.add('hidden');
-  document.getElementById('qr-sale-result')?.classList.add('hidden');
-
-  // 대기 상태 다시 표시
-  showScanWaiting(true);  // 입고 대기 표시
-  const waitingOutbound = document.getElementById('scan-waiting-outbound');
-  if (waitingOutbound) waitingOutbound.classList.remove('hidden');
-
-  const waitingSale = document.getElementById('scan-waiting-sale');
-  if (waitingSale) waitingSale.classList.remove('hidden');
+  ['inbound', 'outbound', 'sale'].forEach((t) => showScanWaiting(true, t));
 }
 
 // QR 판매 확정
@@ -1989,35 +1385,9 @@ async function loadSaleHistory() {
 
 // 판매 이력 렌더링
 function renderSaleHistory(transactions) {
-  const container = document.getElementById('qr-sale-history');
-  if (!container) return;
-
-  if (!transactions || transactions.length === 0) {
-    container.innerHTML = '<p class="text-center text-slate-400 py-8">오늘 판매 내역이 없습니다</p>';
-    return;
-  }
-
-  container.innerHTML = transactions.map(tx => `
-    <div class="flex items-center justify-between p-4 bg-slate-50 rounded-xl border border-slate-200 hover:border-green-300 transition-colors">
-      <div class="flex items-center gap-4">
-        <div class="w-12 h-12 bg-white rounded-lg flex items-center justify-center border border-slate-200 shadow-sm">
-          <i class="fas fa-box text-green-600"></i>
-        </div>
-        <div>
-          <h4 class="font-bold text-slate-800">${tx.product_name}</h4>
-          <p class="text-sm text-slate-500">
-            <span class="font-mono bg-slate-200 px-1 rounded text-xs mr-2">${tx.qr_code}</span>
-            ${new Date(tx.created_at).toLocaleTimeString()}
-          </p>
-        </div>
-      </div>
-      <div class="text-right">
-        <span class="block text-lg font-bold text-green-600">-${tx.quantity}개</span>
-        <span class="text-xs text-slate-500">${tx.user_name}</span>
-      </div>
-    </div>
-  `).join('');
+  renderQRHistoryList('qr-sale-history', transactions, 'emerald');
 }
+
 
 // QR 코드 생성
 async function generateQRCodes() {
