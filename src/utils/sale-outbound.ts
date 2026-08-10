@@ -31,7 +31,8 @@ export async function createOutboundFromSale(
   }
 
   const sale = await DB.prepare(`
-    SELECT s.*, c.name as customer_name, c.phone as customer_phone, c.address as customer_address
+    SELECT s.*, c.name as customer_name, c.phone as customer_phone,
+           COALESCE(c.address_detail, c.company, '') as customer_address
     FROM sales s
     LEFT JOIN customers c ON s.customer_id = c.id
     WHERE s.id = ? AND s.tenant_id = ?
