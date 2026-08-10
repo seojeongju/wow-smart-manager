@@ -569,7 +569,10 @@ app.post('/:id/ship', async (c) => {
         .bind(id, tenantId).first<OutboundOrder>();
 
     if (!order) return c.json({ success: false, error: 'Order not found' }, 404);
-    if (order.status !== 'PENDING') return c.json({ success: false, error: 'Order is not in PENDING state' }, 400);
+    // PENDING: 간편 즉시출고 / PACKING: 피킹·패킹 완료 후 확정
+    if (order.status !== 'PENDING' && order.status !== 'PACKING') {
+        return c.json({ success: false, error: '출고 확정은 PENDING 또는 PACKING 상태에서만 가능합니다.' }, 400);
+    }
 
     // 2. Items 조회
     const { results: items } = await DB.prepare(`
@@ -577,57 +580,64 @@ app.post('/:id/ship', async (c) => {
         FROM outbound_items oi
         JOIN products p ON oi.product_id = p.id
         WHERE oi.outbound_order_id = ?
-    `).bind(id).all<{ id: number, product_id: number, quantity_ordered: number, product_name: string, current_stock: number }>();
+    `).bind(id).all<{
+        id: number
+        product_id: number
+        quantity_ordered: number
+        quantity_picked: number
+        quantity_packed: number
+        product_name: string
+        current_stock: number
+    }>();
 
     try {
         // 재고 체크
         for (const item of items) {
-            // Global Check
-            if (item.current_stock < item.quantity_ordered) {
+            const shipQty = order.status === 'PACKING'
+                ? (Number(item.quantity_packed) || Number(item.quantity_picked) || Number(item.quantity_ordered))
+                : Number(item.quantity_ordered)
+
+            if (item.current_stock < shipQty) {
                 throw new Error(`상품 '${item.product_name}'의 재고가 부족합니다.`);
             }
-            // Warehouse Stock Check
             const whStock = await DB.prepare('SELECT quantity FROM product_warehouse_stocks WHERE product_id = ? AND warehouse_id = ?')
                 .bind(item.product_id, warehouseId).first<{ quantity: number }>();
             const currentWhStock = whStock?.quantity || 0;
-            if (currentWhStock < item.quantity_ordered) {
+            if (currentWhStock < shipQty) {
                 throw new Error(`상품 '${item.product_name}'의 창고 재고가 부족합니다. (현재: ${currentWhStock})`);
             }
         }
 
         // 재고 차감 및 상태 업데이트
         for (const item of items) {
-            // 1) Global 재고 차감
-            await DB.prepare('UPDATE products SET current_stock = current_stock - ? WHERE id = ?')
-                .bind(item.quantity_ordered, item.product_id).run();
+            const shipQty = order.status === 'PACKING'
+                ? (Number(item.quantity_packed) || Number(item.quantity_picked) || Number(item.quantity_ordered))
+                : Number(item.quantity_ordered)
 
-            // 2) Warehouse 재고 차감
+            await DB.prepare('UPDATE products SET current_stock = current_stock - ? WHERE id = ?')
+                .bind(shipQty, item.product_id).run();
+
             await DB.prepare(`
                 UPDATE product_warehouse_stocks 
                 SET quantity = quantity - ?, updated_at = CURRENT_TIMESTAMP 
                 WHERE product_id = ? AND warehouse_id = ?
-            `).bind(item.quantity_ordered, item.product_id, warehouseId).run();
+            `).bind(shipQty, item.product_id, warehouseId).run();
 
-            // 3) 이동 내역 기록
             await DB.prepare(`
               INSERT INTO stock_movements (tenant_id, product_id, warehouse_id, movement_type, quantity, reason, notes, created_by)
               VALUES (?, ?, ?, '출고', ?, ?, ?, ?)
             `).bind(
-                tenantId, item.product_id, warehouseId, -item.quantity_ordered,
+                tenantId, item.product_id, warehouseId, -shipQty,
                 '출고확정', `Order: ${order.order_number}`, userId
             ).run();
 
-            // 4) Item status update
             await DB.prepare('UPDATE outbound_items SET status = ?, quantity_picked = ?, quantity_packed = ? WHERE id = ?')
-                .bind('SHIPPED', item.quantity_ordered, item.quantity_ordered, item.id).run();
+                .bind('SHIPPED', shipQty, shipQty, item.id).run();
         }
 
-        // 3. Order Status Update & Warehouse ID Update
         await DB.prepare('UPDATE outbound_orders SET status = ?, warehouse_id = ? WHERE id = ?')
             .bind('SHIPPED', warehouseId, id).run();
 
-        // 4. Update Linked Sales Status
-        // Find sales via mappings
         const { results: mappings } = await DB.prepare('SELECT sale_id FROM outbound_order_mappings WHERE outbound_order_id = ?').bind(id).all<{ sale_id: number }>();
         for (const map of mappings) {
             await DB.prepare("UPDATE sales SET status = 'shipped' WHERE id = ?").bind(map.sale_id).run();
@@ -640,6 +650,107 @@ app.post('/:id/ship', async (c) => {
         return c.json({ success: false, error: e.message }, 500);
     }
 });
+
+// 피킹: 스캔 수량 누적 (PENDING/PICKING)
+app.post('/:id/picking', async (c) => {
+    const { DB } = c.env
+    const tenantId = c.get('tenantId')
+    const id = c.req.param('id')
+    const body = await c.req.json<PickingRequest>()
+
+    const order = await DB.prepare('SELECT * FROM outbound_orders WHERE id = ? AND tenant_id = ?')
+        .bind(id, tenantId).first<OutboundOrder>()
+    if (!order) return c.json({ success: false, error: '출고를 찾을 수 없습니다.' }, 404)
+    if (order.status !== 'PENDING' && order.status !== 'PICKING') {
+        return c.json({ success: false, error: '피킹은 PENDING/PICKING 상태에서만 가능합니다.' }, 400)
+    }
+    if (!body.items?.length) {
+        return c.json({ success: false, error: '피킹 품목이 없습니다.' }, 400)
+    }
+
+    for (const pick of body.items) {
+        const item = await DB.prepare(`
+            SELECT * FROM outbound_items
+            WHERE outbound_order_id = ? AND product_id = ?
+        `).bind(id, pick.product_id).first<{
+            id: number
+            quantity_ordered: number
+            quantity_picked: number
+        }>()
+        if (!item) {
+            return c.json({ success: false, error: `출고 품목에 없는 상품입니다. (product_id=${pick.product_id})` }, 400)
+        }
+        const add = Math.max(0, Number(pick.quantity) || 0)
+        if (add <= 0) continue
+        const nextPicked = Math.min(Number(item.quantity_ordered), Number(item.quantity_picked || 0) + add)
+        const itemStatus = nextPicked >= Number(item.quantity_ordered) ? 'PICKED' : 'PENDING'
+        await DB.prepare(`
+            UPDATE outbound_items SET quantity_picked = ?, status = ? WHERE id = ?
+        `).bind(nextPicked, itemStatus, item.id).run()
+    }
+
+    const pending = await DB.prepare(`
+        SELECT COUNT(*) as cnt FROM outbound_items
+        WHERE outbound_order_id = ? AND COALESCE(quantity_picked, 0) < quantity_ordered
+    `).bind(id).first<{ cnt: number }>()
+
+    const nextStatus = (pending?.cnt || 0) === 0 ? 'PACKING' : 'PICKING'
+    await DB.prepare(`
+        UPDATE outbound_orders SET status = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?
+    `).bind(nextStatus, id).run()
+
+    return c.json({
+        success: true,
+        message: nextStatus === 'PACKING' ? '피킹이 완료되어 패킹 단계로 이동합니다.' : '피킹이 반영되었습니다.',
+        data: { status: nextStatus }
+    })
+})
+
+// 패킹: 송장 저장 및 PACKING 상태 유지 (출고확정은 /ship)
+app.post('/:id/packing', async (c) => {
+    const { DB } = c.env
+    const tenantId = c.get('tenantId')
+    const id = c.req.param('id')
+    const body = await c.req.json<PackingRequest>()
+
+    const order = await DB.prepare('SELECT * FROM outbound_orders WHERE id = ? AND tenant_id = ?')
+        .bind(id, tenantId).first<OutboundOrder>()
+    if (!order) return c.json({ success: false, error: '출고를 찾을 수 없습니다.' }, 404)
+    if (order.status !== 'PICKING' && order.status !== 'PACKING' && order.status !== 'PENDING') {
+        return c.json({ success: false, error: '패킹은 PENDING/PICKING/PACKING 상태에서만 가능합니다.' }, 400)
+    }
+    if (!body.tracking_number) {
+        return c.json({ success: false, error: '운송장 번호가 필요합니다.' }, 400)
+    }
+
+    await DB.prepare(`
+        INSERT INTO outbound_packages (outbound_order_id, tracking_number, courier, box_type, box_count, weight)
+        VALUES (?, ?, ?, ?, ?, ?)
+    `).bind(
+        id,
+        body.tracking_number,
+        body.courier || null,
+        body.box_type || null,
+        body.box_count || 1,
+        body.weight ?? null
+    ).run()
+
+    await DB.prepare(`
+        UPDATE outbound_items
+        SET quantity_packed = CASE
+              WHEN COALESCE(quantity_picked, 0) > 0 THEN quantity_picked
+              ELSE quantity_ordered
+            END,
+            status = 'PACKED'
+        WHERE outbound_order_id = ?
+    `).bind(id).run()
+
+    await DB.prepare(`
+        UPDATE outbound_orders SET status = 'PACKING', updated_at = CURRENT_TIMESTAMP WHERE id = ?
+    `).bind(id).run()
+
+    return c.json({ success: true, message: '패킹·송장이 저장되었습니다. 출고 확정 단계에서 재고가 차감됩니다.' })
+})
 
 // 출고 수정 (배송 정보 등)
 app.put('/:id', async (c) => {

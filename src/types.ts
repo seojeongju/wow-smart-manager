@@ -111,6 +111,9 @@ export interface Claim {
   status: 'requested' | 'approved' | 'completed' | 'rejected';
   reason?: string;
   admin_notes?: string;
+  warehouse_id?: number;
+  refund_amount?: number;
+  settlement_status?: string;
   created_at: string;
   updated_at: string;
 }
@@ -239,6 +242,8 @@ export interface CreateSaleRequest {
   items: {
     product_id: number;
     quantity: number;
+    /** 확정 단가(미전송 시 고객/등급/기본 판매가로 서버 계산) */
+    unit_price?: number;
     qr_code?: string;
     lot_number?: string;
   }[];

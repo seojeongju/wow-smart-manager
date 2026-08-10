@@ -2556,7 +2556,8 @@ async function checkout() {
     customer_id: customerId,
     items: window.cart.map(item => ({
       product_id: item.product.id,
-      quantity: item.quantity
+      quantity: item.quantity,
+      unit_price: Number(item.product.selling_price)
     })),
     discount_amount: discount,
     payment_method: paymentMethod,
@@ -2822,6 +2823,7 @@ async function renderClaimsTab(container) {
                 <th class="px-6 py-3 text-left font-semibold text-slate-500 uppercase tracking-wider">사유</th>
                 <th class="px-6 py-3 text-left font-semibold text-slate-500 uppercase tracking-wider">요청자</th>
                 <th class="px-6 py-3 text-left font-semibold text-slate-500 uppercase tracking-wider">상태</th>
+                <th class="px-6 py-3 text-left font-semibold text-slate-500 uppercase tracking-wider">정산</th>
                 <th class="px-6 py-3 text-left font-semibold text-slate-500 uppercase tracking-wider">관리</th>
               </tr>
             </thead>
@@ -2849,6 +2851,11 @@ async function renderClaimsTab(container) {
                       ${getKoreanStatus(c.status)}
                     </span>
                   </td>
+                  <td class="px-6 py-4 text-xs text-slate-600">
+                    ${c.settlement_status === 'refund_pending' ? `환불예정 ${Number(c.refund_amount || 0).toLocaleString()}원` :
+                      c.settlement_status === 'exchanged' ? '교환완료' :
+                        c.settlement_status === 'refunded' ? `환불완료 ${Number(c.refund_amount || 0).toLocaleString()}원` : '-'}
+                  </td>
                   <td class="px-6 py-4">
                     ${c.status === 'requested' ? `
                       <button onclick="updateClaimStatus(${c.id}, 'approved')" class="text-emerald-600 hover:text-emerald-800 mr-2 font-medium text-xs bg-emerald-50 px-2 py-1 rounded hover:bg-emerald-100 transition-colors">승인</button>
@@ -2857,7 +2864,7 @@ async function renderClaimsTab(container) {
                   </td>
                 </tr>
               `).join('') : `
-                <tr><td colspan="7" class="px-6 py-10 text-center text-slate-500">요청 내역이 없습니다.</td></tr>
+                <tr><td colspan="9" class="px-6 py-10 text-center text-slate-500">요청 내역이 없습니다.</td></tr>
               `}
             </tbody>
           </table>
@@ -3678,7 +3685,7 @@ function injectClaimApproveModal() {
         <form onsubmit="submitClaimApprove(event)">
           <input type="hidden" id="claimApproveId">
           <div class="p-6 space-y-5">
-            <p class="text-sm text-slate-600">반품/교환 물품이 입고될 창고를 선택해주세요.</p>
+            <p class="text-sm text-slate-600">반품은 입고·환불예정, 교환은 회수 입고 후 동일 품목이 재출고됩니다. 창고를 선택하세요.</p>
             <div>
               <label class="block text-sm font-semibold text-slate-700 mb-2">입고 창고</label>
               <select id="claimApproveWarehouse" required class="w-full border border-slate-300 rounded-lg px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-indigo-500 transition-shadow bg-white">
@@ -4061,8 +4068,11 @@ async function submitTransfer(e) {
 // 2. 피킹/검수 (Picking)
 async function renderOutboundPicking(container) {
   try {
-    const response = await axios.get(`${API_BASE}/outbound?status=PENDING`); // PENDING or PICKING
-    const orders = response.data.data.filter(o => o.status === 'PENDING' || o.status === 'PICKING');
+    const [pendingRes, pickingRes] = await Promise.all([
+      axios.get(`${API_BASE}/outbound?status=PENDING&limit=100`),
+      axios.get(`${API_BASE}/outbound?status=PICKING&limit=100`)
+    ]);
+    const orders = [...(pendingRes.data.data || []), ...(pickingRes.data.data || [])];
 
     container.innerHTML = `
       <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 overflow-y-auto p-1">
@@ -4079,11 +4089,11 @@ async function renderOutboundPicking(container) {
               </div>
             </div>
             <div class="space-y-2 mb-4">
-              <p class="text-sm text-slate-600"><i class="fas fa-user mr-2 w-4"></i>${o.destination_name}</p>
-              <p class="text-sm text-slate-600 truncate"><i class="fas fa-map-marker-alt mr-2 w-4"></i>${o.destination_address}</p>
+              <p class="text-sm text-slate-600"><i class="fas fa-user mr-2 w-4"></i>${o.destination_name || '-'}</p>
+              <p class="text-sm text-slate-600 truncate"><i class="fas fa-map-marker-alt mr-2 w-4"></i>${o.destination_address || '-'}</p>
             </div>
             <div class="border-t border-slate-100 pt-4 flex justify-between items-center">
-              <span class="text-sm font-medium text-slate-600">총 ${o.item_count}개 품목</span>
+              <span class="text-sm font-medium text-slate-600">총 ${o.item_count || 0}개 품목</span>
               <button class="text-teal-600 hover:text-indigo-800 font-medium text-sm">피킹 시작 <i class="fas fa-arrow-right ml-1"></i></button>
             </div>
           </div>
@@ -4096,6 +4106,7 @@ async function renderOutboundPicking(container) {
     showError(container, '출고 목록 로드 실패');
   }
 }
+window.renderOutboundPicking = renderOutboundPicking;
 
 async function openPickingModal(id) {
   // 상세 조회 및 모달 표시
@@ -4195,8 +4206,13 @@ async function simulateScan(sku, orderId) {
 // 3. 패킹/송장 (Packing)
 async function renderOutboundPacking(container) {
   try {
-    const response = await axios.get(`${API_BASE}/outbound?status=PACKING`);
-    const orders = response.data.data;
+    const response = await axios.get(`${API_BASE}/outbound?status=PACKING&limit=100`);
+    const orders = response.data.data || [];
+    let warehouses = [];
+    try {
+      const whRes = await axios.get(`${API_BASE}/warehouses`);
+      warehouses = whRes.data.data || [];
+    } catch (_) { /* ignore */ }
 
     container.innerHTML = `
       <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 overflow-y-auto p-1">
@@ -4206,7 +4222,7 @@ async function renderOutboundPacking(container) {
               <h4 class="font-bold text-lg text-slate-800">${o.order_number}</h4>
               <span class="px-2 py-1 bg-amber-100 text-amber-700 text-xs font-bold rounded">패킹 대기</span>
             </div>
-            <div class="space-y-4">
+            <div class="space-y-3">
               <div>
                 <label class="block text-xs font-bold text-slate-500 mb-1">택배사</label>
                 <select id="courier-${o.id}" class="w-full border border-slate-300 rounded px-2 py-1 text-sm">
@@ -4217,7 +4233,7 @@ async function renderOutboundPacking(container) {
               </div>
               <div>
                 <label class="block text-xs font-bold text-slate-500 mb-1">운송장 번호</label>
-                <input type="text" id="tracking-${o.id}" class="w-full border border-slate-300 rounded px-2 py-1 text-sm" placeholder="숫자만 입력">
+                <input type="text" id="tracking-${o.id}" class="w-full border border-slate-300 rounded px-2 py-1 text-sm" placeholder="숫자만 입력" value="${o.tracking_number || ''}">
               </div>
               <div>
                 <label class="block text-xs font-bold text-slate-500 mb-1">박스 타입</label>
@@ -4227,13 +4243,23 @@ async function renderOutboundPacking(container) {
                   <option value="C형">C형 (대)</option>
                 </select>
               </div>
+              <div>
+                <label class="block text-xs font-bold text-slate-500 mb-1">출고 창고</label>
+                <select id="ship-wh-${o.id}" class="w-full border border-slate-300 rounded px-2 py-1 text-sm">
+                  <option value="">창고 선택</option>
+                  ${warehouses.map(w => `<option value="${w.id}">${w.name}</option>`).join('')}
+                </select>
+              </div>
               <button onclick="submitPacking(${o.id})" class="w-full bg-teal-600 text-white py-2 rounded hover:bg-teal-700 font-medium">
                 패킹 완료 및 송장 저장
+              </button>
+              <button onclick="confirmPackingShip(${o.id})" class="w-full bg-slate-800 text-white py-2 rounded hover:bg-slate-900 font-medium">
+                출고 확정 (재고 차감)
               </button>
             </div>
           </div>
         `).join('')}
-        ${orders.length === 0 ? '<div class="col-span-full text-center py-10 text-slate-500">패킹 대기 중인 지시서가 없습니다.</div>' : ''}
+        ${orders.length === 0 ? '<div class="col-span-full text-center py-10 text-slate-500">패킹 대기 중인 지시서가 없습니다. 피킹을 먼저 완료하세요.</div>' : ''}
       </div>
     `;
   } catch (error) {
@@ -4241,6 +4267,7 @@ async function renderOutboundPacking(container) {
     showError(container, '목록 로드 실패');
   }
 }
+window.renderOutboundPacking = renderOutboundPacking;
 
 async function submitPacking(id) {
   const courier = document.getElementById(`courier-${id}`).value;
@@ -4256,15 +4283,36 @@ async function submitPacking(id) {
     await axios.post(`${API_BASE}/outbound/${id}/packing`, {
       courier, tracking_number: trackingNumber, box_type: boxType, box_count: 1
     });
-    alert('저장되었습니다.');
-    switchOutboundTab('packing');
+    alert('송장이 저장되었습니다. 이어서 출고 확정을 진행하세요.');
+    if (typeof switchOutboundTab === 'function') switchOutboundTab('packing');
+    else renderOutboundPacking(document.getElementById('outboundTabContent'));
   } catch (e) {
     console.error(e);
-    alert('저장 실패');
+    alert('저장 실패: ' + (e.response?.data?.error || e.message));
   }
 }
+window.submitPacking = submitPacking;
 
-// 4. 출고 확정 (Confirmation)
+async function confirmPackingShip(id) {
+  const wh = document.getElementById(`ship-wh-${id}`)?.value;
+  if (!wh) {
+    alert('출고 창고를 선택하세요.');
+    return;
+  }
+  if (!confirm('출고를 확정하면 재고가 차감됩니다. 진행할까요?')) return;
+  try {
+    await axios.post(`${API_BASE}/outbound/${id}/ship`, { warehouseId: Number(wh) });
+    alert('출고가 확정되었습니다.');
+    if (typeof switchOutboundTab === 'function') switchOutboundTab('packing');
+  } catch (e) {
+    alert('출고 확정 실패: ' + (e.response?.data?.error || e.message));
+  }
+}
+window.confirmPackingShip = confirmPackingShip;
+window.openPickingModal = openPickingModal;
+window.simulateScan = simulateScan;
+
+// 4. 출고 확정 (Confirmation) — 레거시 호환 유지
 async function renderOutboundConfirmation(container) {
   try {
     // PACKING 상태이지만 아직 SHIPPED가 아닌 것들? 

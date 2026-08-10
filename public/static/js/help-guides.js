@@ -181,10 +181,35 @@ const HELP_GUIDES = {
       '고객·창고·수량을 확인합니다.',
       '출고를 확정하면 재고가 차감됩니다.'
     ],
-    tips: ['엑셀 템플릿 일괄 등록도 지원됩니다.'],
+    tips: ['단계별 물류는 피킹 → 패킹/송장 → 출고확정 탭을 사용하세요.', '엑셀 템플릿 일괄 등록도 지원됩니다.'],
     related: [
-      { label: '출고 이력', page: 'outbound', tab: 'hist' },
+      { label: '피킹', page: 'outbound', tab: 'picking' },
+      { label: '패킹/송장', page: 'outbound', tab: 'packing' },
       { label: 'QR 출고', page: 'qr', tab: 'outbound' }
+    ]
+  },
+  'outbound:picking': {
+    title: '출고 피킹',
+    summary: 'PENDING/PICKING 출고 지시서에서 바코드·SKU로 피킹 수량을 쌓습니다.',
+    steps: [
+      '피킹 대기 카드를 눌러 검수 화면을 엽니다.',
+      'SKU를 스캔(또는 입력)하면 피킹 수량이 증가합니다.',
+      '전 품목 피킹이 끝나면 자동으로 패킹 단계로 넘어갑니다.'
+    ],
+    tips: ['이 단계에서는 아직 재고가 차감되지 않습니다.'],
+    related: [{ label: '패킹/송장', page: 'outbound', tab: 'packing' }]
+  },
+  'outbound:packing': {
+    title: '패킹/송장',
+    summary: '피킹 완료 건에 택배사·운송장을 넣고 출고를 확정합니다.',
+    steps: [
+      '택배사·운송장·박스를 입력한 뒤 [패킹 완료 및 송장 저장]을 누릅니다.',
+      '출고 창고를 고른 뒤 [출고 확정]으로 재고를 차감합니다.'
+    ],
+    tips: ['간편 출고는 등록 시 바로 확정될 수 있습니다.'],
+    related: [
+      { label: '피킹', page: 'outbound', tab: 'picking' },
+      { label: '출고 이력', page: 'outbound', tab: 'hist' }
     ]
   },
   'outbound:hist': {
@@ -558,6 +583,8 @@ const HELP_HUB_SECTIONS = [
       { key: 'sales:orders', label: '주문 관리' },
       { key: 'sales:claims', label: '클레임' },
       { key: 'outbound:reg', label: '간편 출고' },
+      { key: 'outbound:picking', label: '피킹' },
+      { key: 'outbound:packing', label: '패킹/송장' },
       { key: 'outbound:hist', label: '출고 이력' },
       { key: 'purchases:purchases', label: '발주 관리' },
       { key: 'purchases:suppliers', label: '공급사' },

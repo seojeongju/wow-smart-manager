@@ -18,14 +18,20 @@ async function renderOutboundPage(initialTab = 'reg') {
       </div>
 
       <!-- 탭 네비게이션 -->
-      <div class="flex border-b border-slate-200 mb-6 bg-white rounded-t-xl px-4 pt-2 shadow-sm">
-        <button id="tab-out-reg" class="px-6 py-4 font-bold text-teal-600 border-b-2 border-teal-600 transition-colors flex items-center" onclick="switchOutboundTab('reg')">
+      <div class="flex border-b border-slate-200 mb-6 bg-white rounded-t-xl px-4 pt-2 shadow-sm overflow-x-auto">
+        <button id="tab-out-reg" class="px-6 py-4 font-bold text-teal-600 border-b-2 border-teal-600 transition-colors flex items-center whitespace-nowrap" onclick="switchOutboundTab('reg')">
           <i class="fas fa-edit mr-2"></i>간편 출고 등록
         </button>
-        <button id="tab-out-hist" class="px-6 py-4 font-medium text-slate-500 hover:text-slate-700 transition-colors flex items-center" onclick="switchOutboundTab('hist')">
+        <button id="tab-out-picking" class="px-6 py-4 font-medium text-slate-500 hover:text-slate-700 transition-colors flex items-center whitespace-nowrap" onclick="switchOutboundTab('picking')">
+          <i class="fas fa-box-open mr-2"></i>피킹
+        </button>
+        <button id="tab-out-packing" class="px-6 py-4 font-medium text-slate-500 hover:text-slate-700 transition-colors flex items-center whitespace-nowrap" onclick="switchOutboundTab('packing')">
+          <i class="fas fa-box mr-2"></i>패킹/송장
+        </button>
+        <button id="tab-out-hist" class="px-6 py-4 font-medium text-slate-500 hover:text-slate-700 transition-colors flex items-center whitespace-nowrap" onclick="switchOutboundTab('hist')">
           <i class="fas fa-history mr-2"></i>출고 이력 조회
         </button>
-        <button id="tab-out-warehouse" class="px-6 py-4 font-medium text-slate-500 hover:text-slate-700 transition-colors flex items-center" onclick="switchOutboundTab('warehouse')">
+        <button id="tab-out-warehouse" class="px-6 py-4 font-medium text-slate-500 hover:text-slate-700 transition-colors flex items-center whitespace-nowrap" onclick="switchOutboundTab('warehouse')">
           <i class="fas fa-warehouse mr-2"></i>창고별 관리
         </button>
       </div>
@@ -42,7 +48,7 @@ async function renderOutboundPage(initialTab = 'reg') {
 }
 
 async function switchOutboundTab(tabName) {
-  const tabs = ['reg', 'hist', 'warehouse'];
+  const tabs = ['reg', 'picking', 'packing', 'hist', 'warehouse'];
   tabs.forEach(t => {
     const btn = document.getElementById(`tab-out-${t}`);
     if (btn) {
@@ -65,6 +71,12 @@ async function switchOutboundTab(tabName) {
 
   if (tabName === 'reg') {
     await renderOutboundRegistrationTab(container);
+  } else if (tabName === 'picking') {
+    if (typeof window.renderOutboundPicking === 'function') await window.renderOutboundPicking(container);
+    else container.innerHTML = '<div class="p-8 text-slate-500">피킹 모듈을 불러오는 중...</div>';
+  } else if (tabName === 'packing') {
+    if (typeof window.renderOutboundPacking === 'function') await window.renderOutboundPacking(container);
+    else container.innerHTML = '<div class="p-8 text-slate-500">패킹 모듈을 불러오는 중...</div>';
   } else if (tabName === 'hist') {
     await renderOutboundHistoryTab(container);
   } else if (tabName === 'warehouse') {

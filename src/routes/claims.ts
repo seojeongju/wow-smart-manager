@@ -109,6 +109,8 @@ app.put('/:id/status', async (c) => {
   const { DB } = c.env
   const id = c.req.param('id')
   const body = await c.req.json<UpdateClaimStatusRequest & { warehouse_id?: number }>()
+  const tenantId = c.get('tenantId')
+  const userId = c.get('userId')
 
   const claim = await DB.prepare('SELECT * FROM claims WHERE id = ?').bind(id).first<Claim>()
   if (!claim) {
@@ -119,55 +121,72 @@ app.put('/:id/status', async (c) => {
     return c.json({ success: false, error: '이미 처리된 클레임입니다.' }, 400)
   }
 
-  // 상태 및 창고 업데이트
+  // 승인(approved) 시 재고 처리 전에 창고 검증
+  if (body.status === 'approved' && (claim.type === 'return' || claim.type === 'exchange')) {
+    if (!body.warehouse_id) {
+      return c.json({ success: false, error: '입고/재출고할 창고를 지정해야 합니다.' }, 400)
+    }
+  }
+
   await DB.prepare(`
     UPDATE claims 
     SET status = ?, admin_notes = ?, warehouse_id = ?, updated_at = CURRENT_TIMESTAMP 
     WHERE id = ?
   `).bind(body.status, body.admin_notes || null, body.warehouse_id || null, id).run()
 
-  // 승인(approved) 시 재고 처리
-  // 반품인 경우 재고 입고 처리
-  if (body.status === 'approved' && claim.type === 'return') {
-    const warehouseId = body.warehouse_id;
-    if (!warehouseId) {
-      return c.json({ success: false, error: '입고할 창고를 지정해야 합니다.' }, 400)
-    }
-
+  if (body.status === 'approved' && (claim.type === 'return' || claim.type === 'exchange')) {
+    const warehouseId = Number(body.warehouse_id)
     const { results: items } = await DB.prepare('SELECT * FROM claim_items WHERE claim_id = ?').bind(id).all<any>()
 
+    // 환불 예정액 (원 판매 단가 × 수량)
+    let refundAmount = 0
     for (const item of items) {
-      // 전체 재고 증가
+      const saleLine = await DB.prepare(`
+        SELECT unit_price FROM sale_items
+        WHERE sale_id = ? AND product_id = ?
+        ORDER BY id ASC LIMIT 1
+      `).bind(claim.sale_id, item.product_id).first<{ unit_price: number }>()
+      const unit = Number(saleLine?.unit_price) || 0
+      refundAmount += unit * Number(item.quantity)
+
+      // 1) 회수 입고 (반품·교환 공통)
       await DB.prepare(`
         UPDATE products 
         SET current_stock = current_stock + ?, updated_at = CURRENT_TIMESTAMP
         WHERE id = ?
       `).bind(item.quantity, item.product_id).run()
 
-      // 창고 재고 증가 (없으면 생성)
-      const whStock = await DB.prepare('SELECT * FROM product_warehouse_stocks WHERE product_id = ? AND warehouse_id = ?')
-        .bind(item.product_id, warehouseId).first()
+      const whStock = await DB.prepare(
+        'SELECT * FROM product_warehouse_stocks WHERE product_id = ? AND warehouse_id = ? AND tenant_id = ?'
+      ).bind(item.product_id, warehouseId, tenantId).first()
 
       if (whStock) {
-        await DB.prepare('UPDATE product_warehouse_stocks SET quantity = quantity + ? WHERE product_id = ? AND warehouse_id = ?')
-          .bind(item.quantity, item.product_id, warehouseId).run()
+        await DB.prepare(
+          'UPDATE product_warehouse_stocks SET quantity = quantity + ? WHERE product_id = ? AND warehouse_id = ? AND tenant_id = ?'
+        ).bind(item.quantity, item.product_id, warehouseId, tenantId).run()
       } else {
-        await DB.prepare('INSERT INTO product_warehouse_stocks (product_id, warehouse_id, quantity) VALUES (?, ?, ?)')
-          .bind(item.product_id, warehouseId, item.quantity).run()
+        await DB.prepare(
+          'INSERT INTO product_warehouse_stocks (tenant_id, product_id, warehouse_id, quantity) VALUES (?, ?, ?, ?)'
+        ).bind(tenantId, item.product_id, warehouseId, item.quantity).run()
       }
 
-      // 재고 이동 기록
       await DB.prepare(`
-        INSERT INTO stock_movements (product_id, warehouse_id, movement_type, quantity, reason, reference_id, created_by)
-        VALUES (?, ?, '입고', ?, '반품 입고', ?, ?)
-      `).bind(item.product_id, warehouseId, item.quantity, claim.sale_id, c.get('userId')).run()
+        INSERT INTO stock_movements (tenant_id, product_id, warehouse_id, movement_type, quantity, reason, reference_id, created_by)
+        VALUES (?, ?, ?, '입고', ?, ?, ?, ?)
+      `).bind(
+        tenantId,
+        item.product_id,
+        warehouseId,
+        item.quantity,
+        claim.type === 'exchange' ? '교환 회수 입고' : '반품 입고',
+        claim.sale_id,
+        userId
+      ).run()
 
-      // Lot 잔량 복원 + 이벤트
       if (item.mes_lot_id) {
-        const tenantId = c.get('tenantId')
         await restoreMesLot(DB, tenantId, item.mes_lot_id, Number(item.quantity))
-        await insertDistributionEvent(DB, tenantId, c.get('userId'), {
-          event_type: 'claim_return',
+        await insertDistributionEvent(DB, tenantId, userId, {
+          event_type: claim.type === 'exchange' ? 'claim_exchange_in' : 'claim_return',
           product_id: item.product_id,
           lot_number: item.lot_number,
           quantity: item.quantity,
@@ -175,13 +194,105 @@ app.put('/:id/status', async (c) => {
           warehouse_id: warehouseId,
           reference_type: 'claim',
           reference_id: Number(id),
-          notes: '반품 승인 — Lot 잔량 복원'
+          notes: claim.type === 'exchange' ? '교환 승인 — 회수 Lot 복원' : '반품 승인 — Lot 잔량 복원'
         })
+      }
+    }
+
+    if (claim.type === 'return') {
+      try {
+        await DB.prepare(`
+          UPDATE claims
+          SET refund_amount = ?, settlement_status = 'refund_pending', status = 'completed',
+              updated_at = CURRENT_TIMESTAMP
+          WHERE id = ?
+        `).bind(refundAmount, id).run()
+      } catch {
+        // 마이그레이션 전이면 금액 필드 없이 완료만
+        await DB.prepare(`
+          UPDATE claims SET status = 'completed', updated_at = CURRENT_TIMESTAMP WHERE id = ?
+        `).bind(id).run()
+      }
+    }
+
+    if (claim.type === 'exchange') {
+      // 2) 동일 품목 재출고 (교환 출고)
+      for (const item of items) {
+        const qty = Number(item.quantity)
+        const product = await DB.prepare(
+          'SELECT name, current_stock FROM products WHERE id = ? AND tenant_id = ?'
+        ).bind(item.product_id, tenantId).first<{ name: string; current_stock: number }>()
+
+        if (!product || Number(product.current_stock) < qty) {
+          return c.json({
+            success: false,
+            error: `${product?.name || item.product_id}: 교환 출고 재고가 부족합니다. (회수 후 잔량 확인)`
+          }, 400)
+        }
+
+        const wh = await DB.prepare(
+          'SELECT quantity FROM product_warehouse_stocks WHERE tenant_id = ? AND product_id = ? AND warehouse_id = ?'
+        ).bind(tenantId, item.product_id, warehouseId).first<{ quantity: number }>()
+        if (!wh || Number(wh.quantity) < qty) {
+          return c.json({
+            success: false,
+            error: `${product.name}: 창고 재고가 교환 출고에 부족합니다.`
+          }, 400)
+        }
+
+        await DB.prepare(
+          'UPDATE products SET current_stock = current_stock - ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?'
+        ).bind(qty, item.product_id).run()
+
+        await DB.prepare(`
+          UPDATE product_warehouse_stocks
+          SET quantity = quantity - ?, updated_at = CURRENT_TIMESTAMP
+          WHERE tenant_id = ? AND product_id = ? AND warehouse_id = ?
+        `).bind(qty, tenantId, item.product_id, warehouseId).run()
+
+        await DB.prepare(`
+          INSERT INTO stock_movements (tenant_id, product_id, warehouse_id, movement_type, quantity, reason, reference_id, created_by)
+          VALUES (?, ?, ?, '출고', ?, '교환 재출고', ?, ?)
+        `).bind(tenantId, item.product_id, warehouseId, -qty, claim.sale_id, userId).run()
+
+        if (item.mes_lot_id) {
+          await insertDistributionEvent(DB, tenantId, userId, {
+            event_type: 'claim_exchange_out',
+            product_id: item.product_id,
+            lot_number: item.lot_number,
+            quantity: qty,
+            qr_code_id: item.qr_code_id,
+            warehouse_id: warehouseId,
+            reference_type: 'claim',
+            reference_id: Number(id),
+            notes: '교환 승인 — 동일 품목 재출고'
+          })
+        }
+      }
+
+      try {
+        await DB.prepare(`
+          UPDATE claims
+          SET refund_amount = 0, settlement_status = 'exchanged', status = 'completed',
+              updated_at = CURRENT_TIMESTAMP
+          WHERE id = ?
+        `).bind(id).run()
+      } catch {
+        await DB.prepare(`
+          UPDATE claims SET status = 'completed', updated_at = CURRENT_TIMESTAMP WHERE id = ?
+        `).bind(id).run()
       }
     }
   }
 
-  return c.json({ success: true, message: '상태가 변경되었습니다.' })
+  return c.json({
+    success: true,
+    message: claim.type === 'exchange' && body.status === 'approved'
+      ? '교환이 승인되어 회수 입고·재출고가 반영되었습니다.'
+      : claim.type === 'return' && body.status === 'approved'
+        ? '반품이 승인되어 재고 입고·환불 예정액이 반영되었습니다.'
+        : '상태가 변경되었습니다.'
+  })
 })
 
 export default app

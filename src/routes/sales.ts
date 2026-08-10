@@ -1,5 +1,6 @@
 import { Hono } from 'hono'
 import type { Bindings, Variables, Sale, CreateSaleRequest } from '../types'
+import { resolveLineUnitPrice } from '../utils/sale-price'
 import { linkSaleItemLot } from '../utils/mes-distribution'
 
 const app = new Hono<{ Bindings: Bindings; Variables: Variables }>()
@@ -257,19 +258,29 @@ app.post('/', async (c) => {
 
   let totalAmount = 0
   const productDetails: any[] = []
+  const customerId = body.customer_id ? Number(body.customer_id) : null
 
   for (const item of body.items) {
     const product = productCache.get(item.product_id)
     if (!product) {
       return c.json({ success: false, error: `상품 ID ${item.product_id} 오류` }, 400)
     }
-    const subtotal = product.selling_price * item.quantity
+    const { unitPrice, priceSource } = await resolveLineUnitPrice(
+      DB,
+      tenantId,
+      product.id,
+      product.selling_price,
+      customerId,
+      item.unit_price
+    )
+    const subtotal = unitPrice * item.quantity
     totalAmount += subtotal
     productDetails.push({
       product_id: product.id,
       quantity: item.quantity,
-      unit_price: product.selling_price,
-      subtotal
+      unit_price: unitPrice,
+      subtotal,
+      price_source: priceSource
     })
   }
 
