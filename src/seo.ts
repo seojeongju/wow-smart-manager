@@ -25,7 +25,8 @@ export const DEFAULT_KEYWORDS = [
 
 /** Search Console / 네이버 서치어드바이저 인증값을 발급받으면 여기에 넣으면 됩니다. */
 export const GOOGLE_SITE_VERIFICATION = ''
-export const NAVER_SITE_VERIFICATION = ''
+export const NAVER_SITE_VERIFICATION = 'eb3371b8f004a496f576cbe405c389b661806c01'
+export const NAVER_HTML_FILE = 'naver165f9e79465026abd5b02aee545d676c.html'
 
 export type SeoPage = {
   title: string
@@ -76,6 +77,8 @@ export function seoHeadHtml(page: SeoPage): string {
   return `
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+${naverMeta}
+${googleMeta}
 <title>${escapeHtml(page.title)}</title>
 <meta name="description" content="${escapeHtml(page.description)}">
 <meta name="keywords" content="${escapeHtml(DEFAULT_KEYWORDS)}">
@@ -98,8 +101,6 @@ export function seoHeadHtml(page: SeoPage): string {
 <meta name="twitter:title" content="${escapeHtml(page.title)}">
 <meta name="twitter:description" content="${escapeHtml(page.description)}">
 <meta name="twitter:image" content="${OG_IMAGE}">
-${googleMeta}
-${naverMeta}
 `.trim()
 }
 

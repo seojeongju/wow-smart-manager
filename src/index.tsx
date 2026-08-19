@@ -39,6 +39,8 @@ import {
     DEFAULT_TITLE,
     SITE_NAME,
     ORG_NAME,
+    NAVER_HTML_FILE,
+    NAVER_SITE_VERIFICATION,
     apexRedirectUrl,
     faqPageHtml,
     jsonLdHtml,
@@ -92,6 +94,13 @@ app.get('/llms.txt', (c) =>
     c.text(llmsTxt(), 200, { 'Content-Type': 'text/plain; charset=utf-8' })
 )
 app.get('/faq', (c) => c.html(faqPageHtml()))
+app.get(`/${NAVER_HTML_FILE}`, (c) =>
+    c.text(NAVER_SITE_VERIFICATION, 200, {
+        'Content-Type': 'text/html; charset=utf-8',
+        'Cache-Control': 'no-store',
+        'X-Robots-Tag': 'noindex',
+    })
+)
 
 // CORS 활성화
 app.use('/api/*', cors())
