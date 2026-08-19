@@ -1,0 +1,16 @@
+[
+  {
+    "relation": ["lookalikes/allowlist"],
+    "target": {
+      "namespace": "web",
+      "site": "https://wow3d.co.kr"
+    }
+  },
+  {
+    "relation": ["lookalikes/allowlist"],
+    "target": {
+      "namespace": "web",
+      "site": "https://wow3dp.co.kr"
+    }
+  }
+]

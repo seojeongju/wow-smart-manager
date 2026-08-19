@@ -37,6 +37,25 @@ import hrRouter from './routes/hr'
 
 const app = new Hono<{ Bindings: Bindings; Variables: Variables }>()
 
+const LOOKALIKE_ALLOWLIST = [
+    {
+        relation: ['lookalikes/allowlist'],
+        target: { namespace: 'web', site: 'https://wow3d.co.kr' },
+    },
+    {
+        relation: ['lookalikes/allowlist'],
+        target: { namespace: 'web', site: 'https://wow3dp.co.kr' },
+    },
+] as const
+
+// Chrome 유사 도메인 경고 해제용 Digital Asset Links
+app.get('/.well-known/assetlinks.json', (c: Context) => {
+    return c.json(LOOKALIKE_ALLOWLIST, 200, {
+        'Cache-Control': 'public, max-age=3600',
+        'X-Content-Type-Options': 'nosniff',
+    })
+})
+
 // CORS 활성화
 app.use('/api/*', cors())
 
