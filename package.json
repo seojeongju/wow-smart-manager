@@ -4,7 +4,7 @@
   "scripts": {
     "dev": "npx vite",
     "dev:sandbox": "npx wrangler pages dev dist --d1 DB=smart-link-f-db --local --ip 0.0.0.0 --port 3000",
-    "build": "npx vite build",
+    "build": "npx vite build && node scripts/copy-seo-assets.mjs",
     "preview": "npx wrangler pages dev",
     "deploy": "npm run build && npx wrangler pages deploy dist --project-name wow-smart-manager",
     "deploy:prod": "npm run build && npx wrangler pages deploy dist --project-name wow-smart-manager",
