@@ -1,0 +1,12 @@
+{
+  "version": 1,
+  "include": ["/*"],
+  "exclude": [
+    "/static/*",
+    "/login.html",
+    "/robots.txt",
+    "/sitemap.xml",
+    "/llms.txt",
+    "/naver165f9e79465026abd5b02aee545d676c.html"
+  ]
+}
