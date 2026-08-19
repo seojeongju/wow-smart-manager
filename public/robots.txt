@@ -1,0 +1,18 @@
+User-agent: *
+Allow: /
+Allow: /login
+Allow: /faq
+Allow: /static/
+Allow: /llms.txt
+Disallow: /admin
+Disallow: /api/
+
+User-agent: Yeti
+Allow: /
+Allow: /login
+Allow: /faq
+Allow: /static/
+Disallow: /admin
+Disallow: /api/
+
+Sitemap: https://wow3d.co.kr/sitemap.xml

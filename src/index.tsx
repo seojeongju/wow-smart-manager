@@ -34,6 +34,22 @@ import transactionStatementsRouter from './routes/transaction-statements'
 import financeRouter from './routes/finance'
 import opportunitiesRouter from './routes/opportunities'
 import hrRouter from './routes/hr'
+import {
+    DEFAULT_DESCRIPTION,
+    DEFAULT_TITLE,
+    SITE_NAME,
+    ORG_NAME,
+    apexRedirectUrl,
+    faqPageHtml,
+    jsonLdHtml,
+    llmsTxt,
+    loginMarketingHtml,
+    noscriptHomeHtml,
+    robotsTxt,
+    seoHeadHtml,
+    shouldNoindexHost,
+    sitemapXml,
+} from './seo'
 
 const app = new Hono<{ Bindings: Bindings; Variables: Variables }>()
 
@@ -55,6 +71,27 @@ app.get('/.well-known/assetlinks.json', (c: Context) => {
         'X-Content-Type-Options': 'nosniff',
     })
 })
+
+app.use('*', async (c, next) => {
+    const host = c.req.header('host') || ''
+    const redirectTo = apexRedirectUrl(host, c.req.url)
+    if (redirectTo) return c.redirect(redirectTo, 301)
+    if (shouldNoindexHost(host)) {
+        c.header('X-Robots-Tag', 'noindex, nofollow')
+    }
+    await next()
+})
+
+app.get('/robots.txt', (c) =>
+    c.text(robotsTxt(), 200, { 'Content-Type': 'text/plain; charset=utf-8' })
+)
+app.get('/sitemap.xml', (c) =>
+    c.text(sitemapXml(), 200, { 'Content-Type': 'application/xml; charset=utf-8' })
+)
+app.get('/llms.txt', (c) =>
+    c.text(llmsTxt(), 200, { 'Content-Type': 'text/plain; charset=utf-8' })
+)
+app.get('/faq', (c) => c.html(faqPageHtml()))
 
 // CORS 활성화
 app.use('/api/*', cors())
@@ -101,6 +138,7 @@ app.get('/admin', (c: Context) => {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="robots" content="noindex,nofollow">
     <title>슈퍼 관리자 - WOW-Smart Manager</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
@@ -283,9 +321,16 @@ app.get('/login', (c: Context) => {
     <html lang="ko">
 
         <head>
-            <meta charset="UTF-8">
-                <meta name="viewport" content="width=device-width, initial-scale=1.0">
-                    <title>로그인 - WOW-Smart Manager</title>
+${seoHeadHtml({
+    title: `로그인 · 회원가입 | ${SITE_NAME} 제조 ERP·MES`,
+    description: DEFAULT_DESCRIPTION,
+    path: '/login',
+})}
+${jsonLdHtml({
+    title: `로그인 · 회원가입 | ${SITE_NAME} 제조 ERP·MES`,
+    description: DEFAULT_DESCRIPTION,
+    path: '/login',
+})}
                     <script src="https://cdn.tailwindcss.com"></script>
                     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
                         <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
@@ -396,8 +441,8 @@ app.get('/login', (c: Context) => {
                                                     </h1>
                                             </div>
                                             <p class="text-slate-400 text-lg leading-relaxed">
-                                                WOW Smart Manager는 단순한 관리를 넘어<br>
-                                                    데이터를 통한 비즈니스 통찰을 제공합니다.
+                                                중소 제조·유통을 위한 클라우드 ERP·MES.<br>
+                                                    재고, 판매, 출고, 생산추적을 한 곳에서 관리하세요.
                                             </p>
                                         </div>
 
@@ -407,8 +452,8 @@ app.get('/login', (c: Context) => {
                                                     <i class="fas fa-bolt text-xl"></i>
                                                 </div>
                                                 <div>
-                                                    <p class="text-white font-semibold">Real-time Stock Tracking</p>
-                                                    <p class="text-slate-500 text-sm">한 눈에 파악하는 정확한 재고 현황</p>
+                                                    <p class="text-white font-semibold">실시간 재고 추적</p>
+                                                    <p class="text-slate-500 text-sm">창고별 재고와 출고 현황을 한눈에 파악</p>
                                                 </div>
                                             </div>
                                             <div class="flex items-center gap-4 group">
@@ -416,8 +461,8 @@ app.get('/login', (c: Context) => {
                                                     <i class="fas fa-chart-line text-xl"></i>
                                                 </div>
                                                 <div>
-                                                    <p class="text-white font-semibold">Smart Sales Insights</p>
-                                                    <p class="text-slate-500 text-sm">성장을 위한 체계적인 판매 분석 리포트</p>
+                                                    <p class="text-white font-semibold">판매·생산 인사이트</p>
+                                                    <p class="text-slate-500 text-sm">매출, 재고, 제조 KPI를 한 대시보드에서</p>
                                                 </div>
                                             </div>
                                         </div>
@@ -534,9 +579,9 @@ app.get('/login', (c: Context) => {
                                 <!-- Pricing Section -->
                                 <div class="w-full max-w-6xl mt-32 animate-up" style="animation-delay: 0.2s">
                                     <div class="text-center mb-16">
-                                        <span class="text-teal-400 font-bold text-sm tracking-[0.3em] uppercase mb-4 block">Pricing Models</span>
+                                        <span class="text-teal-400 font-bold text-sm tracking-[0.3em] uppercase mb-4 block">요금제</span>
                                         <h2 class="text-4xl font-bold text-white mb-4">비즈니스에 맞는 최적의 플랜</h2>
-                                        <p class="text-slate-400">합리적인 요금으로 시작하는 스마트한 관리의 첫걸음</p>
+                                        <p class="text-slate-400">무료로 시작하고, 팀 규모에 따라 스탠다드·프로로 확장하세요</p>
                                     </div>
 
                                     <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
@@ -639,8 +684,9 @@ app.get('/login', (c: Context) => {
                                         </div>
                                     </div>
 
+${loginMarketingHtml()}
                                     <div class="mt-32 text-center text-xs text-slate-600 tracking-widest pb-10">
-                                        &copy; 2025 WOW-Smart Manager. All rights reserved.
+                                        &copy; 2026 ${SITE_NAME} · ${ORG_NAME}. All rights reserved.
                                     </div>
                                 </div>
                             </div>
@@ -755,9 +801,16 @@ app.get('/', (c: Context) => {
                     <!DOCTYPE html>
                     <html lang="ko">
                         <head>
-                            <meta charset="UTF-8">
-                                <meta name="viewport" content="width=device-width, initial-scale=1.0">
-                                    <title>WOW-Smart Manager</title>
+${seoHeadHtml({
+    title: DEFAULT_TITLE,
+    description: DEFAULT_DESCRIPTION,
+    path: '/',
+})}
+${jsonLdHtml({
+    title: DEFAULT_TITLE,
+    description: DEFAULT_DESCRIPTION,
+    path: '/',
+})}
                                     <script src="https://cdn.tailwindcss.com"></script>
                                     <link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" rel="stylesheet">
                                         <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
@@ -964,6 +1017,7 @@ app.get('/', (c: Context) => {
                                             </script>
                                         </head>
                                         <body class="text-slate-800 antialiased">
+                                            ${noscriptHomeHtml()}
                                             <div id="app" class="flex h-screen overflow-hidden">
                                                 <!-- 모바일 사이드바 오버레이 -->
                                                 <div id="sidebarOverlay" class="fixed inset-0 bg-black bg-opacity-50 z-20 hidden md:hidden transition-opacity" onclick="toggleSidebar()"></div>
